@@ -1,0 +1,8 @@
+# Your Todoist token lives here — never commit it
+.env
+.env.*
+
+node_modules/
+*.log
+.DS_Store
+Thumbs.db
