@@ -1,4 +1,4 @@
-// Day Planner — local server
+// Praxis — local server
 // No installs needed: uses only what ships with Node.js (v18 or newer).
 // Serves the app from ./public and relays requests to Todoist so your
 // API token stays in this folder (in the .env file) and never sits in the browser.
@@ -160,7 +160,7 @@ const server = http.createServer(async (req, res) => {
 
 server.on("error", (e) => {
   if (e.code === "EADDRINUSE") {
-    console.log(`\nDay Planner already seems to be running. Open http://localhost:${PORT}\n`);
+    console.log(`\nPraxis already seems to be running. Open http://localhost:${PORT}\n`);
     openBrowser();
     setTimeout(() => process.exit(0), 1500);
   } else {
@@ -176,7 +176,7 @@ function openBrowser() {
 }
 
 server.listen(PORT, HOST, () => {
-  console.log(`\n  Day Planner is running at http://localhost:${PORT}`);
+  console.log(`\n  Praxis is running at http://localhost:${PORT}`);
   console.log("  Keep this window open while you use it. Close it to stop.\n");
   openBrowser();
 });

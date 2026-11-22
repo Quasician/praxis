@@ -1,4 +1,4 @@
-// Day Planner — Day 1: connect Todoist, show Today / Overdue / Inbox.
+// Praxis — Day 1: connect Todoist, show Today / Overdue / Inbox.
 
 const $ = (s) => document.querySelector(s);
 
@@ -457,6 +457,6 @@ setInterval(() => { if (!$("#app").hidden && !state.loading) render(); }, 60000)
     const { connected } = await api("/api/status");
     connected ? showApp() : showSetup();
   } catch {
-    showSetup("Can't reach the local server. Is the Day Planner window still open?");
+    showSetup("Can't reach the local server. Is the Praxis window still open?");
   }
 })();
