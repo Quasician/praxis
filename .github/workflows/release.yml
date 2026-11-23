@@ -61,7 +61,22 @@ jobs:
           git ls-remote --exit-code --tags origin "refs/tags/$tag" >/dev/null && exit 0
           git tag "$tag" "$GITHUB_SHA"
           git push origin "refs/tags/$tag"
-      - name: Build and publish installer
+      # Create the release up front, as a draft. Without this, electron-builder's parallel
+      # uploads each create a release and the files end up split across duplicates.
+      # Installed copies don't see drafts, so they never pick up a half-uploaded release.
+      - name: Create draft release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          tag="${{ needs.version.outputs.tag }}"
+          gh release view "$tag" >/dev/null 2>&1 || gh release create "$tag" --draft --verify-tag --title "${tag#v}" --notes "Praxis ${tag#v}. Installed copies update automatically."
+      - name: Build and upload installer
         run: npm run release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Publish release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release edit "${{ needs.version.outputs.tag }}" --draft=false --latest
