@@ -51,7 +51,14 @@ export function TasksPane() {
           ) : (() => {
             const items = sortTasks(inbox.filter(keep), "inbox");
             return items.length
-              ? <ul className="tasks" style={{ marginTop: 6 }}>{items.map((t) => <TaskRow key={t.id} t={t} ctx="inbox" />)}</ul>
+              ? <>
+                  <button className="tray-banner dump-banner" id="file-inbox" onClick={() => openDialog("dump")}>
+                    <span className="tray-flag">✦</span>
+                    <span><b>{items.length} in your Inbox.</b> Let Claude file them: project, date, effort.</span>
+                    <span className="tray-go">Sort →</span>
+                  </button>
+                  <ul className="tasks" style={{ marginTop: 6 }}>{items.map((t) => <TaskRow key={t.id} t={t} ctx="inbox" />)}</ul>
+                </>
               : <div className="empty"><div className="big">Inbox zero.</div>Anything you capture on your phone lands here.</div>;
           })()}
       </div>

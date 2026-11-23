@@ -6,6 +6,7 @@ import fs from "fs";
 import path from "path";
 import { createStore } from "./store";
 import { eventsForRange, testCalendar } from "./calendar";
+import { ClaudeError, looksLikeKey, sortDump, verifyKey, type SortContext } from "./claude";
 
 export interface ServerOptions {
   dataDir: string;
@@ -62,7 +63,7 @@ export function createPraxisServer(opts: ServerOptions) {
     if (!isTrusted(req)) return sendJSON(res, 403, { error: "Forbidden" });
     const route = `${req.method} ${url.pathname}`;
 
-    if (route === "GET /api/status") return sendJSON(res, 200, { connected: Boolean(store.getToken()) });
+    if (route === "GET /api/status") return sendJSON(res, 200, { connected: Boolean(store.getToken()), claude: Boolean(store.getClaudeKey()) });
 
     if (route === "POST /api/token") {
       const { token } = JSON.parse((await readBody(req)) || "{}");
@@ -74,6 +75,26 @@ export function createPraxisServer(opts: ServerOptions) {
       return sendJSON(res, 200, { connected: true });
     }
     if (route === "DELETE /api/token") { store.setToken(null); return sendJSON(res, 200, { connected: false }); }
+
+    if (route === "POST /api/claude/key") {
+      let body: { key?: string };
+      try { body = JSON.parse(await readBody(req)); } catch { return sendJSON(res, 400, { error: "Invalid JSON" }); }
+      const key = String(body.key || "").trim();
+      if (!looksLikeKey(key)) return sendJSON(res, 400, { error: "That doesn't look like an Anthropic API key (it starts with sk-ant-)." });
+      try { await verifyKey(key); } catch (e) { return sendJSON(res, (e as ClaudeError).status || 400, { error: (e as Error).message }); }
+      store.setClaudeKey(key);
+      return sendJSON(res, 200, { claude: true });
+    }
+    if (route === "DELETE /api/claude/key") { store.setClaudeKey(null); return sendJSON(res, 200, { claude: false }); }
+    if (route === "POST /api/claude/sort") {
+      const key = store.getClaudeKey();
+      if (!key) return sendJSON(res, 401, { error: "Add your Anthropic API key first (⋯ → Claude)." });
+      let body: SortContext;
+      try { body = JSON.parse(await readBody(req)); } catch { return sendJSON(res, 400, { error: "Invalid JSON" }); }
+      if (typeof body?.text !== "string" || body.text.length > 20000 || (body.inbox && body.inbox.length > 80)) return sendJSON(res, 400, { error: "That's too much for one go. Try splitting it up." });
+      try { return sendJSON(res, 200, await sortDump(key, body)); }
+      catch (e) { return sendJSON(res, e instanceof ClaudeError ? e.status : 500, { error: (e as Error).message }); }
+    }
 
     if (route === "GET /api/config") return sendJSON(res, 200, store.readConfig());
     if (route === "POST /api/config") {

@@ -657,3 +657,44 @@ li:hover > .mini.ghost, .ms-steps li:hover .mini.ghost { opacity: 1; }
   .layout, .week-view, .areas-view:not(.side) { padding-left: 36px; padding-right: 36px; }
   .topbar { padding-left: 36px; padding-right: 36px; }
 }
+
+/* ---------- Brain dump ---------- */
+.dump-btn { white-space: nowrap; }
+.dump-dialog { width: min(900px, 94vw); }
+.dump-form { padding: 22px 24px 18px; display: flex; flex-direction: column; gap: 12px; max-height: 86vh; overflow-y: auto; }
+.dump-text { width: 100%; min-height: 260px; resize: vertical; font: 14px/1.55 var(--sans); color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; outline: none; }
+.dump-text:focus { border-color: var(--accent); }
+.dump-row { display: flex; align-items: center; gap: 8px; }
+.dump-hint { margin-right: auto; font-size: 12px; color: var(--ink-3); }
+.dump-error { margin: 0; color: var(--p4); font-size: 13px; }
+.dump-questions { font-size: 13px; color: var(--ink-2); background: color-mix(in srgb, var(--accent) 7%, var(--panel)); border-radius: 8px; padding: 8px 10px; display: flex; flex-direction: column; gap: 3px; }
+.dump-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.dump-item { --c: var(--accent); display: flex; gap: 10px; align-items: flex-start; padding: 8px 10px; border: 1px solid var(--line); border-left: 3px solid var(--c); border-radius: 9px; background: var(--bg); transition: opacity .15s; }
+.dump-item.off { opacity: .45; }
+.dump-include { margin-top: 6px; accent-color: var(--accent); }
+.dump-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 5px; }
+.dump-content { font: 500 14px var(--sans); color: var(--ink); background: transparent; border: 1px solid transparent; border-radius: 6px; padding: 3px 5px; margin-left: -6px; outline: none; }
+.dump-content:hover { border-color: var(--line); } .dump-content:focus { border-color: var(--accent); background: var(--panel); }
+.dump-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 12px; color: var(--ink-2); }
+.dump-meta select, .dump-meta input[type=date], .dump-meta input[type=time] { font: inherit; color: var(--ink); background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 2px 5px; color-scheme: light dark; }
+.dump-date { display: inline-flex; gap: 4px; }
+.dump-chip { display: inline-flex; align-items: center; gap: 4px; padding: 1px 4px 1px 8px; border-radius: 999px; background: var(--line-2); }
+.dump-chip button { border: 0; background: none; color: var(--ink-3); cursor: pointer; padding: 0 3px; font-size: 13px; }
+.dump-chip.deadline { background: color-mix(in srgb, var(--p4) 12%, transparent); color: var(--p4); }
+.dump-wp { display: inline-flex; border: 1px solid var(--line); border-radius: 7px; overflow: hidden; }
+.dump-wp button { border: 0; background: var(--panel); color: var(--ink-3); font: inherit; padding: 2px 8px; cursor: pointer; }
+.dump-wp button + button { border-left: 1px solid var(--line); }
+.dump-wp .wp-deep.on { background: color-mix(in srgb, var(--p4) 14%, var(--panel)); color: var(--p4); }
+.dump-wp .wp-medium.on { background: var(--line-2); color: var(--ink); }
+.dump-wp .wp-light.on { background: color-mix(in srgb, var(--p2) 14%, var(--panel)); color: var(--p2); }
+.dump-prio { font-weight: 600; color: var(--p3); } .dump-prio.p4 { color: var(--p4); }
+.dump-note { color: var(--ink-3); font-style: italic; }
+.spacer { flex: 1; }
+.claude-dialog { width: min(560px, 94vw); }
+.claude-form { padding: 22px 24px 18px; display: flex; flex-direction: column; gap: 12px; }
+.claude-steps { margin: 0; padding-left: 20px; font-size: 13px; color: var(--ink-2); display: flex; flex-direction: column; gap: 4px; }
+.claude-steps a { color: var(--accent); }
+.claude-ok { margin: 0; font-size: 13px; color: #2f8f5b; }
+#claude-key { font: 13px var(--mono, monospace); color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; outline: none; }
+#claude-key:focus { border-color: var(--accent); }
+.dump-dialog .claude-form { padding: 22px 24px 18px; }

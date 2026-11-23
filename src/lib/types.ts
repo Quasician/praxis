@@ -85,4 +85,4 @@ export interface Config {
   [key: string]: unknown;
 }
 
-export interface SyncCommand { type: string; uuid: string; args: Record<string, unknown> }
+export interface SyncCommand { type: string; uuid: string; temp_id?: string; args: Record<string, unknown> }

@@ -158,6 +158,7 @@ function refreshTrayMenu() {
   tray?.setContextMenu(Menu.buildFromTemplate([
     { label: "Open Praxis", click: showWindow },
     { label: "Quick add…", accelerator: QUICK_ADD, click: quickAdd },
+    { label: "Brain dump…", click: () => trigger("brain-dump") },
     { label: "Full screen", accelerator: "F11", type: "checkbox", checked: !!win?.isFullScreen(), click: () => { showWindow(); toggleFullScreen(); } },
     { type: "separator" },
     { label: "Open at login", type: "checkbox", checked: app.getLoginItemSettings().openAtLogin, click: (item) => { setOpenAtLogin(item.checked); } },
@@ -169,10 +170,12 @@ function refreshTrayMenu() {
 }
 
 // ---------- quick add from anywhere ----------
-function quickAdd() {
+/** Opens the window and fires a "praxis:<name>" event in it (quick-add, brain-dump, shutdown). */
+function trigger(name: string) {
   showWindow();
-  win?.webContents.executeJavaScript('window.dispatchEvent(new Event("praxis:quick-add"))').catch(() => undefined);
+  win?.webContents.executeJavaScript(`window.dispatchEvent(new Event("praxis:${name}"))`).catch(() => undefined);
 }
+const quickAdd = () => trigger("quick-add");
 function registerQuickAdd() {
   if (!globalShortcut.register(QUICK_ADD, quickAdd)) log("couldn't register", QUICK_ADD, "(another app may be using it)");
 }

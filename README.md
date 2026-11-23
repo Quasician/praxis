@@ -40,6 +40,7 @@ Your data stays on your computer in `%APPDATA%\Praxis` (`.env` holds the Todoist
 | `P` | Plan my day (auto-fill free time) |
 | `Enter` | Accept the proposed plan |
 | `D` / `W` / `A` | Day / Week / Areas view |
+| `B` | Brain dump |
 | `Ctrl+Shift+Space` | Quick add from anywhere (desktop app) |
 | `F11`, `Ctrl +/−/0` | Fullscreen, zoom (desktop app) |
 | `1` / `2` | Today / Inbox |
@@ -109,6 +110,18 @@ Link your Google Calendar under **⋯ → Calendars…** and your events appear 
 Praxis only reads the calendar. The link is a secret, so it's stored only in `praxis.config.json` on
 this computer (never committed) and masked on screen. Changes in Google can take a few minutes to show.
 Events that duplicate a Todoist task at the same time (from Todoist's own calendar sync) are hidden.
+
+## Brain dump (Claude)
+
+Press `B` or click **✦ Brain dump**, and type everything on your mind, as messy as you like. Claude turns it into
+tasks, each with a project, a date only if you implied one, a duration and an effort level (`@deep` / `@light`).
+Nothing is added until you've reviewed the list: edit anything, untick what you don't want, then **Add**. Everything
+goes to Todoist in one batch.
+
+- **File my Inbox:** on the Inbox tab, Claude suggests a project, effort and duration for everything sitting
+  there. Dates you already set are kept unless you change them.
+- Uses your own Anthropic API key (⋯ → **Claude…**). It's pay-as-you-go, and a dump costs well under a cent.
+  The key is stored next to your Todoist token and never reaches the window.
 
 ## Weekly planner
 
@@ -186,6 +199,6 @@ Pushes that don't change the version are only checked, not released.
 - ~~Rebuild on React + TypeScript, desktop app with auto-updates~~ ✓
 - ~~Weekly planner: Friday draft, look-back, every overdue task gets a home~~ ✓
 - ~~Ultrawide layout, fullscreen and zoom; releases publish themselves~~ ✓
-- Day 5: brain-dump inbox powered by Claude
+- ~~Day 5: brain-dump inbox with Claude~~ ✓
 - Day 6: end-of-day shutdown
 - Day 7: polish, more shortcuts, open it like a real app

@@ -1,5 +1,5 @@
 // Where Praxis keeps your data on disk:
-//   .env                → your Todoist API token
+//   .env                → your Todoist API token (and Anthropic API key, if you added one)
 //   praxis.config.json  → areas, planner settings, calendars, slip history
 // In the desktop app this folder is %APPDATA%/Praxis; when run from source it's the project folder.
 import fs from "fs";
@@ -29,14 +29,17 @@ export function createStore(dataDir: string) {
   }
 
   let env = readEnv();
+  function setSecret(name: string, value: string | null) {
+    const { [name]: _old, ...rest } = env;
+    env = value ? { ...rest, [name]: value } : rest;
+    writeEnv(env);
+  }
   return {
     dataDir,
     getToken: () => process.env.TODOIST_TOKEN || env.TODOIST_TOKEN || "",
-    setToken(token: string | null) {
-      const { TODOIST_TOKEN: _old, ...rest } = env;
-      env = token ? { ...rest, TODOIST_TOKEN: token } : rest;
-      writeEnv(env);
-    },
+    setToken(token: string | null) { setSecret("TODOIST_TOKEN", token); },
+    getClaudeKey: () => process.env.ANTHROPIC_API_KEY || env.ANTHROPIC_API_KEY || "",
+    setClaudeKey(key: string | null) { setSecret("ANTHROPIC_API_KEY", key); },
     readConfig(): Config {
       try { return JSON.parse(fs.readFileSync(configFile, "utf8")); } catch { return {}; }
     },
