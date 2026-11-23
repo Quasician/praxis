@@ -58,6 +58,19 @@ Praxis can fill your free time for you, **hardest work first**:
 With **auto** on (the default), Praxis proposes the plan the first time you open it each day.
 Change any of this in **⋯ → Planner settings**.
 
+## Calendar
+
+Link your Google Calendar under **⋯ → Calendars…** and your events appear on the timeline;
+"Plan my day" schedules around them (events marked *free* in Google don't block time).
+
+1. In [Google Calendar settings](https://calendar.google.com/calendar/r/settings), click a calendar
+   under **Settings for my calendars**.
+2. Copy **Integrate calendar → Secret address in iCal format** and paste it into Praxis.
+
+Praxis only reads the calendar. The link is a secret, so it's stored only in `praxis.config.json` on
+this computer (never committed) and masked on screen. Changes in Google can take a few minutes to show.
+Events that duplicate a Todoist task at the same time (from Todoist's own calendar sync) are hidden.
+
 ## Areas and milestones
 
 Switch to **Areas** (top of the window, or press `A`) for the bigger picture.
@@ -84,7 +97,8 @@ Switch to **Areas** (top of the window, or press `A`) for the bigger picture.
 
 ## Files
 
-- `server.js`: local server that relays requests to the Todoist API (v1). No npm install needed.
+- `server.js`: local server that relays requests to the Todoist API (v1) and reads your calendars. No npm install needed.
+- `lib/ics.js`: small iCalendar reader (time zones, repeating events, exceptions)
 - `public/`: the app (HTML, CSS, JS)
 
 ## Roadmap
@@ -92,7 +106,8 @@ Switch to **Areas** (top of the window, or press `A`) for the bigger picture.
 - ~~Day 2: drag tasks onto the timeline to time-block them~~ ✓
 - ~~Day 3: life areas and milestones~~ ✓
 - ~~Auto-planner: fills free time, hardest tasks first~~ ✓
-- Day 4: Google Calendar events on the timeline (and the planner works around them)
+- ~~Day 4: Google Calendar events on the timeline (and the planner works around them)~~ ✓
+- Next: "Needs a decision" tray so overdue tasks never get lost
 - Day 5: brain-dump inbox powered by Claude
-- Day 6: end-of-day shutdown and a weekly review that checks in on each area
+- Day 6: end-of-day shutdown, plus the Friday weekly plan and review (zero overdue every week)
 - Day 7: polish, more shortcuts, open it like a real app

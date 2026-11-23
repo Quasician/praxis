@@ -7,6 +7,7 @@ const http = require("http");
 const fs = require("fs");
 const path = require("path");
 const { exec } = require("child_process");
+const ics = require("./lib/ics");
 
 const PORT = Number(process.env.PORT) || 4321;
 const HOST = "127.0.0.1";
@@ -25,6 +26,34 @@ function writeConfig(cfg) {
   fs.writeFileSync(tmp, JSON.stringify(cfg, null, 2) + "\n");
   fs.renameSync(tmp, CONFIG_FILE);
 }
+
+// ---------- calendars (Google Calendar "secret address in iCal format") ----------
+const CAL_CACHE_MS = 5 * 60 * 1000;
+const calCache = new Map(); // url -> { at, text }
+function normalizeCalUrl(u) {
+  const s = String(u || "").trim().replace(/^webcal:\/\//i, "https://");
+  let url;
+  try { url = new URL(s); } catch { return null; }
+  if (url.protocol === "https:") return url.toString();
+  // Test-only: allow a local http calendar when PRAXIS_TEST_HTTP_CAL=1.
+  if (process.env.PRAXIS_TEST_HTTP_CAL === "1" && url.protocol === "http:" && ["127.0.0.1", "localhost"].includes(url.hostname)) return url.toString();
+  return null;
+}
+async function fetchCalendarText(url, { force = false } = {}) {
+  const hit = calCache.get(url);
+  if (!force && hit && Date.now() - hit.at < CAL_CACHE_MS) return hit.text;
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 15000);
+  try {
+    const r = await fetch(url, { signal: ctrl.signal, headers: { "User-Agent": "Praxis/1.0" } });
+    if (!r.ok) throw new Error(r.status === 404 ? "Calendar not found. Check the link (it may have been reset)." : `Calendar server said ${r.status}`);
+    const text = await r.text();
+    if (!/BEGIN:VCALENDAR/.test(text)) throw new Error("That link didn't return a calendar (.ics). Use the “Secret address in iCal format”.");
+    calCache.set(url, { at: Date.now(), text });
+    return text;
+  } finally { clearTimeout(timer); }
+}
+const localTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
 // ---------- token storage (.env in this folder) ----------
 function readEnv() {
@@ -145,6 +174,47 @@ const server = http.createServer(async (req, res) => {
         if (!cfg || typeof cfg !== "object" || Array.isArray(cfg)) return sendJSON(res, 400, { error: "Settings must be an object" });
         writeConfig(cfg);
         return sendJSON(res, 200, cfg);
+      }
+
+      // Calendar events for a time range, from every enabled calendar
+      if (url.pathname === "/api/calendar" && req.method === "GET") {
+        const from = Date.parse(url.searchParams.get("from")), to = Date.parse(url.searchParams.get("to"));
+        if (!Number.isFinite(from) || !Number.isFinite(to) || to <= from || to - from > 62 * 86400000) {
+          return sendJSON(res, 400, { error: "from/to must be a valid range of at most 62 days" });
+        }
+        const force = url.searchParams.get("refresh") === "1";
+        const cals = (readConfig().calendars || []).filter((c) => c.enabled !== false && c.url);
+        const events = [], errors = [];
+        await Promise.all(cals.map(async (c) => {
+          const u = normalizeCalUrl(c.url);
+          if (!u) { errors.push({ id: c.id, name: c.name, error: "Invalid link" }); return; }
+          try {
+            const text = await fetchCalendarText(u, { force });
+            for (const e of ics.eventsBetween(text, from, to, localTz).events) {
+              events.push({ ...e, calendarId: c.id, calendar: c.name, color: c.color });
+            }
+          } catch (e) {
+            errors.push({ id: c.id, name: c.name, error: e.name === "AbortError" ? "Timed out" : e.message });
+          }
+        }));
+        events.sort((a, b) => a.start.localeCompare(b.start));
+        return sendJSON(res, 200, { events, errors, calendars: cals.length });
+      }
+
+      // Try a calendar link before saving it
+      if (url.pathname === "/api/calendar/test" && req.method === "POST") {
+        let body;
+        try { body = JSON.parse(await readBody(req)); } catch { return sendJSON(res, 400, { error: "Invalid JSON" }); }
+        const u = normalizeCalUrl(body.url);
+        if (!u) return sendJSON(res, 400, { error: "Paste the full https:// link (the “Secret address in iCal format”)." });
+        try {
+          const text = await fetchCalendarText(u, { force: true });
+          const now = Date.now();
+          const { name, events } = ics.eventsBetween(text, now, now + 7 * 86400000, localTz);
+          return sendJSON(res, 200, { ok: true, name, upcoming: events.length, next: events.slice(0, 3).map((e) => ({ title: e.title, start: e.start, allDay: e.allDay })) });
+        } catch (e) {
+          return sendJSON(res, 400, { error: e.name === "AbortError" ? "Timed out reaching the calendar." : e.message });
+        }
       }
 
       // Relay everything under /api/todoist/* to Todoist

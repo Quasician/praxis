@@ -508,3 +508,41 @@ li:hover > .mini.ghost, .ms-steps li:hover .mini.ghost { opacity: 1; }
 .day-pick { flex-direction: row !important; cursor: pointer; border: 1px solid var(--line); border-radius: 8px; padding: 5px 9px; font-size: 12.5px; user-select: none; }
 .day-pick input { display: none; }
 .day-pick.on { background: var(--accent); border-color: var(--accent); color: #fff !important; }
+
+/* ---------- Calendar events ---------- */
+.tl-block.event {
+  cursor: default; z-index: 2;
+  background: color-mix(in srgb, var(--c) 18%, var(--panel));
+  border: 1px solid color-mix(in srgb, var(--c) 40%, transparent);
+  border-left: 3px solid var(--c);
+}
+.tl-block.event.free { background: repeating-linear-gradient(135deg, color-mix(in srgb, var(--c) 10%, var(--panel)) 0 6px, var(--panel) 6px 12px); }
+.tl-block.event:hover { box-shadow: none; }
+.ev-icon { flex: none; color: var(--c); margin-top: 2px; }
+.tl-block.event.compact .ev-icon { margin-top: 0; }
+.tl-allday { display: inline-flex; flex-wrap: wrap; gap: 4px; }
+.allday-chip {
+  font-size: 11.5px; font-weight: 500; padding: 1px 8px; border-radius: 999px;
+  background: color-mix(in srgb, var(--c) 16%, var(--panel)); border: 1px solid color-mix(in srgb, var(--c) 35%, transparent);
+}
+
+/* calendars dialog */
+.cal-list { display: flex; flex-direction: column; gap: 6px; }
+.cal-row { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 10px; font-size: 13px; }
+.cal-dot { width: 10px; height: 10px; border-radius: 50%; flex: none; }
+.cal-name { font-weight: 600; }
+.cal-url { color: var(--ink-3); font-size: 12px; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cal-toggle { flex-direction: row !important; align-items: center; gap: 5px !important; }
+.cal-help { font-size: 12.5px; color: var(--ink-2); border: 1px solid var(--line-2); border-radius: 10px; padding: 8px 12px; }
+.cal-help summary { cursor: pointer; font-weight: 600; color: var(--ink); }
+.cal-help ol { margin: 8px 0 4px; padding-left: 20px; }
+.cal-help p { margin: 4px 0 2px; color: var(--ink-3); }
+.cal-add { display: flex; gap: 6px; flex-wrap: wrap; }
+.cal-add #cal-url { flex: 1 1 100%; }
+.cal-add #cal-name { flex: 1; }
+.cal-add select { font: inherit; font-size: 13px; color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 6px 8px; }
+.cal-add input { font: inherit; font-size: 13.5px; color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 7px 9px; outline: none; }
+.cal-add input:focus { border-color: var(--accent); }
+.cal-msg { margin: 0; font-size: 12.5px; min-height: 1.2em; }
+.cal-msg.ok { color: var(--p2); }
+.cal-msg.err { color: var(--p4); }

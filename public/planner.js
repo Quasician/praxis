@@ -54,7 +54,9 @@ function freeIntervals(cfg) {
   const busy = [];
   const work = workBand(cfg);
   if (work) busy.push([work[0], work[1] + cfg.afterWork]);
-  for (const b of layoutBlocks(splitToday(state.today).today)) busy.push([b.start - cfg.gap, b.end + cfg.gap]);
+  const todays = splitToday(state.today).today;
+  // Existing task blocks and calendar events (except ones marked "free") are busy time.
+  for (const b of layoutBlocks(todays, visibleEvents(todays).filter((e) => !e.transparent))) busy.push([b.start - cfg.gap, b.end + cfg.gap]);
   let free = start < end ? [[start, end]] : [];
   for (const [bs, be] of busy) {
     free = free.flatMap(([fs, fe]) => (be <= fs || bs >= fe) ? [[fs, fe]] : [[fs, bs], [be, fe]]);

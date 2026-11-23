@@ -21,6 +21,8 @@ const state = {
   inbox: [],
   loading: true,
   lastSync: null,
+  events: [],             // today's calendar events (from your linked calendars)
+  calErrors: [],
 };
 
 // ---------- API ----------
@@ -107,10 +109,17 @@ async function loadAll({ quiet = false } = {}) {
     const inbox = projects.find((p) => p.inbox_project || p.is_inbox_project) || projects.find((p) => p.name === "Inbox");
     state.inboxId = inbox ? inbox.id : null;
 
-    const [today, inboxTasks] = await Promise.all([
+    const dayStart = startOfToday(), dayEnd = new Date(+dayStart + 864e5);
+    const [today, inboxTasks, cal] = await Promise.all([
       fetchAll(`/tasks/filter?query=${encodeURIComponent("today | overdue")}`),
       state.inboxId ? fetchAll(`/tasks?project_id=${encodeURIComponent(state.inboxId)}`) : Promise.resolve([]),
+      api(`/api/calendar?from=${encodeURIComponent(dayStart.toISOString())}&to=${encodeURIComponent(dayEnd.toISOString())}${quiet ? "" : "&refresh=1"}`)
+        .catch((e) => ({ events: [], errors: [{ name: "Calendar", error: e.message }] })),
     ]);
+    state.events = cal.events || [];
+    const newErrors = (cal.errors || []).map((x) => `${x.name}: ${x.error}`);
+    if (newErrors.join() !== state.calErrors.join() && newErrors.length) toast(`Couldn't load calendar ${newErrors[0]}`);
+    state.calErrors = newErrors;
     state.today = today.filter((t) => !t.checked && !t.is_deleted);
     state.inbox = inboxTasks.filter((t) => !t.checked && !t.is_deleted);
     state.loading = false;
@@ -290,9 +299,35 @@ function blockMinutes(t) {
 }
 
 // Today's timed tasks as blocks: {task, start, dur}, with side-by-side columns for overlaps.
-function layoutBlocks(todayTasks) {
+// Calendar events worth drawing: timed, today, and not a copy of a Todoist task that's
+// already on the timeline (Todoist's Google Calendar sync creates such copies).
+const normTitle = (s) => plain(s).toLowerCase().replace(/[^\p{L}\p{N} ]+/gu, " ").replace(/\s+/g, " ").trim();
+function visibleEvents(todayTasks = splitToday(state.today).today) {
+  const timed = todayTasks.map((t) => ({ t, d: parseDue(t.due) })).filter((x) => x.d && x.d.hasTime);
+  return state.events.filter((e) => {
+    if (e.allDay) return false;
+    const es = new Date(e.start), title = normTitle(e.title);
+    return !timed.some(({ t, d }) => {
+      const tt = normTitle(t.content);
+      return Math.abs(d.d - es) <= 10 * 60000 && tt.length >= 3 && title.length >= 3 && (tt.includes(title) || title.includes(tt));
+    });
+  });
+}
+// All-day events are calendar dates (end date exclusive), so compare dates, not instants.
+const allDayEvents = () => { const d = ymd(new Date()); return state.events.filter((e) => e.allDay && e.date <= d && d < (e.endDate || e.date)); };
+
+function layoutBlocks(todayTasks, events = []) {
   const now = new Date();
   const items = [];
+  for (const e of events) {
+    const s = new Date(e.start), en = new Date(e.end);
+    let start = sameDay(s, now) ? minOfDay(s) : 0;
+    let end = sameDay(en, now) ? minOfDay(en) : 24 * 60;
+    if (s > now && !sameDay(s, now)) continue;
+    start = Math.max(start, TL_START * 60); end = Math.min(end, TL_END * 60);
+    if (end - start < 5) continue;
+    items.push({ event: e, start, dur: end - start, end });
+  }
   for (const t of todayTasks) {
     const due = parseDue(t.due);
     if (!due || !due.hasTime || !sameDay(due.d, now)) continue;
@@ -346,6 +381,22 @@ function blockHTML({ task, start, dur, col = 0, cols = 1 }) {
     </div>`;
 }
 
+function eventHTML({ event: e, start, dur, col = 0, cols = 1 }) {
+  const now = minOfDay(new Date());
+  const h = Math.max((dur / 60) * hourPx() - 2, 18);
+  const compact = dur < 45;
+  return `
+    <div class="tl-block event ${start + dur <= now ? "past" : ""} ${compact ? "compact" : ""} ${e.transparent ? "free" : ""}"
+         style="top:${minToY(start)}px;height:${h}px;--c:${esc(e.color || "#8a8178")};left:calc(${(col / cols) * 100}% + 4px);width:calc(${100 / cols}% - 8px)"
+         title="${esc(e.title)} · ${esc(fmtMin(start))}–${esc(fmtMin(start + dur))}${e.location ? " · " + esc(e.location) : ""}${e.calendar ? " (" + esc(e.calendar) + ")" : ""}">
+      <svg class="ev-icon" viewBox="0 0 24 24" width="11" height="11"><rect x="3" y="5" width="18" height="16" rx="3" fill="none" stroke="currentColor" stroke-width="2.2"/><path d="M3 10h18M8 3v4M16 3v4" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>
+      <div class="blk-body">
+        <div class="blk-title">${esc(e.title)}</div>
+        <div class="blk-time">${esc(fmtMin(start))} – ${esc(fmtMin(start + dur))}${!compact && e.location ? ` · ${esc(e.location)}` : ""}</div>
+      </div>
+    </div>`;
+}
+
 let scrolledTimeline = false;
 function renderTimeline(todayTasks) {
   const now = new Date();
@@ -354,17 +405,19 @@ function renderTimeline(todayTasks) {
     const label = new Date(2000, 0, 1, h).toLocaleTimeString([], { hour: "numeric" });
     hours.push(`<div class="tl-hour"><span>${esc(label)}</span></div>`);
   }
-  const blocks = layoutBlocks(todayTasks);
+  const blocks = layoutBlocks(todayTasks, visibleEvents(todayTasks));
   const nowY = minToY(minOfDay(now));
   const nowLine = now.getHours() >= TL_START ? `<div class="tl-now" style="top:${nowY}px"></div>` : "";
 
   const tl = $("#timeline");
   const overlay = typeof plannerTimelineHTML === "function" ? plannerTimelineHTML() : "";
-  tl.innerHTML = `<div class="tl-grid">${hours.join("")}${overlay}${blocks.map(blockHTML).join("")}${nowLine}</div>`;
+  tl.innerHTML = `<div class="tl-grid">${hours.join("")}${overlay}${blocks.map((b) => (b.event ? eventHTML(b) : blockHTML(b))).join("")}${nowLine}</div>`;
+  const allDay = allDayEvents();
+  $("#tl-allday").innerHTML = allDay.map((e) => `<span class="allday-chip" style="--c:${esc(e.color || "var(--ink-3)")}" title="${esc(e.calendar || "")}">${esc(e.title)}</span>`).join("");
 
   // Header summary: what's still planned for the rest of today.
   const nowMin = minOfDay(now);
-  const ahead = blocks.filter((b) => b.end > nowMin);
+  const ahead = blocks.filter((b) => b.task && b.end > nowMin);
   const mins = ahead.reduce((s, b) => s + (b.end - Math.max(b.start, nowMin)), 0);
   $("#tl-summary").textContent = state.loading ? "" :
     ahead.length ? `${ahead.length} block${ahead.length > 1 ? "s" : ""} ahead · ${fmtSpan(mins)} planned` : "Nothing planned yet";

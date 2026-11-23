@@ -49,6 +49,7 @@
           </button>
           <div id="menu" class="menu" hidden>
             <button id="planner-settings-btn">Planner settings…</button>
+            <button id="calendars-btn">Calendars…</button>
             <a href="https://app.todoist.com/app/today" target="_blank" rel="noopener">Open Todoist</a>
             <button id="disconnect-btn">Disconnect Todoist</button>
           </div>
@@ -79,6 +80,7 @@
         <div class="timeline-head">
           <h2>Your day</h2>
           <span id="tl-summary" class="tl-summary"></span>
+          <span id="tl-allday" class="tl-allday"></span>
           <button id="plan-btn" class="plan-btn" title="Fill your free time, hardest tasks first (P)">
             <svg viewBox="0 0 24 24" width="15" height="15"><path fill="currentColor" d="M12 2l1.8 5.2L19 9l-5.2 1.8L12 16l-1.8-5.2L5 9l5.2-1.8zM19 14l.9 2.6 2.6.9-2.6.9L19 21l-.9-2.6-2.6-.9 2.6-.9z"/></svg>
             Plan my day
@@ -149,10 +151,42 @@
     </form>
   </dialog>
 
+  <!-- Calendars -->
+  <dialog id="calendars-dialog" class="dialog">
+    <form method="dialog" id="calendars-form" class="planner-form">
+      <h2>Calendars</h2>
+      <p class="dialog-sub">Show your Google Calendar events on the timeline. The planner works around them.</p>
+      <div id="cal-list" class="cal-list"></div>
+
+      <details class="cal-help" open>
+        <summary>How to get your calendar's private link</summary>
+        <ol>
+          <li>Open <a href="https://calendar.google.com/calendar/r/settings" target="_blank" rel="noopener">Google Calendar settings</a> on the web.</li>
+          <li>On the left, under <b>Settings for my calendars</b>, click the calendar.</li>
+          <li>Scroll to <b>Integrate calendar</b> and copy <b>Secret address in iCal format</b>.</li>
+        </ol>
+        <p>Anyone with that link can see the calendar, so it's only stored on this computer (in <code>praxis.config.json</code>). Some work accounts hide this option.</p>
+      </details>
+
+      <div class="cal-add">
+        <input id="cal-url" type="password" placeholder="Paste the secret iCal address (https://calendar.google.com/…/basic.ics)" autocomplete="off" spellcheck="false" />
+        <input id="cal-name" type="text" placeholder="Name (optional)" />
+        <select id="cal-color" aria-label="Color"></select>
+        <button type="button" id="cal-add-btn" class="primary">Test &amp; add</button>
+      </div>
+      <p id="cal-msg" class="cal-msg" role="status"></p>
+
+      <div class="dialog-actions">
+        <button value="close" class="ghost-btn">Done</button>
+      </div>
+    </form>
+  </dialog>
+
   <div id="toast" class="toast" hidden></div>
 
   <script src="app.js"></script>
   <script src="areas.js"></script>
   <script src="planner.js"></script>
+  <script src="calendars.js"></script>
 </body>
 </html>
