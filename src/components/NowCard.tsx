@@ -69,7 +69,8 @@ export function NowCard({ mini = false }: { mini?: boolean }) {
     if (!focus || left > 0 || warned.current === focus.startedAt) return;
     warned.current = focus.startedAt;
     toast(`Time's up on “${plain(focus.content).slice(0, 50)}”. Done, or 5 more minutes?`);
-    try { if ("Notification" in window && Notification.permission === "granted") new Notification("Praxis: time's up", { body: plain(focus.content) }); } catch { /* ignore */ }
+    // The desktop app shows its own reminder on top of everything; in a browser, a notification.
+    try { if (!isDesktop() && "Notification" in window && Notification.permission === "granted") new Notification("Praxis: time's up", { body: plain(focus.content) }); } catch { /* ignore */ }
   }, [left <= 0, focus?.startedAt]); // eslint-disable-line
 
   if (!task) {

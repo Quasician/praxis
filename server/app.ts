@@ -13,6 +13,8 @@ export interface ServerOptions {
   dataDir: string;
   staticDir: string;
   todoistBase?: string;
+  /** Only in the desktop app: reminders that float above other windows. */
+  desktop?: { nudge(action: string, key: string): void; test(): void };
 }
 
 const MIME: Record<string, string> = {
@@ -93,6 +95,15 @@ export function createPraxisServer(opts: ServerOptions) {
       const p = body.provider === "cli" || body.provider === "api" ? body.provider : "auto";
       store.writeConfig({ ...store.readConfig(), ai: { provider: p } });
       return sendJSON(res, 200, { provider: p });
+    }
+
+    if (route === "POST /api/desktop/nudge" || route === "POST /api/desktop/test-nudge") {
+      if (!opts.desktop) return sendJSON(res, 404, { error: "Only in the desktop app." });
+      if (route.endsWith("test-nudge")) { opts.desktop.test(); return sendJSON(res, 200, { ok: true }); }
+      let body: { action?: string; key?: string };
+      try { body = JSON.parse((await readBody(req)) || "{}"); } catch { return sendJSON(res, 400, { error: "Invalid JSON" }); }
+      opts.desktop.nudge(String(body.action || "").slice(0, 20), String(body.key || "").slice(0, 200));
+      return sendJSON(res, 200, { ok: true });
     }
 
     if (route === "POST /api/token") {

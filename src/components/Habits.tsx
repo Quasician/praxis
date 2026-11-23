@@ -3,13 +3,16 @@ import { habitStreak } from "../domain/progress";
 import { parseDue, sameDay, minOfDay, ymd } from "../lib/dates";
 import { plain } from "../lib/text";
 import type { Task } from "../lib/types";
+import type { Slot } from "../domain/nudges";
+import { blockMinutes } from "../lib/tasks";
+import { completeTask, updateConfigFresh } from "../data/actions";
 import { AWAY_DAYS, PILE, daysAway, freshStart, overdueNow } from "../data/habits";
 import { proposePlan } from "../data/planActions";
 import { useCompleted } from "../data/queries";
 import { useData } from "../data/useData";
 import { useUi } from "../state/ui";
 import { Dialog } from "./common";
-import { finishNow } from "./NowCard";
+import { FOCUS_MIN, finishNow } from "./NowCard";
 
 // ---------- never-miss-twice streak ----------
 export function StreakChip() {
@@ -77,6 +80,7 @@ export function useBlockNotifications() {
   const { today } = useData();
   const sent = useRef(new Set<string>());
   useEffect(() => {
+    if (isDesktop()) return; // the desktop app shows its own reminders, on top of full-screen apps too
     const tick = () => {
       if (!("Notification" in window) || Notification.permission !== "granted") return;
       const now = new Date(), m = minOfDay(now);
@@ -155,4 +159,42 @@ export function Celebration() {
   </>;
 }
 
-declare global { interface Window { __praxisToday?: () => Task[] } }
+declare global { interface Window { __praxisToday?: () => Task[]; __praxisSchedule?: () => Slot[] } }
+
+// ---------- the desktop app's reminders ----------
+/** Lets the desktop app read today's timed blocks and act on its reminder buttons (Done, Start, +5 min). */
+export function useDesktopBridge() {
+  useEffect(() => {
+    if (!isDesktop()) return;
+    const todayTasks = () => window.__praxisToday?.() || [];
+    window.__praxisSchedule = () => {
+      const now = new Date();
+      return todayTasks().flatMap((t) => {
+        const d = parseDue(t.due);
+        if (!d?.hasTime || !sameDay(d.d, now)) return [];
+        const start = d.d.getTime();
+        return [{ id: t.id, title: plain(t.content), start, end: start + blockMinutes(t) * 60_000 }];
+      });
+    };
+    const find = (e: Event) => todayTasks().find((t) => t.id === (e as CustomEvent<string>).detail);
+    const onDone = (e: Event) => { const t = find(e); if (t) completeTask(t); };
+    const onStart = (e: Event) => {
+      const t = find(e);
+      if (!t) return;
+      useUi.getState().setNowTask(t.id);
+      updateConfigFresh((c) => ({ ...c, focus: { taskId: t.id, content: t.content, startedAt: new Date().toISOString(), minutes: FOCUS_MIN } }));
+    };
+    const onMore = () => updateConfigFresh((c) => (c.focus ? { ...c, focus: { ...c.focus, minutes: Math.ceil((Date.now() - Date.parse(c.focus.startedAt)) / 60_000) + 5 } } : c));
+    const onStop = () => updateConfigFresh((c) => ({ ...c, focus: null }));
+    window.addEventListener("praxis:complete", onDone);
+    window.addEventListener("praxis:start-focus", onStart);
+    window.addEventListener("praxis:focus-more", onMore);
+    window.addEventListener("praxis:focus-stop", onStop);
+    return () => {
+      window.removeEventListener("praxis:complete", onDone);
+      window.removeEventListener("praxis:start-focus", onStart);
+      window.removeEventListener("praxis:focus-more", onMore);
+      window.removeEventListener("praxis:focus-stop", onStop);
+    };
+  }, []);
+}

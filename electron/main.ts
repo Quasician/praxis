@@ -4,11 +4,12 @@
 //   • Ctrl+Shift+Space from anywhere → quick add
 //   • Opens at login (toggle in the tray menu)
 //   • Updates itself from GitHub Releases in the background
-import { app, BrowserWindow, dialog, globalShortcut, Menu, nativeImage, nativeTheme, Notification, screen, shell, Tray } from "electron";
+import { app, BrowserWindow, dialog, globalShortcut, Menu, nativeImage, nativeTheme, Notification, powerMonitor, screen, shell, Tray } from "electron";
 import { autoUpdater } from "electron-updater";
 import fs from "fs";
 import path from "path";
 import { createPraxisServer } from "../server/app";
+import { dueNudges, reminderCfg, testNudge, type Nudge, type Slot } from "../src/domain/nudges";
 
 const QUICK_ADD = "CommandOrControl+Shift+Space";
 const UPDATE_EVERY = 30 * 60 * 1000; // plus a check whenever the window is brought up
@@ -46,8 +47,12 @@ if (!app.requestSingleInstanceLock()) {
 }
 
 async function start() {
-  const { listen, store } = createPraxisServer({ dataDir: app.getPath("userData"), staticDir: rendererDir });
-  watchShutdown(store.readConfig);
+  const { listen, store } = createPraxisServer({
+    dataDir: app.getPath("userData"), staticDir: rendererDir,
+    desktop: { nudge: (action, key) => onNudgeAction(action, key), test: () => showNudge(testNudge(), true) },
+  });
+  readConfig = store.readConfig;
+  startNudger();
   const port = await listen(Number(process.env.PRAXIS_PORT) || 4321);
   baseUrl = `http://localhost:${port}`;
   log("server on", baseUrl);
@@ -89,7 +94,8 @@ function createWindow() {
     backgroundColor: nativeTheme.shouldUseDarkColors ? "#171513" : "#f6f3ee",
     autoHideMenuBar: true,
     show: false,
-    webPreferences: { contextIsolation: true, sandbox: true },
+    // Keep running at full speed while tucked in the tray, so today's plan stays fresh for reminders.
+    webPreferences: { contextIsolation: true, sandbox: true, backgroundThrottling: false },
   });
   win.removeMenu();
   win.loadURL(baseUrl);
@@ -195,6 +201,7 @@ function refreshTrayMenu() {
     { label: "Shut down the day…", click: () => trigger("shutdown") },
     { label: "Now (always on top)", click: () => openMini() },
     { label: "Mark Now done", accelerator: NOW_DONE, click: nowDone },
+    { label: "Show a test reminder", click: () => showNudge(testNudge(), true) },
     { label: "Full screen", accelerator: "F11", type: "checkbox", checked: !!win?.isFullScreen(), click: () => { showWindow(); toggleFullScreen(); } },
     { type: "separator" },
     { label: "Open at login", type: "checkbox", checked: app.getLoginItemSettings().openAtLogin, click: (item) => { setOpenAtLogin(item.checked); } },
@@ -216,22 +223,140 @@ const quickAdd = () => trigger("quick-add");
 const NOW_DONE = "CommandOrControl+Alt+D";
 const nowDone = () => win?.webContents.executeJavaScript('window.dispatchEvent(new Event("praxis:now-done"))').catch(() => undefined);
 
-// ---------- evening reminder ----------
-/** When Praxis is tucked away in the tray at shut-down time, a Windows notification nudges you (once a day). */
-function watchShutdown(readConfig: () => Record<string, unknown>) {
-  let nudged = "";
-  setInterval(() => {
-    const planner = (readConfig().planner || {}) as { shutdownAt?: string; lastShutdown?: string | null };
-    const now = new Date();
-    const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
-    const [h, m] = (planner.shutdownAt || "21:00").split(":").map(Number);
-    if (nudged === today || planner.lastShutdown === today || now.getHours() * 60 + now.getMinutes() < h * 60 + m) return;
-    nudged = today;
-    if (win?.isVisible() && win.isFocused()) return; // the in-app pill covers it
-    const n = new Notification({ title: "Shut down the day", body: "Two minutes: what got done, a home for the leftovers, a look at tomorrow." });
-    n.on("click", () => trigger("shutdown"));
-    n.show();
-  }, 60_000);
+// ---------- reminders that reach you in full-screen apps ----------
+// Windows turns on Do Not Disturb automatically while an app is full screen, which hides ordinary
+// notifications. So Praxis shows its own small card instead: always on top (above full-screen windows),
+// never taking keyboard focus, on the monitor your mouse is on.
+let readConfig: () => Record<string, unknown> = () => ({});
+let nudgeWin: BrowserWindow | null = null;
+let current: Nudge | null = null;
+const sent = new Set<string>();
+const snoozed: { at: number; nudge: Nudge }[] = [];
+let lastNudgeAt = Date.now();
+let activeSince = Date.now();
+const CARD = { width: 560, height: 176 };
+const PILL = { width: 340, height: 60 };
+const ymdOf = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+
+async function todaySlots(): Promise<Slot[]> {
+  if (!win || win.isDestroyed()) return [];
+  try {
+    const list = await win.webContents.executeJavaScript("window.__praxisSchedule ? window.__praxisSchedule() : []");
+    return Array.isArray(list) ? list.filter((x) => x && typeof x.id === "string" && Number.isFinite(x.start) && Number.isFinite(x.end)) : [];
+  } catch { return []; }
+}
+
+function startNudger() {
+  const tick = async () => {
+    try {
+      const now = new Date();
+      // Away from the computer for 5+ minutes resets "how long you've been going".
+      if (powerMonitor.getSystemIdleTime() > 300) activeSince = Date.now();
+      const cfg = readConfig();
+      const r = reminderCfg(cfg.reminders as never);
+      const planner = (cfg.planner || {}) as { shutdownAt?: string; dayEnd?: string; lastShutdown?: string | null };
+      const list = dueNudges({
+        now, slots: await todaySlots(), r,
+        shutdownAt: planner.shutdownAt || "21:00", windDownAt: planner.dayEnd || "21:30",
+        shutdownDone: planner.lastShutdown === ymdOf(now),
+        focus: (cfg.focus as never) || null, lastNudgeAt, activeSince,
+      }, sent);
+      // Reminders you pushed back ("In 10 min") come back first.
+      const due = snoozed.findIndex((x) => x.at <= now.getTime());
+      if (due >= 0) list.unshift(snoozed.splice(due, 1)[0].nudge);
+      // You're looking at Praxis already: skip the gentle ones.
+      const looking = !!win?.isVisible() && win.isFocused();
+      const next = list.find((n) => !(looking && (n.kind === "heads-up" || n.kind === "time-check")));
+      for (const n of list) sent.add(n.key);
+      if (next) showNudge(next, false);
+    } catch (e) { log("nudge tick failed", (e as Error)?.message || e); }
+  };
+  setTimeout(tick, 5000);
+  setInterval(tick, 20_000);
+  // Coming back from sleep: check straight away.
+  powerMonitor.on("resume", () => { activeSince = Date.now(); setTimeout(tick, 3000); });
+  powerMonitor.on("unlock-screen", () => { activeSince = Date.now(); setTimeout(tick, 3000); });
+}
+
+function showNudge(n: Nudge, test: boolean) {
+  const cfg = readConfig();
+  const r = reminderCfg(cfg.reminders as never);
+  lastNudgeAt = Date.now();
+  if (r.style === "windows" && !test) return showToast(n);
+  current = n;
+  const ui = (cfg.ui || {}) as { theme?: string; warmEvenings?: boolean };
+  const theme = ui.theme === "light" || ui.theme === "dark" ? ui.theme : nativeTheme.shouldUseDarkColors ? "dark" : "light";
+  const h = new Date().getHours();
+  const q = new URLSearchParams({ nudge: JSON.stringify(n), theme });
+  if (ui.warmEvenings !== false && (h >= 20 || h < 5)) q.set("evening", "1");
+  if (r.sound) q.set("sound", "1");
+  const url = `${baseUrl}/?${q.toString()}`;
+
+  const area = screen.getDisplayNearestPoint(screen.getCursorScreenPoint()).bounds; // bounds, not workArea: full-screen apps cover the taskbar
+  const bounds = { ...CARD, x: Math.round(area.x + (area.width - CARD.width) / 2), y: area.y + 28 };
+  if (nudgeWin && !nudgeWin.isDestroyed()) {
+    nudgeWin.setBounds(bounds);
+    nudgeWin.loadURL(url);
+    nudgeWin.showInactive();
+  } else {
+    nudgeWin = new BrowserWindow({
+      ...bounds, frame: false, transparent: true, resizable: false, movable: false, minimizable: false, maximizable: false,
+      fullscreenable: false, skipTaskbar: true, focusable: false, show: false, hasShadow: false, alwaysOnTop: true,
+      title: "Praxis reminder", backgroundColor: "#00000000",
+      webPreferences: { contextIsolation: true, sandbox: true, backgroundThrottling: false },
+    });
+    nudgeWin.setAlwaysOnTop(true, "screen-saver"); // above full-screen windows
+    nudgeWin.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+    nudgeWin.removeMenu();
+    nudgeWin.webContents.setWindowOpenHandler(({ url: u }) => { shell.openExternal(u); return { action: "deny" }; });
+    nudgeWin.webContents.on("will-navigate", (e, u) => { if (!u.startsWith(baseUrl)) e.preventDefault(); });
+    nudgeWin.on("closed", () => { nudgeWin = null; current = null; });
+    nudgeWin.loadURL(url);
+    nudgeWin.once("ready-to-show", () => nudgeWin?.showInactive());
+  }
+  if (win && !win.isFocused()) win.flashFrame(true); // the taskbar button glows too
+  log("nudge", n.kind, n.key);
+}
+
+function showToast(n: Nudge) {
+  if (!Notification.isSupported()) return;
+  const toast = new Notification({ title: n.title, body: n.body, silent: !reminderCfg(readConfig().reminders as never).sound, timeoutType: n.sticky ? "never" : "default" });
+  toast.on("click", () => (n.kind === "shutdown" ? trigger("shutdown") : n.kind === "start" ? openMini() : showWindow()));
+  toast.show();
+}
+
+function closeNudge() {
+  if (nudgeWin && !nudgeWin.isDestroyed()) nudgeWin.close();
+  nudgeWin = null; current = null;
+  win?.flashFrame(false);
+}
+
+const emit = (name: string, detail?: string) =>
+  win?.webContents.executeJavaScript(`window.dispatchEvent(new CustomEvent(${JSON.stringify(`praxis:${name}`)}, { detail: ${JSON.stringify(detail ?? null)} }))`).catch(() => undefined);
+
+function onNudgeAction(action: string, key: string) {
+  const n = current;
+  if (!n || n.key !== key) { if (action !== "collapse" && action !== "expand") closeNudge(); return; }
+  if (action === "collapse" || action === "expand") {
+    if (!nudgeWin || nudgeWin.isDestroyed()) return;
+    const area = screen.getDisplayMatching(nudgeWin.getBounds()).bounds;
+    nudgeWin.setBounds(action === "collapse"
+      ? { ...PILL, x: area.x + area.width - PILL.width - 24, y: area.y + 20 }
+      : { ...CARD, x: Math.round(area.x + (area.width - CARD.width) / 2), y: area.y + 28 });
+    return;
+  }
+  closeNudge();
+  const later = (min: number) => snoozed.push({ at: Date.now() + min * 60_000, nudge: { ...n, key: `${n.key}:later${Date.now()}`, body: n.kind === "start" ? `You pushed this back ${min} minutes. Ready now?` : n.body } });
+  switch (action) {
+    case "start": if (n.taskId) { emit("start-focus", n.taskId); openMini(); } break;
+    case "done": if (n.taskId) emit("complete", n.taskId); break;
+    case "more": emit("focus-more"); break;
+    case "stop": emit("focus-stop"); break;
+    case "later": later(n.kind === "start" ? 10 : 15); break;
+    case "shutdown": trigger("shutdown"); break;
+    case "open": showWindow(); break;
+    default: break; // dismiss
+  }
 }
 
 // ---------- taskbar jump list (right-click the taskbar button) ----------

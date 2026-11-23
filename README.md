@@ -115,6 +115,17 @@ Praxis is built to be easy on the eyes on a big monitor all day:
 - **Readable type**: Atkinson Hyperlegible for text (designed for legibility) and Bricolage Grotesque for headings, bundled so they work offline.
 - **Calm motion**: finishing a task fills the circle and folds the row away; the focus timer is a ring that fills. If Windows has "Show animations" turned off, Praxis stops animating too.
 
+## Reminders that reach you (2.1)
+
+When you're deep in a full-screen app, Windows' Do Not Disturb hides ordinary notifications. So the desktop app shows its own small card at the top of the screen instead, on top of everything (full-screen apps too) and without taking your keyboard:
+
+- **A heads-up** a few minutes before a planned block, then **when it starts** (Start focus, Already done, In 10 min).
+- **When a focus timer runs out** (Done, +5 min, Stop timer).
+- **Shut down the day** and **Wind down** at your evening times.
+- **Time checks** every 90 minutes when nothing is planned and you've been at the computer the whole time, so hours don't vanish.
+
+A card you don't answer shrinks to a small pill in the corner after 30 seconds and stays until you click it. Change all of this under ⋯ → Reminders…, including a soft chime and a "Show a test reminder" button. If you'd rather have normal Windows notifications, pick that there, and add Praxis to Windows' priority notifications so they get through. Games running in *exclusive* full screen draw over everything, including these cards; borderless/windowed full screen is fine.
+
 ## Calendar
 
 Link your Google Calendar under **⋯ → Calendars…** and your events appear on the timeline;

@@ -26,7 +26,8 @@ import { HelpDialog } from "./HelpDialog";
 import { ProgressView } from "./ProgressView";
 import { useAppearance } from "./useAppearance";
 import { MorningDialog } from "./MorningDialog";
-import { Celebration, FreshStartDialog, shouldFreshStart, useBlockNotifications, useDoneHotkey } from "./Habits";
+import { Celebration, FreshStartDialog, shouldFreshStart, useBlockNotifications, useDesktopBridge, useDoneHotkey } from "./Habits";
+import { RemindersDialog } from "./RemindersDialog";
 import { daysAway } from "../data/habits";
 import { BacklogDialog } from "./BacklogDialog";
 import { useMedia } from "./useNow";
@@ -46,6 +47,7 @@ function Shell() {
   useBackgroundJobs();
   useAppearance();
   useBlockNotifications();
+  useDesktopBridge();
   useDoneHotkey();
   useShortcuts();
   return (
@@ -65,6 +67,7 @@ function Shell() {
       <MorningDialog />
       <BacklogDialog />
       <FreshStartDialog />
+      <RemindersDialog />
       <Celebration />
       <Toast />
       <DragGhost />

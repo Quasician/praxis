@@ -113,6 +113,7 @@ export interface Config {
   tiny?: Record<string, string>;            // task id → its 2-minute version
   lastOpen?: string;                        // ymd Praxis was last opened (for the fresh start)
   ui?: Appearance;
+  reminders?: Partial<import("../domain/nudges").Reminders>;
   lastSeenVersion?: string;
   [key: string]: unknown;
 }

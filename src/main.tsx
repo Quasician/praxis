@@ -5,8 +5,11 @@ import { queryClient } from "./data/queries";
 import { App } from "./components/App";
 import { ErrorBoundary } from "./components/HelpDialog";
 import { NowMini } from "./components/NowCard";
+import { NudgeCard } from "./components/Nudge";
 
-const mini = new URLSearchParams(location.search).has("mini");
+const params = new URLSearchParams(location.search);
+const mini = params.has("mini");
+const nudge = params.has("nudge");
 // Until settings load, follow Windows' light/dark choice.
 document.documentElement.dataset.theme = matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
 import "@fontsource-variable/atkinson-hyperlegible-next";
@@ -16,7 +19,7 @@ import "./styles.css";
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
-      <ErrorBoundary>{mini ? <NowMini /> : <App />}</ErrorBoundary>
+      <ErrorBoundary>{nudge ? <NudgeCard /> : mini ? <NowMini /> : <App />}</ErrorBoundary>
     </QueryClientProvider>
   </StrictMode>,
 );
