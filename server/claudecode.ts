@@ -17,8 +17,14 @@ const exists = (p: string) => { try { return fs.statSync(p).isFile(); } catch { 
 function candidates(): string[] {
   const home = os.homedir();
   const dirs = (process.env.PATH || "").split(path.delimiter).filter(Boolean);
+  // Install folders checked directly, because Praxis may have started before the install changed PATH.
   dirs.push(path.join(home, ".local", "bin"), path.join(home, ".claude", "local"));
   if (isWin && process.env.APPDATA) dirs.push(path.join(process.env.APPDATA, "npm"));
+  if (isWin && process.env.LOCALAPPDATA) {
+    const winget = path.join(process.env.LOCALAPPDATA, "Microsoft", "WinGet");
+    dirs.push(path.join(winget, "Links"));
+    try { for (const d of fs.readdirSync(path.join(winget, "Packages"))) if (/^Anthropic\.ClaudeCode/i.test(d)) dirs.push(path.join(winget, "Packages", d)); } catch { /* no WinGet packages */ }
+  }
   const names = isWin ? ["claude.exe", "claude.cmd"] : ["claude"];
   const out: string[] = [];
   for (const d of dirs) for (const n of names) { const p = path.join(d, n); if (exists(p) && !out.includes(p)) out.push(p); }

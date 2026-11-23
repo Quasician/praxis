@@ -184,8 +184,8 @@ function ClaudeKey({ intro = false, onDone }: { intro?: boolean; onDone: () => v
         <p className={`ai-status ${cliReady ? "ok" : ""}`} id="ai-cli-status">{cliLine}</p>
         {ai && !cliReady && (
           <ol className="claude-steps" id="ai-cli-steps">
-            {!cli!.installed && <li>Install Claude Code: open <a href="https://code.claude.com/docs/en/setup" target="_blank" rel="noopener">the setup page</a> and run its one-line Windows (PowerShell) install command.</li>}
-            <li>Open a terminal, type <code>claude</code> and sign in with the same account you use for Claude.</li>
+            {!cli!.installed && <li>Install Claude Code. In PowerShell, run <code>winget install Anthropic.ClaudeCode</code> (or the installer on <a href="https://code.claude.com/docs/en/setup" target="_blank" rel="noopener">the setup page</a>).</li>}
+            <li>Open a <b>new</b> PowerShell window, type <code>claude</code> and sign in with the same account you use for Claude, then <code>/exit</code>.</li>
             <li>Come back here and click <b>Check again</b>.</li>
           </ol>
         )}
