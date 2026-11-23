@@ -23,6 +23,8 @@ The token is saved in a `.env` file in this folder. Never share or upload that f
 | --- | --- |
 | `Q` or `/` | Quick add (Todoist's natural language works: "call landlord tomorrow 3pm #Errands p1") |
 | `R` | Refresh |
+| `P` | Plan my day (auto-fill free time) |
+| `Enter` | Accept the proposed plan |
 | `D` / `A` | Day view / Areas view |
 | `1` / `2` | Today / Inbox |
 | `Esc` | Leave the input, or cancel a drag |
@@ -38,6 +40,23 @@ The token is saved in a `.env` file in this folder. Never share or upload that f
 Every change saves the time and duration to Todoist, so your phone reminds you when a block starts.
 Repeating tasks keep repeating: moving today's "every day at 7pm" only moves today's occurrence.
 They can't be unscheduled, since the repeat rule needs a time.
+
+## Auto-planning ("Plan my day")
+
+Praxis can fill your free time for you, **hardest work first**:
+
+1. **Free time** = your planning window (default 7:00 AM–9:30 PM), minus work hours on work days
+   (default Mon–Fri 7 AM–3 PM, plus a 30-minute break after work), minus blocks already on the
+   timeline, with 10-minute gaps. 20% of the free time is kept open on purpose.
+2. **Candidates** = today's and overdue tasks without a time, plus the next step of your two
+   nearest milestones.
+3. **Ranking**: willpower first (`@deep` > unlabelled > `@light`), then priority, then how overdue.
+   The hardest tasks get the earliest free slots; anything that doesn't fit is listed, not crammed in.
+4. You get a **proposal** (dashed blocks). Drag them to adjust, drag one onto the list to leave it
+   out, **Reshuffle**, or **Accept**, which saves everything to Todoist in one go.
+
+With **auto** on (the default), Praxis proposes the plan the first time you open it each day.
+Change any of this in **⋯ → Planner settings**.
 
 ## Areas and milestones
 
@@ -72,8 +91,8 @@ Switch to **Areas** (top of the window, or press `A`) for the bigger picture.
 
 - ~~Day 2: drag tasks onto the timeline to time-block them~~ ✓
 - ~~Day 3: life areas and milestones~~ ✓
-- Next: auto-planner that fills your free time, hardest tasks first
-- Day 4: Google Calendar events on the timeline
+- ~~Auto-planner: fills free time, hardest tasks first~~ ✓
+- Day 4: Google Calendar events on the timeline (and the planner works around them)
 - Day 5: brain-dump inbox powered by Claude
 - Day 6: end-of-day shutdown and a weekly review that checks in on each area
 - Day 7: polish, more shortcuts, open it like a real app

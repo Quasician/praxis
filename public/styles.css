@@ -450,3 +450,61 @@ li:hover > .mini.ghost, .ms-steps li:hover .mini.ghost { opacity: 1; }
 .proj-pick.on { background: color-mix(in srgb, var(--c) 16%, var(--panel)); border-color: var(--c); color: var(--ink); }
 .proj-pick.taken { opacity: .55; }
 .proj-pick small { color: var(--ink-3); }
+
+/* ---------- Auto-planner ---------- */
+.plan-btn {
+  display: inline-flex; align-items: center; gap: 6px; align-self: center;
+  border: 0; border-radius: 9px; padding: 6px 12px; font-size: 13px; font-weight: 600;
+  background: var(--accent); color: #fff;
+}
+.plan-btn:hover { filter: brightness(1.07); }
+.timeline-head .hint { flex-basis: 100%; margin-left: 0; text-align: right; }
+.plan-banner {
+  margin: 10px 14px 0; padding: 10px 12px; border-radius: 10px;
+  background: var(--accent-soft); border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent);
+  font-size: 13px;
+}
+.plan-line { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.plan-text { flex: 1; min-width: 200px; }
+.plan-actions { display: flex; gap: 6px; }
+.plan-actions .primary { padding: 7px 16px; }
+.plan-unplaced { margin-top: 8px; color: var(--ink-2); font-size: 12.5px; display: flex; flex-wrap: wrap; gap: 4px 6px; align-items: center; }
+.plan-unplaced span { background: var(--panel); border: 1px solid var(--line); border-radius: 999px; padding: 1px 8px; }
+.plan-hint { margin-top: 6px; color: var(--ink-3); font-size: 11.5px; }
+
+.tl-band {
+  position: absolute; left: 0; right: 0; z-index: 1; pointer-events: none;
+  background: repeating-linear-gradient(135deg, transparent 0 7px, color-mix(in srgb, var(--ink-3) 10%, transparent) 7px 8px);
+  border-radius: 6px;
+}
+.tl-band span { position: absolute; right: 8px; top: 6px; font-size: 11px; font-weight: 600; color: var(--ink-3); letter-spacing: .04em; text-transform: uppercase; }
+.tl-band.off { background: color-mix(in srgb, var(--ink-3) 7%, transparent); }
+
+.tl-block.proposed {
+  border-style: dashed; border-width: 1.5px; border-left-width: 3px; border-left-style: solid;
+  background: color-mix(in srgb, var(--c) 9%, var(--panel));
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 12%, transparent);
+}
+.pbadge { display: inline-block; margin-left: 4px; padding: 0 6px; border-radius: 999px; font-size: 10.5px; font-weight: 600; line-height: 16px; vertical-align: 1px; }
+.pbadge.wp3 { background: color-mix(in srgb, var(--p4) 16%, transparent); color: var(--p4); }
+.pbadge.wp1 { background: color-mix(in srgb, var(--p2) 14%, transparent); color: var(--p2); }
+.pbadge.ms { background: color-mix(in srgb, var(--c) 18%, transparent); color: var(--ink-2); }
+
+/* settings form */
+.planner-form label { display: flex; flex-direction: column; gap: 4px; font-size: 12.5px; color: var(--ink-2); }
+.planner-form input[type=time], .planner-form input[type=number], .planner-form input[type=text] {
+  font: inherit; font-size: 13.5px; color: var(--ink); background: var(--bg); border: 1px solid var(--line);
+  border-radius: 8px; padding: 6px 8px; color-scheme: light dark; min-width: 0;
+}
+.planner-form input[type=number] { width: 70px; }
+.planner-form .unit { display: flex; align-items: center; gap: 6px; color: var(--ink-3); }
+.planner-form .unit input[type=text] { width: 100px; }
+.form-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; }
+.form-row { display: flex; align-items: center; gap: 12px; }
+.form-label { font-size: 12.5px; color: var(--ink-2); }
+.switch-row { flex-direction: row !important; align-items: center; gap: 10px !important; font-size: 13.5px !important; color: var(--ink) !important; }
+.switch-row input { width: 16px; height: 16px; accent-color: var(--accent); }
+.day-picks { display: flex; gap: 4px; }
+.day-pick { flex-direction: row !important; cursor: pointer; border: 1px solid var(--line); border-radius: 8px; padding: 5px 9px; font-size: 12.5px; user-select: none; }
+.day-pick input { display: none; }
+.day-pick.on { background: var(--accent); border-color: var(--accent); color: #fff !important; }

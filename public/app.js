@@ -117,6 +117,7 @@ async function loadAll({ quiet = false } = {}) {
     state.lastSync = new Date();
     setSync("");
     render();
+    document.dispatchEvent(new Event("praxis:synced"));
   } catch (e) {
     if (e.status === 401) return showSetup("Your Todoist connection expired. Paste your token again.");
     setSync("Couldn't sync — retrying soon");
@@ -358,7 +359,8 @@ function renderTimeline(todayTasks) {
   const nowLine = now.getHours() >= TL_START ? `<div class="tl-now" style="top:${nowY}px"></div>` : "";
 
   const tl = $("#timeline");
-  tl.innerHTML = `<div class="tl-grid">${hours.join("")}${blocks.map(blockHTML).join("")}${nowLine}</div>`;
+  const overlay = typeof plannerTimelineHTML === "function" ? plannerTimelineHTML() : "";
+  tl.innerHTML = `<div class="tl-grid">${hours.join("")}${overlay}${blocks.map(blockHTML).join("")}${nowLine}</div>`;
 
   // Header summary: what's still planned for the rest of today.
   const nowMin = minOfDay(now);
@@ -410,6 +412,17 @@ $("#list").addEventListener("pointerdown", (e) => {
 $("#timeline").addEventListener("pointerdown", (e) => {
   if (e.button !== 0 || e.target.closest(".blk-check")) return;
   const el = e.target.closest(".tl-block");
+  // Proposed (not yet accepted) blocks from the auto-planner move locally only.
+  if (el && el.classList.contains("proposed")) {
+    const item = plannerState.items[Number(el.dataset.idx)];
+    if (!item) return;
+    e.preventDefault();
+    return startPending(e, {
+      kind: e.target.closest(".tl-resize") ? "resize" : "move",
+      task: item.task, source: el, start: item.start, dur: item.dur,
+      grab: pointerMin(e) - item.start, proposalIdx: Number(el.dataset.idx),
+    });
+  }
   const task = el && findTask(el.dataset.id);
   if (!task) return;
   e.preventDefault();
@@ -525,6 +538,11 @@ function onDragEnd() {
   const d = drag;
   if (!d || !d.started) return cancelDrag();
   endDragUI();
+  if (d.proposalIdx !== undefined) {
+    plannerMoveItem(d.proposalIdx, d.target, d.unschedule && !d.target);
+    renderPending = false;
+    return render();
+  }
   if (d.target && !(d.kind !== "new" && d.target.start === d.start && d.target.dur === d.dur)) {
     scheduleTask(d.task, d.target.start, d.target.dur);
   } else if (d.unschedule) {
@@ -774,6 +792,8 @@ document.addEventListener("keydown", (e) => {
   else if (e.key === "2") setTab("inbox");
   else if (e.key === "d") setView("plan");
   else if (e.key === "a") setView("areas");
+  else if (e.key === "p") proposePlan();
+  else if (e.key === "Enter" && plannerState.active && plannerState.items.length) acceptPlan();
 });
 
 // Stay fresh: re-sync when you come back to the window, and every 2 minutes.
