@@ -1,6 +1,7 @@
 // Everything that changes Todoist or your settings. Changes show up instantly
 // (optimistic) and are rolled back if Todoist rejects them.
 import { api, closeTask, itemUpdate, reopenTask, syncOrThrow } from "../lib/api";
+import { todoistDown } from "../lib/api";
 import { parseDue, sameDay, startOfToday, ymd } from "../lib/dates";
 import { DROPPED_LABEL, MILESTONE_LABEL, SOMEDAY_LABEL, dueFor, floatingDate, isPinned, timedDue } from "../lib/tasks";
 import { plain } from "../lib/text";
@@ -47,7 +48,7 @@ export function reconcileSoon(ms = 3500) {
 }
 
 const short = (t: Task, n = 50) => plain(t.content).slice(0, n);
-const errMsg = (e: unknown) => (e instanceof Error ? e.message : String(e));
+const errMsg = (e: unknown) => (todoistDown(e) ? "Todoist is having trouble right now (not Praxis), so it wasn't saved. Try again in a few minutes." : e instanceof Error ? e.message : String(e));
 
 // ---------- settings ----------
 let saveChain: Promise<unknown> = Promise.resolve();

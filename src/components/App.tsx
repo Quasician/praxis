@@ -18,6 +18,7 @@ import { PlannerSettingsDialog } from "./PlannerSettings";
 import { Setup } from "./Setup";
 import { TasksPane } from "./TasksPane";
 import { TimelinePane } from "./Timeline";
+import { HorizonPane } from "./Horizon";
 import { TopBar } from "./TopBar";
 import { TriageDialog } from "./TriageDialog";
 import { BrainDumpDialog, ClaudeDialog } from "./BrainDump";
@@ -28,6 +29,7 @@ import { useAppearance } from "./useAppearance";
 import { MorningDialog } from "./MorningDialog";
 import { Celebration, FreshStartDialog, shouldFreshStart, useBlockNotifications, useDesktopBridge, useDoneHotkey } from "./Habits";
 import { RemindersDialog } from "./RemindersDialog";
+import { ConstellationDialog } from "./ConstellationDialog";
 import { daysAway } from "../data/habits";
 import { BacklogDialog } from "./BacklogDialog";
 import { useMedia } from "./useNow";
@@ -44,6 +46,11 @@ export function App() {
 function Shell() {
   const view = useUi((s) => s.view);
   const wide = useMedia("(min-width: 2200px)"); // ultrawide: show areas beside the day
+  const { config } = useData();
+  // Day → Week zooms out, Week → Day zooms in (the new view animates as it mounts).
+  const ZOOM = { day: 0, week: 1, areas: 1, progress: 2 } as Record<string, number>;
+  const prev = useRef(view), dir = useRef("");
+  if (prev.current !== view) { dir.current = (ZOOM[view] ?? 1) > (ZOOM[prev.current] ?? 1) ? "out" : (ZOOM[view] ?? 1) < (ZOOM[prev.current] ?? 1) ? "in" : "fade"; prev.current = view; }
   useBackgroundJobs();
   useAppearance();
   useBlockNotifications();
@@ -51,9 +58,9 @@ function Shell() {
   useDoneHotkey();
   useShortcuts();
   return (
-    <div id="app" className="app">
+    <div id="app" className="app" data-anim={dir.current}>
       <TopBar />
-      {view === "day" && <main className={`layout${wide ? " wide" : ""}`}><TasksPane /><TimelinePane />{wide && <AreasView side />}</main>}
+      {view === "day" && <main className={`layout${wide ? " wide" : ""}`}><TasksPane />{config?.ui?.dayLayout === "classic" ? <TimelinePane /> : <HorizonPane />}{wide && <AreasView side />}</main>}
       {view === "week" && <WeekView />}
       {view === "areas" && <AreasView />}
       {view === "progress" && <ProgressView />}
@@ -68,6 +75,7 @@ function Shell() {
       <BacklogDialog />
       <FreshStartDialog />
       <RemindersDialog />
+      <ConstellationDialog />
       <Celebration />
       <Toast />
       <DragGhost />
@@ -166,6 +174,7 @@ function useShortcuts() {
       else if (e.key === "s") ui.openDialog("shutdown");
       else if (e.key === "?") ui.openDialog("help");
       else if (e.key === "m") ui.openDialog("morning");
+      else if (e.key === "n") ui.openDialog("constellation");
       else if (e.key === "f") updateConfig((c) => ({ ...c, ui: { ...(c.ui || {}), focus: !c.ui?.focus } }));
       else if (e.key === "Enter" && ui.plan.active && ui.plan.items.length) acceptPlan();
     };

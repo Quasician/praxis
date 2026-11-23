@@ -10,18 +10,22 @@ import { adjustProposal } from "../data/planActions";
 import { useUi, type DragState } from "../state/ui";
 
 const SNAP = 15;
-export const hourPx = () => parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--hour")) || 64;
+/** The Horizon runs the day left to right; the classic timeline runs top to bottom. */
+export const horizontal = () => document.documentElement.dataset.layout === "horizon";
+export const hourPx = () => parseFloat(getComputedStyle(document.documentElement).getPropertyValue(horizontal() ? "--hour-x" : "--hour")) || 64;
 export const minToY = (min: number) => (min / 60 - TL_START) * hourPx();
+export const minToX = minToY;
 const gridEl = () => document.querySelector(".tl-grid") as HTMLElement | null;
 const inside = (el: Element | null, e: { clientX: number; clientY: number }) => {
   if (!el) return false;
   const r = el.getBoundingClientRect();
   return e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom;
 };
-export function pointerMin(e: { clientY: number }) {
+export function pointerMin(e: { clientX: number; clientY: number }) {
   const g = gridEl();
   if (!g) return TL_START * 60;
-  return TL_START * 60 + ((e.clientY - g.getBoundingClientRect().top) / hourPx()) * 60;
+  const r = g.getBoundingClientRect();
+  return TL_START * 60 + (((horizontal() ? e.clientX - r.left : e.clientY - r.top)) / hourPx()) * 60;
 }
 const snap = (m: number) => Math.round(m / SNAP) * SNAP;
 const clampStart = (start: number, dur: number) => Math.max(TL_START * 60, Math.min(start, TL_END * 60 - dur));
@@ -73,10 +77,11 @@ function autoScroll() {
   const tl = document.querySelector("#timeline") as HTMLElement | null;
   if (e && tl && (inside(tl, e) || drag.kind === "resize")) {
     const r = tl.getBoundingClientRect(), edge = 48;
-    let dy = 0;
-    if (e.clientY < r.top + edge) dy = -Math.ceil((r.top + edge - e.clientY) / 4);
-    else if (e.clientY > r.bottom - edge) dy = Math.ceil((e.clientY - (r.bottom - edge)) / 4);
-    if (dy) { tl.scrollTop += dy; update(e); }
+    const [p, lo, hi] = horizontal() ? [e.clientX, r.left, r.right] : [e.clientY, r.top, r.bottom];
+    let d = 0;
+    if (p < lo + edge) d = -Math.ceil((lo + edge - p) / 4);
+    else if (p > hi - edge) d = Math.ceil((p - (hi - edge)) / 4);
+    if (d) { if (horizontal()) tl.scrollLeft += d; else tl.scrollTop += d; update(e); }
   }
   requestAnimationFrame(autoScroll);
 }

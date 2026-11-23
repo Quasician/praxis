@@ -156,7 +156,7 @@ kbd {
 
 .layout {
   flex: 1; min-height: 0;
-  display: grid; grid-template-columns: minmax(380px, 460px) 1fr; gap: 18px;
+  display: grid; grid-template-columns: minmax(380px, 460px) minmax(0, 1fr); gap: 18px;
   padding: 0 28px 24px;
 }
 .tasks-pane, .timeline-pane {
@@ -1225,3 +1225,136 @@ body.mini-body #root { height: 100%; }
 [data-focus] .focus-pane .now-ring .fill { stroke: var(--star); stroke-width: 3; }
 [data-focus] .focus-pane .now-ring .now-clock { font: 680 22px var(--display); color: #3a2a08; }
 [data-focus] .focus-pane .now-card.over .now-ring .fill { stroke: var(--late); }
+
+/* ---------- New project (draw a constellation) ---------- */
+.sky-head-right { display: flex; align-items: flex-end; gap: 18px; }
+.sky-empty .primary { justify-self: center; margin-top: 8px; }
+.constellation-dialog { width: min(980px, 92vw); }
+.cons-form { display: flex; flex-direction: column; gap: 12px; }
+.cons-form h2 { margin: 0; }
+.cons-field { display: flex; flex-direction: column; gap: 6px; font-size: 13.5px; font-weight: 600; color: var(--ink-2); flex: 1; }
+.cons-field textarea, .cons-field input, .cons-field select { font: inherit; font-weight: 400; font-size: 15px; color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; resize: vertical; }
+.cons-field .optional { font-weight: 400; color: var(--ink-3); }
+.cons-row { display: flex; gap: 14px; }
+.cons-preview { flex-direction: row; gap: 22px; align-items: stretch; }
+.cons-sky { flex: none; width: 300px; display: flex; flex-direction: column; gap: 10px; }
+.cons-svg { width: 300px; height: 220px; display: block; }
+.cons-svg-bg { fill: var(--night-top); }
+.cons-line { stroke: var(--c); stroke-width: 1.2; stroke-opacity: .55; stroke-dasharray: 4 4; animation: rise .4s var(--ease) both; }
+.cons-star { animation: ignite .6s var(--ease) both; transform-box: fill-box; transform-origin: center; }
+.cons-core { fill: color-mix(in srgb, var(--c) 35%, #fff); }
+.cons-ring { fill: none; stroke: var(--star); stroke-width: 1.4; }
+.cons-reshape { align-self: center; }
+.cons-edit { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 10px; }
+.cons-name { font: 650 22px var(--display); letter-spacing: -.015em; color: var(--ink); background: transparent; border: 0; border-bottom: 1px solid var(--line); padding: 2px 0 6px; }
+.cons-name:focus { outline: none; border-bottom-color: var(--accent); }
+.cons-steps { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.cons-step { display: flex; align-items: center; gap: 8px; }
+.cons-step input, .cons-step select { font: inherit; font-size: 14px; color: var(--ink); background: var(--bg); border: 1px solid transparent; border-radius: 9px; padding: 7px 9px; }
+.cons-step input:focus, .cons-step select:focus { border-color: var(--line); outline: none; }
+.cons-step-title { flex: 1; min-width: 0; }
+.cons-dot { flex: none; width: 9px; height: 9px; border-radius: 50%; border: 1.5px solid var(--accent); }
+.cons-dot.first { border-color: var(--star); box-shadow: 0 0 0 3px color-mix(in srgb, var(--star) 25%, transparent); }
+.cons-remove { opacity: .5; } .cons-step:hover .cons-remove { opacity: 1; }
+.cons-add { align-self: flex-start; }
+.form-error { color: var(--late); font-size: 13.5px; margin: 0; }
+
+/* ---------- I'm stuck + guess the time (Now card) ---------- */
+.now-btn.stuck { color: var(--ink-2); }
+.now-move { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin-top: 8px; padding: 10px 12px; border-radius: 12px;
+  background: color-mix(in srgb, var(--star) 12%, var(--panel)); border: 1px solid color-mix(in srgb, var(--star) 30%, transparent); animation: rise .25s var(--ease); }
+.now-move-label { font-size: 12px; font-weight: 650; color: var(--star); }
+.now-move-text { flex: 1 1 220px; font-size: 14.5px; font-weight: 600; color: var(--ink); }
+.now-move-actions { display: flex; gap: 6px; }
+.now-move .now-btn { padding: 4px 10px; font-size: 12.5px; }
+.now-guess { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 8px; font-size: 12.5px; color: var(--ink-2); }
+.now-guess > span { margin-right: 2px; }
+.now-chip { border: 1px solid var(--line); background: color-mix(in srgb, var(--panel) 70%, transparent); color: var(--ink); border-radius: 999px; padding: 3px 10px; font: inherit; font-size: 12.5px; cursor: pointer; }
+.now-chip:hover { border-color: var(--accent); color: var(--accent); }
+.now-card.mini .now-move { margin-top: 4px; padding: 6px 8px; }
+.now-card.mini .now-move-text { font-size: 13px; }
+
+/* ---------- The Horizon (day, left to right) ---------- */
+.timeline.hz { overflow: auto hidden; overflow-y: auto; position: relative; flex: 1; scrollbar-gutter: stable; }
+.hz-grid { position: relative; margin: 0 !important; min-height: 100%; }
+.hz-sky { position: absolute; left: 0; top: 0; right: 0; border-radius: 16px 16px 0 0; opacity: .85; }
+.hz-arc { position: absolute; inset: 0; overflow: visible; }
+.hz-star { fill: #e6ecff; opacity: .55; }
+[data-theme="light"] .hz-star { opacity: .9; }
+.hz-horizon { stroke: color-mix(in srgb, var(--ink) 18%, transparent); stroke-width: 1; }
+.hz-path { fill: none; stroke-width: 2; stroke-linecap: round; }
+.hz-path.done { stroke: color-mix(in srgb, var(--star) 70%, transparent); }
+.hz-path.ahead { stroke: color-mix(in srgb, var(--star) 45%, transparent); stroke-dasharray: 2 7; }
+.hz-sun .disc { fill: #fff3cf; stroke: var(--star); stroke-width: 3; }
+.hz-sun .glow { fill: color-mix(in srgb, var(--star) 30%, transparent); animation: sun-glow 5s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
+@keyframes sun-glow { 50% { transform: scale(1.25); opacity: .6; } }
+.hz-moon .disc { fill: #eef1fb; } .hz-moon .bite { fill: var(--sky-night); }
+.hz-ruler { position: absolute; left: 0; right: 0; height: 30px; border-bottom: 1px solid color-mix(in srgb, var(--line) 60%, transparent); }
+.hz-ruler span { position: absolute; top: 7px; transform: translateX(-50%); font-size: 12px; color: var(--ink-3); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.hz-ruler span:first-child { transform: none; padding-left: 6px; }
+.hz-lanes { position: absolute; left: 0; right: 0; background-image: linear-gradient(to right, color-mix(in srgb, var(--line) 45%, transparent) 1px, transparent 1px); }
+.hz-band { position: absolute; pointer-events: none; }
+.hz-band span { position: absolute; top: 6px; left: 8px; font-size: 12px; color: var(--ink-3); }
+.hz-band.work { background: color-mix(in srgb, var(--accent) 4%, transparent); border-left: 1px dashed color-mix(in srgb, var(--accent) 25%, transparent); border-right: 1px dashed color-mix(in srgb, var(--accent) 25%, transparent); }
+.hz-band.off { background: repeating-linear-gradient(135deg, transparent 0 9px, color-mix(in srgb, var(--ink) 3%, transparent) 9px 10px); }
+.hz-past { position: absolute; left: 0; pointer-events: none; z-index: 1; background: color-mix(in srgb, var(--panel) 50%, transparent); }
+.hz-now.tl-now { top: 0 !important; width: 2px; left: 0; background: linear-gradient(to bottom, var(--star), color-mix(in srgb, var(--star) 20%, transparent)); z-index: 3; pointer-events: none; transform: translateX(-1px); }
+.hz-now.tl-now::before { display: none; }
+/* Blocks hang below the sky at their times; a short block's label runs on past its bar. */
+.timeline.hz .tl-block { position: absolute; height: 58px; right: auto; overflow: visible; display: flex; align-items: center; gap: 8px; padding: 0 10px; box-sizing: border-box; z-index: 2; }
+.timeline.hz .tl-block .blk-body { white-space: nowrap; min-width: 0; }
+.timeline.hz .tl-block .blk-title, .timeline.hz .tl-block .blk-time { overflow: visible; text-overflow: clip; }
+.timeline.hz .tl-block .blk-title { font-size: 14px; }
+.timeline.hz .tl-block .blk-time { font-size: 12px; }
+.timeline.hz .tl-block .tl-resize { left: auto; right: -3px; top: 6px; bottom: 6px; width: 8px; height: auto; cursor: ew-resize; border-radius: 4px; }
+.timeline.hz .tl-block.past { opacity: .55; }
+.timeline.hz .tl-block.preview { z-index: 4; }
+.timeline.hz .tl-block.event { cursor: default; }
+.timeline.hz .blk-check { flex: none; }
+body.dragging.resizing { cursor: ew-resize; }
+[data-layout="horizon"] body.dragging.resizing, html[data-layout="horizon"] .dragging.resizing { cursor: ew-resize; }
+
+/* ---------- Week: seven skies ---------- */
+.day-sky { position: relative; height: 64px; margin: -2px -2px 8px; border-radius: 12px; overflow: hidden;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--sky-day) 90%, var(--panel)), color-mix(in srgb, var(--sky-day) 45%, var(--panel))); }
+.day-sky.partly { background: linear-gradient(180deg, color-mix(in srgb, var(--sky-day) 75%, var(--panel)), color-mix(in srgb, var(--sky-gold) 30%, var(--panel))); }
+.day-sky.cloudy { background: linear-gradient(180deg, color-mix(in srgb, var(--sky-dusk) 55%, var(--panel)), color-mix(in srgb, var(--sky-day) 30%, var(--panel))); }
+.day-sky.storm { background: linear-gradient(180deg, color-mix(in srgb, var(--sky-night) 85%, var(--panel)), color-mix(in srgb, var(--sky-dusk) 50%, var(--panel))); }
+.day-sky.today { cursor: pointer; box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--star) 55%, transparent); }
+.day-sky svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+.ds-sun circle { fill: #ffe39a; } .ds-sun .halo { fill: color-mix(in srgb, var(--star) 30%, transparent); }
+.ds-cloud { fill: color-mix(in srgb, #fff 88%, var(--sky-day)); opacity: .92; }
+[data-theme="dark"] .ds-cloud { fill: color-mix(in srgb, #c7cfde 70%, var(--panel)); }
+.storm .ds-cloud { fill: color-mix(in srgb, #5b6478 80%, var(--panel)); opacity: 1; }
+.ds-rain { stroke: color-mix(in srgb, var(--accent) 60%, #fff); stroke-width: 1.6; stroke-linecap: round; opacity: .7; }
+.ds-star circle { fill: #fff4d6; } .ds-star .halo { fill: color-mix(in srgb, var(--star) 28%, transparent); }
+.day-weather { position: absolute; left: 10px; bottom: 6px; font-size: 12px; font-weight: 650; color: var(--ink); text-shadow: 0 1px 2px color-mix(in srgb, var(--panel) 80%, transparent); }
+.storm .day-weather { color: #fff; text-shadow: 0 1px 2px rgba(0, 0, 0, .4); }
+
+/* Zooming between Day and Week */
+.view-anim { animation-duration: .38s; animation-timing-function: var(--ease); animation-fill-mode: both; }
+.view-anim.out { animation-name: zoom-out; } .view-anim.in { animation-name: zoom-in; } .view-anim.fade { animation-name: rise; }
+@keyframes zoom-out { from { opacity: 0; transform: scale(1.05); } }
+@keyframes zoom-in { from { opacity: 0; transform: scale(.95); } }
+.app[data-anim="out"] > main { animation: zoom-out .38s var(--ease) both; }
+.app[data-anim="in"] > main { animation: zoom-in .38s var(--ease) both; }
+.app[data-anim="fade"] > main { animation: rise .3s var(--ease) both; }
+.horizon-pane { min-width: 0; overflow: hidden; }
+.timeline.hz { min-width: 0; width: 100%; }
+
+/* ---------- The whole app follows the time of day ----------
+   The accent (buttons, highlights, selection, focus rings) and a faint wash at the top of the window
+   shift with the sky: rose at dawn, blue by day, amber at golden hour, violet at dusk, indigo at night.
+   Reminder cards and the Now pop-out use the same phases. Contrast stays at reading level in every phase. */
+[data-theme="light"][data-sky="dawn"]  { --accent: #a9405f; --accent-soft: #f6e1e8; }
+[data-theme="light"][data-sky="day"]   { --accent: #5155cf; --accent-soft: #e4e5fb; }
+[data-theme="light"][data-sky="gold"]  { --accent: #a3590c; --accent-soft: #f6e7d2; }
+[data-theme="light"][data-sky="dusk"]  { --accent: #7a4cbe; --accent-soft: #ece3f8; }
+[data-theme="light"][data-sky="night"] { --accent: #4c55c2; --accent-soft: #e2e4f7; }
+[data-theme="dark"][data-sky="dawn"]   { --accent: #f09ab6; --accent-soft: #3a2632; --now: #f09ab6; }
+[data-theme="dark"][data-sky="day"]    { --accent: #9aa0ff; --accent-soft: #272a45; --now: #9aa0ff; }
+[data-theme="dark"][data-sky="gold"]   { --accent: #f0b45e; --accent-soft: #3a3021; --now: #f0b45e; }
+[data-theme="dark"][data-sky="dusk"]   { --accent: #c49af2; --accent-soft: #33284a; --now: #c49af2; }
+[data-theme="dark"][data-sky="night"]  { --accent: #8f98f5; --accent-soft: #25284a; --now: #8f98f5; }
+body { background-image: linear-gradient(180deg, color-mix(in srgb, var(--sky-now) 20%, var(--bg)) 0, var(--bg) 340px); background-repeat: no-repeat; }
+.nudge-doc body { background-image: none; }

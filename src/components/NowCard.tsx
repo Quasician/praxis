@@ -11,8 +11,12 @@ import { useCommitted, useData } from "../data/useData";
 import { toast, useUi } from "../state/ui";
 import { useAppearance } from "./useAppearance";
 import { useNow } from "./useNow";
+import { askNextMove } from "../data/constellation";
+import { addStep } from "../data/actions";
+import { ApiError } from "../lib/api";
 
 export const FOCUS_MIN = 25;
+export const GUESSES = [10, 15, 25, 45, 60, 90];
 const RING = 2 * Math.PI * 23;
 const isDesktop = () => /Electron/i.test(navigator.userAgent);
 
@@ -56,6 +60,11 @@ export function NowCard({ mini = false }: { mini?: boolean }) {
   const [tick, setTick] = useState(Date.now());
   const minuteNow = useNow();
   const warned = useRef("");
+  // "I'm stuck": one tiny next move for this task.
+  const [move, setMove] = useState<{ text: string; why?: string; fallback?: boolean } | null>(null);
+  const [tried, setTried] = useState<string[]>([]);
+  const [stuckBusy, setStuckBusy] = useState(false);
+  useEffect(() => { setMove(null); setTried([]); }, [task?.id]);
 
   useEffect(() => {
     if (!focus) return;
@@ -85,6 +94,19 @@ export function NowCard({ mini = false }: { mini?: boolean }) {
   const stop = () => updateConfig((c) => ({ ...c, focus: null }));
   const more = () => updateConfig((c) => (c.focus ? { ...c, focus: { ...c.focus, minutes: Math.ceil(elapsed / 60) + 5 } } : c));
   const done = () => finishNow(task, cfg, focus, elapsed);
+  const stuck = async () => {
+    setStuckBusy(true);
+    try {
+      const r = await askNextMove(task, { tried, minutesIn: running ? Math.round(elapsed / 60) : 0 });
+      setMove({ text: r.move, why: r.why }); setTried((t) => [...t, r.move]);
+    } catch (e) {
+      const noClaude = e instanceof ApiError && e.status === 401;
+      setMove({ text: `Open what you need for “${plain(task.content).slice(0, 60)}” and do just the first 2 minutes.`, fallback: true });
+      toast(noClaude ? "Connect Claude (⋯ → Claude…) for a move that fits this task." : `Couldn't reach Claude: ${(e as Error).message}`);
+    } finally { setStuckBusy(false); }
+  };
+  const keepMove = async () => { if (!move) return; try { await addStep(task.id, move.text); toast("Added as a step"); setMove(null); } catch (e) { toast(`Couldn't add it: ${(e as Error).message}`); } };
+  const guess = (m: number) => updateConfig((c) => (c.focus ? { ...c, focus: { ...c.focus, guess: m } } : c));
   const snooze = () => { const dd = parseDue(task.due); if (dd?.hasTime) scheduleTask(task, minOfDay(dd.d) + 10, blockMinutes(task)); };
   const skip = () => setSkipped((s) => new Set([...s, task.id]));
   const running = !!focus && focus.taskId === task.id;
@@ -104,7 +126,23 @@ export function NowCard({ mini = false }: { mini?: boolean }) {
         <span className="now-title" title={plain(task.content)}>{plain(task.content)}</span>
         {!running && nextIn !== null && <span className="now-next-in" id="now-next-in">Next block in {nextIn < 60 ? `${nextIn} min` : `${Math.floor(nextIn / 60)}h ${nextIn % 60}m`}</span>}
         {tiny && <span className="now-tiny" id="now-tiny-text" title="On a low day, this counts">Tiny: {tiny}</span>}
-        {!mini && <span className="now-meta">{d?.hasTime ? `${d.d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })} · ` : ""}{blockMinutes(task)}m{next ? <> · next: <span className="now-next">{plain(next.content).slice(0, 48)}</span></> : null}</span>}
+        {move && (
+          <div className="now-move" id="now-move" role="status">
+            <span className="now-move-label">Try this</span>
+            <span className="now-move-text" id="now-move-text">{move.text}</span>
+            <span className="now-move-actions">
+              {!move.fallback && <button id="now-move-another" className="now-btn" disabled={stuckBusy} onClick={stuck}>{stuckBusy ? "…" : "Another"}</button>}
+              {!mini && <button id="now-move-step" className="now-btn" onClick={keepMove}>Add as a step</button>}
+              <button className="now-btn" aria-label="Dismiss" onClick={() => setMove(null)}>×</button>
+            </span>
+          </div>
+        )}
+        {running && !focus?.guess && elapsed < 180 && (
+          <div className="now-guess" id="now-guess"><span>How long will it take?</span>
+            {GUESSES.map((m) => <button key={m} id={`now-guess-${m}`} className="now-chip" onClick={() => guess(m)}>{m < 60 ? `${m}m` : `${m / 60 === 1 ? "1h" : `${m / 60}h`}`}</button>)}
+          </div>
+        )}
+        {!mini && <span className="now-meta">{running && focus?.guess ? `you guessed ${focus.guess}m · ` : ""}{d?.hasTime ? `${d.d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })} · ` : ""}{blockMinutes(task)}m{next ? <> · next: <span className="now-next">{plain(next.content).slice(0, 48)}</span></> : null}</span>}
       </div>
       <div className="now-actions">
         {running ? <>
@@ -115,12 +153,14 @@ export function NowCard({ mini = false }: { mini?: boolean }) {
           <button id="now-done" className="now-btn done" title="Done" onClick={done}>✓</button>
           <button id="now-more" className="now-btn" title="5 more minutes" onClick={more}>+5</button>
           <button id="now-stop" className="now-btn" title="Stop the timer" onClick={stop}>■</button>
+          <button id="now-stuck" className="now-btn stuck" title="Get one tiny next move" disabled={stuckBusy} onClick={stuck}>{stuckBusy ? "Thinking…" : "I'm stuck"}</button>
         </> : <>
           <button id="now-start" className="now-btn start" title={`Start a ${FOCUS_MIN}-minute focus session`} onClick={start}>▶ Start</button>
           <button id="now-done" className="now-btn done" title="Already done" onClick={done}>✓</button>
           {tiny && <button id="now-tiny" className="now-btn tiny" title={`I did the tiny version: ${tiny}`} onClick={() => doTiny(task)}>✓ Tiny</button>}
           {d?.hasTime && sameDay(d.d, new Date()) && minOfDay(new Date()) >= minOfDay(d.d) - 10 && minOfDay(new Date()) < minOfDay(d.d) + blockMinutes(task) && <button id="now-snooze" className="now-btn" title="Push this block 10 minutes later" onClick={snooze}>+10m</button>}
           {!focus && <button id="now-skip" className="now-btn" title="Not now: show the next one" onClick={skip}>↷</button>}
+          <button id="now-stuck" className="now-btn stuck" title="Get one tiny next move" disabled={stuckBusy} onClick={stuck}>{stuckBusy ? "Thinking…" : "I'm stuck"}</button>
         </>}
         {!mini && isDesktop() && <button id="now-popout" className="now-btn" title="Keep this on top of other windows" onClick={() => window.open(`${location.origin}/?mini=1`, "praxis-now")}>⧉</button>}
         {mini && <button className="now-btn close" title="Close" onClick={() => window.close()}>×</button>}
@@ -147,12 +187,22 @@ export function NowMini() {
 }
 
 /** Finish the Now task: record how long a timed session took, clear the timer, complete it. */
-export async function finishNow(task: Task, cfg: ReturnType<typeof useData>["cfg"], focus: { taskId: string } | null, elapsedSec: number) {
+export async function finishNow(task: Task, cfg: ReturnType<typeof useData>["cfg"], focus: { taskId: string; guess?: number } | null, elapsedSec: number) {
   const actual = focus && focus.taskId === task.id ? Math.round(elapsedSec / 60) : 0;
+  const g = (focus && focus.taskId === task.id && (focus as { guess?: number }).guess) || undefined;
   updateConfig((c) => ({
     ...c, focus: null,
     // A timed session teaches Praxis how long this kind of task really takes (ignore accidental 1-minute runs).
-    samples: actual >= 3 ? [...(c.samples || []), { wp: willpower(task, cfg), est: blockMinutes(task), actual: Math.min(actual, 600), at: new Date().toISOString() }].slice(-SAMPLES_KEEP) : c.samples,
+    samples: actual >= 3 ? [...(c.samples || []), { wp: willpower(task, cfg), est: blockMinutes(task), actual: Math.min(actual, 600), at: new Date().toISOString(), ...(g ? { guess: g } : {}) }].slice(-SAMPLES_KEEP) : c.samples,
   }));
   await completeTask(task);
+  // After the "Completed" message (and its Undo) has had its moment.
+  if (g && actual >= 3) setTimeout(() => toast(guessVerdict(g, actual)), 2600);
+}
+
+/** One line after a guessed session: how close you were. */
+export function guessVerdict(guess: number, actual: number) {
+  const off = Math.abs(actual - guess) / Math.max(guess, 1);
+  if (off <= 0.15) return `Spot on: you guessed ${guess} min and it took ${actual}.`;
+  return actual > guess ? `You guessed ${guess} min; it took ${actual}. Things tend to take longer than they feel.` : `You guessed ${guess} min; it only took ${actual}.`;
 }

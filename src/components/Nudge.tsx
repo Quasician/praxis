@@ -54,7 +54,7 @@ export function NudgeCard() {
   useEffect(() => {
     document.documentElement.dataset.theme = q.get("theme") === "light" ? "light" : "dark";
     if (q.get("evening")) document.documentElement.dataset.evening = "";
-    document.documentElement.dataset.sky = skyAt(new Date(n.at || Date.now()).getHours());
+    document.documentElement.dataset.sky = skyAt(new Date(n.at || Date.now()));
     document.documentElement.classList.add("nudge-doc");
     if (q.get("sound")) chime();
     const id = setTimeout(() => {

@@ -70,6 +70,7 @@ export function TopBar() {
           </button>
           <div id="menu" className="menu" hidden={!menu}>
             <button id="planner-settings-btn" onClick={() => { setMenu(false); openDialog("planner"); }}>Planner settings…</button>
+            <button id="new-project-btn" onClick={() => { setMenu(false); openDialog("constellation"); }}>New project…</button>
             <button id="reminders-btn" onClick={() => { setMenu(false); openDialog("reminders"); }}>Reminders…</button>
             <button id="calendars-btn" onClick={() => { setMenu(false); openDialog("calendars"); }}>Calendars…</button>
             <button id="claude-btn" onClick={() => { setMenu(false); openDialog("claude"); }}>Claude…</button>
@@ -84,6 +85,7 @@ export function TopBar() {
                 ))}
               </div>
               <label className="menu-switch" onClick={(e) => e.stopPropagation()}><input type="checkbox" id="warm-evenings" checked={config?.ui?.warmEvenings !== false} onChange={(e) => updateConfig((c) => ({ ...c, ui: { ...(c.ui || {}), warmEvenings: e.target.checked } }))} /> Warmer colors after 8 PM</label>
+              <label className="menu-switch" onClick={(e) => e.stopPropagation()}><input type="checkbox" id="horizon-layout" checked={config?.ui?.dayLayout !== "classic"} onChange={(e) => updateConfig((c) => ({ ...c, ui: { ...(c.ui || {}), dayLayout: e.target.checked ? "horizon" : "classic" } }))} /> Day as a horizon (left to right)</label>
               <label className="menu-switch" onClick={(e) => e.stopPropagation()}><input type="checkbox" id="focus-mode" checked={!!config?.ui?.focus} onChange={(e) => updateConfig((c) => ({ ...c, ui: { ...(c.ui || {}), focus: e.target.checked } }))} /> Focus mode (F): only what's next</label>
             </div>
             <button id="help-btn" onClick={() => { setMenu(false); openDialog("help"); }}>Keyboard shortcuts (?)</button>

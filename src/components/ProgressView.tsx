@@ -1,4 +1,4 @@
-import { dayStats, effectiveFill, habitStreak, learn, rate, rateByArea, rateByWillpower, streak, type DayStat } from "../domain/progress";
+import { dayStats, effectiveFill, habitStreak, timeSense, learn, rate, rateByArea, rateByWillpower, streak, type DayStat } from "../domain/progress";
 import { fmtMin, fromYmd } from "../lib/dates";
 import { colorOf } from "../lib/text";
 import { useActive, useCompleted } from "../data/queries";
@@ -41,6 +41,7 @@ export function ProgressView() {
         <Tile id="pv-week" label="Plan done this week" value={pct(wr)} sub={lr === null ? `${sum(thisWeek, "plannedDone")} of ${sum(thisWeek, "planned")} planned tasks` : `last week ${pct(lr)}`} trend={wr !== null && lr !== null ? Math.sign(wr - lr) : 0} />
         <Tile id="pv-extra" label="Done outside the plan" value={String(sum(thisWeek, "extra"))} sub="this week" />
         <Tile id="pv-streak" label="Streak (never miss twice)" value={`${habitStreak(config, completed).days}`} sub={`days · closed ${streak(config, "shutdown")} in a row · mornings ${streak(config, "committedAt")}`} />
+        <TimeSenseTile sense={timeSense(config?.samples)} />
       </div>
 
       {!hasHistory && <div className="pv-empty" id="pv-empty">Nothing to show yet. Accept a plan or do the morning commit, and each day's plan vs. done fills in here.</div>}
@@ -122,4 +123,10 @@ function Bar({ label, r, detail, color }: { label: string; r: number | null; det
       <span className="pv-bar-value">{pct(r)}<small>{detail}</small></span>
     </div>
   );
+}
+
+function TimeSenseTile({ sense }: { sense: ReturnType<typeof timeSense> }) {
+  if (!sense) return <Tile id="pv-timesense" label="Time sense" value="—" sub="Guess how long when you start a focus session" />;
+  const lean = Math.abs(sense.lean) < 0.1 ? "no lean either way" : sense.lean > 0 ? `things take ${Math.round(sense.lean * 100)}% longer than you guess` : `you finish ${Math.round(-sense.lean * 100)}% sooner than you guess`;
+  return <Tile id="pv-timesense" label="Time sense" value={`±${Math.round(sense.miss * 100)}%`} sub={`${lean} · ${sense.n} ${sense.n === 1 ? "guess" : "guesses"}${sense.improving ? " · getting sharper" : ""}`} trend={sense.improving ? 1 : 0} />;
 }

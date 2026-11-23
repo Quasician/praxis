@@ -115,6 +115,22 @@ Praxis is built to be easy on the eyes on a big monitor all day:
 - **Readable type**: Atkinson Hyperlegible for text (designed for legibility) and Bricolage Grotesque for headings, bundled so they work offline.
 - **Calm motion**: finishing a task fills the circle and folds the row away; the focus timer is a ring that fills. If Windows has "Show animations" turned off, Praxis stops animating too.
 
+## The Horizon (3.2)
+
+The Day view runs **left to right as one sky**. The sun crosses it at today's real sunrise and sunset (dotted ahead of you, solid behind), the past dims, and your blocks hang below it at their times. Drag tasks onto the day, drag a block sideways to move it or by its right edge to change its length; the mouse wheel scrolls through the day. Prefer the old top-to-bottom timeline? ⋯ → untick "Day as a horizon".
+
+**The week as seven skies.** Each day in the Week view has a little sky: clear when it's light, cloudier as it fills up, stormy when you've planned more than you have time for. Stars over a day are project steps planned for it. Click today's sky to zoom back into the day. Moving between Day and Week zooms out and in.
+
+**Colors follow the time of day.** Buttons, highlights and a faint wash at the top of the window shift through the day: rose at dawn, blue by day, amber at golden hour, violet at dusk, indigo at night. Reminder cards and the Now pop-out match. Every phase keeps text at comfortable reading contrast.
+
+## New projects, getting unstuck, and your sense of time (3.1)
+
+- **New project (N, or "+ New project" on your sky).** Describe a goal; Claude breaks it into steps you can start without thinking, sized and in order. You see the constellation it'll make (Reshape for another), edit the steps, and Praxis writes the milestone and steps to Todoist, with the first step on today if you like.
+- **I'm stuck** (on the Now card and the pop-out). One tiny next move, under two minutes. "Another" for a different one; "Add as a step" to keep it. Without Claude connected you still get a plain first move.
+- **Guess the time.** When you start a focus session, tap how long you think it'll take (or ignore it). When you finish, Praxis tells you how close you were, and Progress shows your **time sense**: how far off you usually are, which way you lean, and whether you're getting sharper.
+
+If Todoist has a bad minute, Praxis retries a change once by itself and tells you plainly if Todoist is down.
+
 ## Your sky (3.0)
 
 Progress opens on a night sky where your projects are constellations:
@@ -310,7 +326,7 @@ Pushes that don't change the version are only checked, not released.
 - ~~1.3: energy check-in, tiny versions, never-miss-twice streak, fresh start, block notifications, rewards~~ ✓
 - ~~2.0: Daylight look; 2.1: reminders on top of full-screen apps~~ ✓
 - ~~3.0: the night sky (projects as constellations) and the sun in focus mode~~ ✓
-- 3.1: draw a constellation with Claude, "I'm stuck", guess the time
-- 3.2: the Horizon (the day left to right; zoom out for the week)
+- ~~3.1: draw a constellation with Claude, "I'm stuck", guess the time~~ ✓
+- ~~3.2: the Horizon (the day left to right), the week as seven skies, colors by time of day~~ ✓
 - 3.3: ideas as clouds; the shut-down sunset
 - ~~1.1: morning commit, committed vs. bonus, adaptive plans, Now card, first steps, backlog cleanup, Progress, learning~~ ✓

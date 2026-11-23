@@ -172,6 +172,7 @@ function DayColumn({ day, cards, load }: { day: WeekDay; cards: WeekCard[]; load
   const isToday = day.key === ymd(new Date());
   return (
     <section ref={setNodeRef} className={`day-col ${isOver ? "over" : ""} ${isToday ? "today" : ""}`} data-day={day.key}>
+      <DaySky pct={pct} load={load} capacity={day.capacity} steps={cards.filter((c) => c.source === "milestone" || !!c.task.parent_id).length} today={isToday} />
       <header className="day-head">
         <div className="day-name">{day.date.toLocaleDateString([], { weekday: "short" })}<span>{day.date.toLocaleDateString([], { month: "short", day: "numeric" })}</span></div>
         {day.work && <span className="day-work" title="Work hours">Work {fmtMin(day.work[0])}–{fmtMin(day.work[1])}</span>}
@@ -226,6 +227,35 @@ function Card({ c, innerRef, dragProps, dragging, overlay }: { c: WeekCard; inne
         {c.source !== "fixed" && <span className={`wk-src ${c.source}`}>{c.source === "overdue" && c.note ? c.note : SOURCE_LABEL[c.source]}</span>}
         {c.locked && <span title="Repeats: keeps its own schedule">↻</span>}
       </div>
+    </div>
+  );
+}
+
+/** Each day as a little sky: the fuller the day, the cloudier; over capacity is a storm. Stars are project steps planned that day. */
+export function weatherFor(pct: number) {
+  return pct > 100 ? "storm" : pct > 80 ? "cloudy" : pct > 45 ? "partly" : "clear";
+}
+const WEATHER_TEXT = { clear: "Clear", partly: "Some clouds", cloudy: "Full", storm: "Stormy" } as const;
+function DaySky({ pct, load, capacity, steps, today }: { pct: number; load: number; capacity: number; steps: number; today: boolean }) {
+  const w = weatherFor(pct);
+  const setView = useUi((s) => s.setView);
+  const clouds = { clear: [], partly: [[150, 22, .8]], cloudy: [[118, 18, .9], [176, 28, .8]], storm: [[96, 16, 1], [150, 12, 1.05], [204, 20, .95]] }[w] as [number, number, number][];
+  return (
+    <div className={`day-sky ${w} ${today ? "today" : ""}`} data-weather={w} title={`${WEATHER_TEXT[w]}: ${fmtSpan(load)} planned of ${fmtSpan(capacity)} free${today ? " · click to open today" : ""}`}
+         onClick={today ? () => setView("day") : undefined} role={today ? "button" : undefined}>
+      <svg viewBox="0 0 280 64" preserveAspectRatio="xMaxYMid meet" aria-hidden="true">
+        {Array.from({ length: Math.min(steps, 7) }, (_, i) => (
+          <g key={`s${i}`} className="ds-star" transform={`translate(${14 + i * 15} ${13 + (i % 2) * 8})`}><circle r="2.4" /><circle r="6" className="halo" /></g>
+        ))}
+        {w !== "storm" && <g className="ds-sun" transform="translate(246 26)"><circle r={today ? 13 : 10} className="halo" /><circle r={today ? 8 : 6.5} /></g>}
+        {clouds.map(([x, y, k], i) => (
+          <g key={i} className="ds-cloud" transform={`translate(${x} ${y}) scale(${k})`}>
+            <circle cx="0" cy="8" r="9" /><circle cx="12" cy="2" r="12" /><circle cx="26" cy="7" r="9.5" /><rect x="-9" y="8" width="44" height="10" rx="5" />
+          </g>
+        ))}
+        {w === "storm" && [110, 140, 170, 200, 230].map((x) => <line key={x} className="ds-rain" x1={x} y1="44" x2={x - 5} y2="58" />)}
+      </svg>
+      <span className="day-weather">{WEATHER_TEXT[w]}{steps ? ` · ${steps} ${steps === 1 ? "star" : "stars"}` : ""}</span>
     </div>
   );
 }

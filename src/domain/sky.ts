@@ -9,12 +9,13 @@ import { isMilestone } from "../lib/tasks";
 import type { Area, Task } from "../lib/types";
 
 export interface SkyStep { id: string; title: string; min: number; done?: string }
-export interface SkyConstellation { name: string; area?: string; steps: SkyStep[]; since: string; finished?: string; target?: string | null }
+export interface SkyConstellation { name: string; area?: string; steps: SkyStep[]; since: string; finished?: string; target?: string | null; seed?: string }
 export interface SkyRecord { cons: Record<string, SkyConstellation>; dust: Record<string, number> }
 
 export const EMPTY_SKY: SkyRecord = { cons: {}, dust: {} };
 const DUST_KEEP = 400;   // days of stardust kept
 const DEFAULT_MIN = 20;  // a step with no duration
+const JUST_MADE = 10 * 60_000; // a project made in Praxis is kept this long while Todoist's lists catch up
 
 const plainTitle = (s: string) => String(s || "").replace(/\[([^\]]+)\]\([^)]+\)/g, "$1").replace(/[*_`]/g, "").trim();
 const minutesOf = (t: Task) => {
@@ -65,6 +66,7 @@ export function mergeSky(prev: SkyRecord | undefined, active: Task[], completed:
       steps,
       ...(finishedAt ? { finished: finishedAt } : {}),
       target: src ? targetOf(src) : was?.target ?? null,
+      ...(was?.seed ? { seed: was.seed } : {}),
     };
   };
 
@@ -74,6 +76,7 @@ export function mergeSky(prev: SkyRecord | undefined, active: Task[], completed:
     if (was.finished) { cons[id] = was; continue; }                                    // already in the Milky Way
     const c = doneById.get(id);
     if (c) cons[id] = build(id, undefined, was, c.completed_at || now.toISOString());   // just finished
+    else if (!was.steps.length && now.getTime() - Date.parse(was.since) < JUST_MADE) cons[id] = was; // just created here: Todoist hasn't caught up yet
     // else: deleted (or no longer a milestone): it leaves the sky
   }
   // Milestones finished before Praxis ever saw them still belong in the Milky Way.
@@ -184,7 +187,7 @@ export function layoutSky(sky: SkyRecord, o: LayoutOpts): SkyLayout {
   const heightFor = (d: number | null) => (d === null ? TOP + 40 : d < 0 ? HORIZON - 34 : HORIZON - 50 - (Math.min(d, 60) / 60) * (HORIZON - 50 - TOP));
 
   const build = (id: string, c: SkyConstellation, scale: number, color: string): ConstellationView => {
-    const { pts, links } = shapeOf(id, c.steps.length);
+    const { pts, links } = shapeOf(c.seed || id, c.steps.length);
     const xs = pts.map((p) => p.x), ys = pts.map((p) => p.y);
     const minX = Math.min(...xs), minY = Math.min(...ys);
     const nextId = o.nextIds.get(id);

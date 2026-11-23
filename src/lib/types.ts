@@ -97,10 +97,10 @@ export interface DayRecord {
   star?: { id: string; prevPriority: number }; // "the one" was raised to p1 in Todoist; put back the next morning
 }
 /** A finished focus session: how long a task really took vs. its estimate. */
-export interface Sample { wp: number; est: number; actual: number; at: string }
-export interface Focus { taskId: string; content: string; startedAt: string; minutes: number }
+export interface Sample { wp: number; est: number; actual: number; at: string; guess?: number }
+export interface Focus { taskId: string; content: string; startedAt: string; minutes: number; guess?: number }
 
-export interface Appearance { theme?: "auto" | "dark" | "light"; warmEvenings?: boolean; focus?: boolean }
+export interface Appearance { theme?: "auto" | "dark" | "light"; warmEvenings?: boolean; focus?: boolean; dayLayout?: "horizon" | "classic" }
 
 export interface Config {
   areas?: Area[];

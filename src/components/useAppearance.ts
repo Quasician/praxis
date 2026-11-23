@@ -1,3 +1,4 @@
+import { sunTimes } from "../domain/sun";
 import { useEffect } from "react";
 import { useData } from "../data/useData";
 import { useMedia, useNow } from "./useNow";
@@ -17,16 +18,18 @@ export function useAppearance() {
     el.dataset.theme = theme;
     if (evening) el.dataset.evening = ""; else delete el.dataset.evening;
     if (ui.focus) el.dataset.focus = ""; else delete el.dataset.focus;
-    el.dataset.sky = skyAt(now.getHours());
-  }, [theme, evening, ui.focus, now.getHours()]); // eslint-disable-line
+    el.dataset.sky = skyAt(now);
+  }, [theme, evening, ui.focus, Math.floor((now.getHours() * 60 + now.getMinutes()) / 5)]); // eslint-disable-line
   return { theme, evening, focus: !!ui.focus };
 }
 
-/** Which part of the sky we're in: tints the Now card. */
-export function skyAt(h: number) {
-  if (h >= 5 && h < 9) return "dawn";
-  if (h >= 9 && h < 17) return "day";
-  if (h >= 17 && h < 19) return "gold";
-  if (h >= 19 && h < 21) return "dusk";
+/** Which part of the sky we're in, from today's real sunrise and sunset: tints the app, the Now card and reminders. */
+export function skyAt(d: Date) {
+  const { rise, set } = sunTimes(d);
+  const m = d.getHours() * 60 + d.getMinutes();
+  if (m >= rise - 60 && m < rise + 75) return "dawn";
+  if (m >= rise + 75 && m < set - 80) return "day";
+  if (m >= set - 80 && m < set + 10) return "gold";
+  if (m >= set + 10 && m < set + 75) return "dusk";
   return "night";
 }

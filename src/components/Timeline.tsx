@@ -17,7 +17,7 @@ const blockStyle = (start: number, dur: number, color: string, col = 0, cols = 1
   ["--c" as string]: color, left: `calc(${(col / cols) * 100}% + 4px)`, width: `calc(${100 / cols}% - 8px)`,
 });
 
-const CheckIcon = ({ size = 10 }: { size?: number }) => (
+export const CheckIcon = ({ size = 10 }: { size?: number }) => (
   <svg viewBox="0 0 24 24" width={size} height={size}><path fill="none" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round" d="M5 12.5l4.5 4.5L19 7.5" /></svg>
 );
 
@@ -164,7 +164,7 @@ function TaskBlock({ b, color, past, lifting, onPointerDown }: { b: Block; color
   );
 }
 
-function PlanBanner() {
+export function PlanBanner() {
   const plan = useUi((s) => s.plan);
   const { cfg } = useData();
   if (!plan.active) return null;

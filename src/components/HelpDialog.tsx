@@ -9,6 +9,7 @@ const KEYS: [string, string][] = [
   ["P", "Plan my day"],
   ["Enter", "Accept the proposed plan"],
   ["M", "Morning commit: pick today's tasks"],
+  ["N", "New project (Claude breaks it into steps)"],
   ["S", "Shut down the day"],
   ["G", "Progress"],
   ["F", "Focus mode: only what's next"],

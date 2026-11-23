@@ -7,6 +7,7 @@ import type { Task } from "../lib/types";
 import { doToday, updateConfig } from "../data/actions";
 import { useActive, useCompleted } from "../data/queries";
 import { useData } from "../data/useData";
+import { useUi } from "../state/ui";
 
 const SEEN_KEY = "praxis.sky.seen";
 const readSeen = () => { try { return Number(localStorage.getItem(SEEN_KEY)) || 0; } catch { return 0; } };
@@ -70,7 +71,10 @@ export function SkyView() {
             {lay.constellations.length ? <><b>{lay.constellations.length}</b> {lay.constellations.length === 1 ? "project" : "projects"} in progress · <b>{litMonth}</b> {litMonth === 1 ? "star" : "stars"} lit in the last 30 days{lay.milky.length ? <> · <b>{lay.milky.length}</b> finished</> : null}</> : "Your projects become constellations here."}
           </p>
         </div>
-        <p className="sky-legend">Bright stars are done, faint ones are still to do, a gold ring is the next step. The lower a project sits, the sooner it's due.</p>
+        <div className="sky-head-right">
+          <p className="sky-legend">Bright stars are done, faint ones are still to do, a gold ring is the next step. The lower a project sits, the sooner it's due.</p>
+          <button className="primary" id="sky-new" onClick={() => useUi.getState().openDialog("constellation")}>+ New project</button>
+        </div>
       </div>
 
       <div className="sky" ref={box} onMouseLeave={() => setHover(null)} onClick={() => setPicked(null)}>
@@ -137,7 +141,8 @@ export function SkyView() {
         {ready && !lay.constellations.length && !lay.milky.length && (
           <div className="sky-empty" id="sky-empty">
             <b>Your projects become constellations here.</b>
-            <span>In Areas, add a milestone and break it into steps. Each step you finish lights a star.</span>
+            <span>Describe a goal and Claude breaks it into steps. Each step you finish lights a star.</span>
+            <button className="primary" onClick={(e) => { e.stopPropagation(); useUi.getState().openDialog("constellation"); }}>+ New project</button>
           </div>
         )}
         {sel && <Picked c={sel} active={active} right={sel.x + sel.w / 2 < W * 0.45} onClose={() => setPicked(null)} />}

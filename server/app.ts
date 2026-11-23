@@ -6,7 +6,7 @@ import fs from "fs";
 import path from "path";
 import { createStore } from "./store";
 import { eventsForRange, testCalendar } from "./calendar";
-import { ClaudeError, firstSteps, looksLikeKey, reviewBacklog, sortDump, tinyVersions, verifyKey, type Auth, type BacklogTask, type SortContext, type StuckTask } from "./claude";
+import { ClaudeError, firstSteps, looksLikeKey, reviewBacklog, sortDump, tinyVersions, drawConstellation, nextMove, verifyKey, type Auth, type BacklogTask, type SortContext, type StuckTask } from "./claude";
 import { cachedCliStatus, cliStatus } from "./claudecode";
 
 export interface ServerOptions {
@@ -137,6 +137,25 @@ export function createPraxisServer(opts: ServerOptions) {
       try {
         if (route.endsWith("tiny")) return sendJSON(res, 200, await tinyVersions(a, body.tasks as StuckTask[], today));
         return sendJSON(res, 200, route.endsWith("steps") ? await firstSteps(a, body.tasks as StuckTask[], today) : await reviewBacklog(a, body.tasks as BacklogTask[], today));
+      } catch (e) { return sendJSON(res, e instanceof ClaudeError ? e.status : 500, { error: (e as Error).message }); }
+    }
+    if (route === "POST /api/claude/constellation" || route === "POST /api/claude/unstick") {
+      const a = await auth();
+      if (!a) return sendJSON(res, 401, { error: NO_AUTH });
+      let body: Record<string, unknown>;
+      try { body = JSON.parse(await readBody(req)); } catch { return sendJSON(res, 400, { error: "Invalid JSON" }); }
+      const str = (v: unknown, n: number) => (typeof v === "string" ? v.slice(0, n) : undefined);
+      const today = str(body.today, 40) || new Date().toDateString();
+      try {
+        if (route.endsWith("constellation")) {
+          const goal = str(body.goal, 600)?.trim();
+          if (!goal) return sendJSON(res, 400, { error: "Describe the goal first." });
+          return sendJSON(res, 200, await drawConstellation(a, { goal, notes: str(body.notes, 2000), deadline: str(body.deadline, 10), area: str(body.area, 60), today }));
+        }
+        const task = str(body.task, 300)?.trim();
+        if (!task) return sendJSON(res, 400, { error: "Which task?" });
+        const tried = Array.isArray(body.tried) ? body.tried.filter((x): x is string => typeof x === "string").slice(0, 8).map((x) => x.slice(0, 200)) : [];
+        return sendJSON(res, 200, await nextMove(a, { task, notes: str(body.notes, 1000), project: str(body.project, 80), tried, minutesIn: Number(body.minutesIn) || 0, today }));
       } catch (e) { return sendJSON(res, e instanceof ClaudeError ? e.status : 500, { error: (e as Error).message }); }
     }
     if (route === "POST /api/claude/sort") {

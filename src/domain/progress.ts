@@ -172,3 +172,15 @@ export function learn(cfg: PlannerSettings, samples: Sample[] = [], completed: T
 /** Planned minutes for a task, scaled by how long that kind of task really takes you. */
 export const learnedMinutes = (t: Task, cfg: PlannerSettings, l?: Learned | null) =>
   !l ? blockMinutes(t) : Math.max(10, Math.round((blockMinutes(t) * (l.factor[willpower(t, cfg)] || 1)) / 5) * 5);
+
+/** How good your time guesses are getting: typical miss and which way you lean, from recent guessed sessions. */
+export function timeSense(samples: Sample[] | undefined, keep = 12) {
+  const g = (samples || []).filter((s) => s.guess && s.actual >= 3).slice(-keep);
+  if (!g.length) return null;
+  const med = (xs: number[]) => { const a = [...xs].sort((x, y) => x - y); const m = Math.floor(a.length / 2); return a.length % 2 ? a[m] : (a[m - 1] + a[m]) / 2; };
+  const err = g.map((s) => Math.abs(s.actual - s.guess!) / s.guess!);
+  const lean = med(g.map((s) => (s.actual - s.guess!) / s.guess!));
+  const half = Math.floor(err.length / 2);
+  const improving = err.length >= 6 ? med(err.slice(half)) < med(err.slice(0, half)) - 0.05 : null;
+  return { n: g.length, miss: med(err), lean, improving };
+}

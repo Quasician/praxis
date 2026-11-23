@@ -46,10 +46,26 @@ export const itemUpdate = (args: Record<string, unknown>): SyncCommand => ({ typ
  * tools do, so a repeating task can be moved without losing its repeat rule.
  * Returns the commands Todoist rejected (empty = all applied).
  */
+/** Todoist sometimes has a bad minute (HTTP 5xx, "Unknown error"). Commands carry ids, so sending them again is safe. */
+export const todoistDown = (e: unknown) => e instanceof ApiError && (e.status >= 500 || /unknown error|todoist support/i.test(e.message));
+async function postSync<T>(body: unknown): Promise<T> {
+  try { return await api<T>("/api/todoist/sync", { method: "POST", body }); }
+  catch (e) {
+    if (!todoistDown(e)) throw e;
+    await new Promise((r) => setTimeout(r, 2500));
+    return api<T>("/api/todoist/sync", { method: "POST", body });
+  }
+}
 export async function sync(commands: SyncCommand[]): Promise<SyncCommand[]> {
-  const res = await api<{ sync_status?: Record<string, unknown> }>("/api/todoist/sync", { method: "POST", body: { commands } });
+  const res = await postSync<{ sync_status?: Record<string, unknown> }>({ commands });
   const st = res?.sync_status || {};
   return commands.filter((c) => st[c.uuid] !== "ok");
+}
+/** Like sync, but also returns Todoist's ids for new items (temp_id → real id). */
+export async function syncMapped(commands: SyncCommand[]): Promise<{ failed: SyncCommand[]; ids: Record<string, string> }> {
+  const res = await postSync<{ sync_status?: Record<string, unknown>; temp_id_mapping?: Record<string, string> }>({ commands });
+  const st = res?.sync_status || {};
+  return { failed: commands.filter((c) => st[c.uuid] !== "ok"), ids: res?.temp_id_mapping || {} };
 }
 export async function syncOrThrow(commands: SyncCommand[]) {
   const bad = await sync(commands);
