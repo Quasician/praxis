@@ -23,7 +23,7 @@ export const qk = {
 const open = (ts: Task[]) => ts.filter((t) => !t.checked && !t.is_deleted);
 const SYNC_EVERY = 120_000;
 
-export const useStatus = () => useQuery({ queryKey: qk.status, queryFn: () => api<{ connected: boolean; claude?: boolean }>("/api/status"), staleTime: Infinity, refetchOnWindowFocus: false });
+export const useStatus = () => useQuery({ queryKey: qk.status, queryFn: () => api<{ connected: boolean; claude?: boolean; via?: "api" | "cli" | null }>("/api/status"), staleTime: Infinity, refetchOnWindowFocus: false });
 
 export const useProjects = (enabled: boolean) => useQuery({
   queryKey: qk.projects, enabled, refetchInterval: SYNC_EVERY,

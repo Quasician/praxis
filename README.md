@@ -147,8 +147,12 @@ goes to Todoist in one batch.
 
 - **File my Inbox:** on the Inbox tab, Claude suggests a project, effort and duration for everything sitting
   there. Dates you already set are kept unless you change them.
-- Uses your own Anthropic API key (⋯ → **Claude…**). It's pay-as-you-go, and a dump costs well under a cent.
-  The key is stored next to your Todoist token and never reaches the window.
+- **Connecting Claude (⋯ → Claude…):** either
+  - **your Claude subscription**, through [Claude Code](https://code.claude.com/docs/en/setup) on this computer: install it,
+    run `claude` once and sign in, then click *Check again*. No key, nothing extra to pay; requests count against your
+    plan's monthly allowance for scripted Claude Code use. Or
+  - **an Anthropic API key** (pay-as-you-go; a dump costs well under a cent). Stored next to your Todoist token,
+    never sent to the window.
 
 ## Shutting down the day
 

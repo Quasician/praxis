@@ -111,8 +111,8 @@ function BacklogBody() {
     return (
       <div className="backlog-form">
         <h2>Clean up your backlog</h2>
-        <p className="dialog-sub">This uses Claude through your Anthropic API key, the same one the brain dump uses.</p>
-        <div className="dialog-actions"><button type="button" className="ghost-btn" onClick={() => close("backlog")}>Close</button><button type="button" className="primary" onClick={() => { close("backlog"); openDialogClaude(); }}>Add a key…</button></div>
+        <p className="dialog-sub">This uses Claude. Connect it once (your Claude subscription through Claude Code, or an API key) and it works here and in brain dumps.</p>
+        <div className="dialog-actions"><button type="button" className="ghost-btn" onClick={() => close("backlog")}>Close</button><button type="button" className="primary" onClick={() => { close("backlog"); openDialogClaude(); }}>Connect Claude…</button></div>
       </div>
     );
   }

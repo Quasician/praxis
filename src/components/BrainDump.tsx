@@ -134,48 +134,92 @@ function ProposalRow({ p }: { p: Proposal }) {
   );
 }
 
-/** Paste / replace / remove the Anthropic API key. */
+interface CliStatus { installed: boolean; loggedIn: boolean; method: string; version: string; path: string; error?: string }
+interface AiStatus { provider: "auto" | "cli" | "api"; apiKey: boolean; cli: CliStatus }
+
+/** Connect Claude: your Claude subscription through Claude Code (recommended), or an Anthropic API key. */
 function ClaudeKey({ intro = false, onDone }: { intro?: boolean; onDone: () => void }) {
   const status = useStatus();
+  const [ai, setAi] = useState<AiStatus | null>(null);
+  const [checking, setChecking] = useState(false);
+  const [showKey, setShowKey] = useState(false);
   const [key, setKey] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const has = !!status.data?.claude;
-  const save = async () => {
+  const load = async (fresh: boolean) => {
+    setChecking(true);
+    try { setAi(await api<AiStatus>(`/api/ai${fresh ? "?fresh=1" : ""}`)); } catch (e) { setError((e as Error).message); }
+    finally { setChecking(false); await queryClient.refetchQueries({ queryKey: qk.status }); }
+  };
+  useEffect(() => { load(false); }, []);
+  const choose = async (provider: AiStatus["provider"]) => {
+    await api("/api/ai", { method: "POST", body: { provider } });
+    await Promise.all([load(false), queryClient.refetchQueries({ queryKey: qk.config })]);
+  };
+  const saveKey = async () => {
     setBusy(true); setError("");
     try {
       await api("/api/claude/key", { method: "POST", body: { key } });
-      setKey("");
-      await queryClient.refetchQueries({ queryKey: qk.status });
-      if (!intro) onDone();
+      setKey(""); setShowKey(false);
+      await choose("api");
     } catch (e) { setError((e as Error).message); }
     finally { setBusy(false); }
   };
+  const cli = ai?.cli;
+  const via = status.data?.via;
+  const cliReady = !!cli?.loggedIn;
+  const cliLine = !ai ? "Looking for Claude Code…"
+    : !cli!.installed ? "Claude Code isn't installed on this computer yet."
+    : !cli!.loggedIn ? "Claude Code is installed but not signed in."
+    : cli!.method === "claude.ai" ? `Ready: Claude Code ${cli!.version} is signed in with your Claude subscription.`
+    : `Claude Code ${cli!.version} is signed in (${cli!.method === "api_key" ? "with an API key, which bills the API" : cli!.method}).`;
+
   return (
-    <form className="claude-form" onSubmit={(e) => { e.preventDefault(); if (key.trim() && !busy) save(); }}>
+    <form className="claude-form" onSubmit={(e) => { e.preventDefault(); if (showKey && key.trim() && !busy) saveKey(); }}>
       <h2>{intro ? "Connect Claude for brain dumps" : "Claude"}</h2>
-      <p className="dialog-sub">
-        Brain dumps use Claude through your own Anthropic API key. It's pay-as-you-go: a typical dump costs well under a cent.
-        The key stays on this computer, next to your Todoist token.
-      </p>
-      {has && !intro && <p className="claude-ok" id="claude-connected">✓ Connected. Paste a new key below to replace it.</p>}
-      <ol className="claude-steps">
-        <li>Open <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">console.anthropic.com → API keys</a> and sign in.</li>
-        <li>Add a little credit under <b>Billing</b> if you haven't ($5 lasts a long time).</li>
-        <li>Click <b>Create key</b>, name it "Praxis", copy it and paste it here.</li>
-      </ol>
-      <input id="claude-key" type="password" autoComplete="off" spellCheck={false} placeholder="sk-ant-…" value={key} onChange={(e) => setKey(e.target.value)} />
+      <p className="dialog-sub">Brain dumps, first steps and backlog cleanup use Claude. Praxis can use your Claude subscription through Claude Code on this computer, with no API key and nothing extra to pay.</p>
+
+      <section className={`ai-option ${via === "cli" ? "on" : ""}`} id="ai-cli">
+        <div className="ai-head"><b>Your Claude subscription (Claude Code)</b>{via === "cli" && <span className="ai-badge">In use</span>}</div>
+        <p className={`ai-status ${cliReady ? "ok" : ""}`} id="ai-cli-status">{cliLine}</p>
+        {ai && !cliReady && (
+          <ol className="claude-steps" id="ai-cli-steps">
+            {!cli!.installed && <li>Install Claude Code: open <a href="https://code.claude.com/docs/en/setup" target="_blank" rel="noopener">the setup page</a> and run its one-line Windows (PowerShell) install command.</li>}
+            <li>Open a terminal, type <code>claude</code> and sign in with the same account you use for Claude.</li>
+            <li>Come back here and click <b>Check again</b>.</li>
+          </ol>
+        )}
+        <p className="ai-note">Uses your plan's monthly allowance for scripted Claude Code use. A brain dump is a small request.</p>
+        <div className="ai-actions">
+          <button type="button" id="ai-check" className="ghost-btn" disabled={checking} onClick={() => load(true)}>{checking ? "Checking…" : "Check again"}</button>
+          {cliReady && via !== "cli" && <button type="button" id="ai-use-cli" className="primary" onClick={() => choose("cli")}>Use my subscription</button>}
+        </div>
+      </section>
+
+      <section className={`ai-option ${via === "api" ? "on" : ""}`} id="ai-api">
+        <div className="ai-head"><b>An Anthropic API key</b>{via === "api" && <span className="ai-badge">In use</span>}</div>
+        <p className="ai-status">{ai?.apiKey ? "A key is saved on this computer." : "Pay-as-you-go through console.anthropic.com, billed separately from your Claude plan."}</p>
+        {showKey ? <>
+          <input id="claude-key" type="password" autoComplete="off" spellCheck={false} autoFocus placeholder="sk-ant-…" value={key} onChange={(e) => setKey(e.target.value)} />
+          <div className="ai-actions">
+            <button type="button" className="ghost-btn" onClick={() => setShowKey(false)}>Cancel</button>
+            <button type="submit" id="claude-save" className="primary" disabled={!key.trim() || busy}>{busy ? "Checking…" : "Save key"}</button>
+          </div>
+        </> : (
+          <div className="ai-actions">
+            <button type="button" id="ai-add-key" className="ghost-btn" onClick={() => setShowKey(true)}>{ai?.apiKey ? "Replace key" : "Add a key"}</button>
+            {ai?.apiKey && via !== "api" && <button type="button" id="ai-use-api" className="ghost-btn" onClick={() => choose("api")}>Use the key</button>}
+            {ai?.apiKey && <button type="button" id="claude-remove" className="ghost-btn danger" onClick={async () => {
+              if (!confirm("Remove your Anthropic API key from Praxis?")) return;
+              await api("/api/claude/key", { method: "DELETE" });
+              await choose("auto");
+            }}>Remove key</button>}
+          </div>
+        )}
+      </section>
+
       {error && <p id="claude-error" className="dump-error">{error}</p>}
-      <div className="dialog-actions">
-        {has && !intro && <button type="button" id="claude-remove" className="ghost-btn danger" onClick={async () => {
-          if (!confirm("Remove your Anthropic API key from Praxis?")) return;
-          await api("/api/claude/key", { method: "DELETE" });
-          await queryClient.refetchQueries({ queryKey: qk.status });
-        }}>Remove key</button>}
-        <span className="spacer" />
-        {!intro && <button type="button" className="ghost-btn" onClick={onDone}>Close</button>}
-        <button type="submit" id="claude-save" className="primary" disabled={!key.trim() || busy}>{busy ? "Checking…" : "Connect"}</button>
-      </div>
+      {!intro && <div className="dialog-actions"><button type="button" className="primary" onClick={onDone}>Done</button></div>}
     </form>
   );
 }

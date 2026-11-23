@@ -6,7 +6,8 @@ import fs from "fs";
 import path from "path";
 import { createStore } from "./store";
 import { eventsForRange, testCalendar } from "./calendar";
-import { ClaudeError, firstSteps, looksLikeKey, reviewBacklog, sortDump, verifyKey, type BacklogTask, type SortContext, type StuckTask } from "./claude";
+import { ClaudeError, firstSteps, looksLikeKey, reviewBacklog, sortDump, verifyKey, type Auth, type BacklogTask, type SortContext, type StuckTask } from "./claude";
+import { cachedCliStatus, cliStatus } from "./claudecode";
 
 export interface ServerOptions {
   dataDir: string;
@@ -59,11 +60,40 @@ export function createPraxisServer(opts: ServerOptions) {
     return { status: r.status, text: await r.text(), type: r.headers.get("content-type") || "application/json" };
   }
 
+  type Provider = "auto" | "cli" | "api";
+  const provider = (): Provider => { const p = (store.readConfig().ai as { provider?: Provider } | undefined)?.provider; return p === "cli" || p === "api" ? p : "auto"; };
+  /** Which way to reach Claude right now: your choice, else an API key if you added one, else Claude Code if it's signed in. */
+  async function auth(): Promise<Auth | null> {
+    const p = provider(), key = store.getClaudeKey();
+    if (p === "api") return key ? { kind: "api", key } : null;
+    if (p === "cli") return (await cliStatus()).loggedIn ? { kind: "cli" } : null;
+    if (key) return { kind: "api", key };
+    return (await cliStatus()).loggedIn ? { kind: "cli" } : null;
+  }
+  const NO_AUTH = "Connect Claude first: ⋯ → Claude… (use your Claude subscription through Claude Code, or an API key).";
+  // Find out about Claude Code in the background so the first status check is instant.
+  cliStatus().catch(() => undefined);
+
   async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, url: URL) {
     if (!isTrusted(req)) return sendJSON(res, 403, { error: "Forbidden" });
     const route = `${req.method} ${url.pathname}`;
 
-    if (route === "GET /api/status") return sendJSON(res, 200, { connected: Boolean(store.getToken()), claude: Boolean(store.getClaudeKey()) });
+    if (route === "GET /api/status") {
+      const p = provider(), key = Boolean(store.getClaudeKey()), cli = Boolean(cachedCliStatus()?.loggedIn);
+      const claude = p === "api" ? key : p === "cli" ? cli : key || cli;
+      return sendJSON(res, 200, { connected: Boolean(store.getToken()), claude, via: !claude ? null : (p === "api" || (p === "auto" && key)) ? "api" : "cli" });
+    }
+    if (route === "GET /api/ai") {
+      const cli = await cliStatus(url.searchParams.get("fresh") === "1");
+      return sendJSON(res, 200, { provider: provider(), apiKey: Boolean(store.getClaudeKey()), cli });
+    }
+    if (route === "POST /api/ai") {
+      let body: { provider?: string };
+      try { body = JSON.parse(await readBody(req)); } catch { return sendJSON(res, 400, { error: "Invalid JSON" }); }
+      const p = body.provider === "cli" || body.provider === "api" ? body.provider : "auto";
+      store.writeConfig({ ...store.readConfig(), ai: { provider: p } });
+      return sendJSON(res, 200, { provider: p });
+    }
 
     if (route === "POST /api/token") {
       const { token } = JSON.parse((await readBody(req)) || "{}");
@@ -87,23 +117,23 @@ export function createPraxisServer(opts: ServerOptions) {
     }
     if (route === "DELETE /api/claude/key") { store.setClaudeKey(null); return sendJSON(res, 200, { claude: false }); }
     if (route === "POST /api/claude/steps" || route === "POST /api/claude/backlog") {
-      const key = store.getClaudeKey();
-      if (!key) return sendJSON(res, 401, { error: "Add your Anthropic API key first (⋯ → Claude)." });
+      const a = await auth();
+      if (!a) return sendJSON(res, 401, { error: NO_AUTH });
       let body: { tasks?: unknown[]; today?: string };
       try { body = JSON.parse(await readBody(req)); } catch { return sendJSON(res, 400, { error: "Invalid JSON" }); }
       if (!Array.isArray(body.tasks) || !body.tasks.length || body.tasks.length > 80) return sendJSON(res, 400, { error: "Send between 1 and 80 tasks." });
       const today = String(body.today || new Date().toDateString()).slice(0, 40);
       try {
-        return sendJSON(res, 200, route.endsWith("steps") ? await firstSteps(key, body.tasks as StuckTask[], today) : await reviewBacklog(key, body.tasks as BacklogTask[], today));
+        return sendJSON(res, 200, route.endsWith("steps") ? await firstSteps(a, body.tasks as StuckTask[], today) : await reviewBacklog(a, body.tasks as BacklogTask[], today));
       } catch (e) { return sendJSON(res, e instanceof ClaudeError ? e.status : 500, { error: (e as Error).message }); }
     }
     if (route === "POST /api/claude/sort") {
-      const key = store.getClaudeKey();
-      if (!key) return sendJSON(res, 401, { error: "Add your Anthropic API key first (⋯ → Claude)." });
+      const a = await auth();
+      if (!a) return sendJSON(res, 401, { error: NO_AUTH });
       let body: SortContext;
       try { body = JSON.parse(await readBody(req)); } catch { return sendJSON(res, 400, { error: "Invalid JSON" }); }
       if (typeof body?.text !== "string" || body.text.length > 20000 || (body.inbox && body.inbox.length > 80)) return sendJSON(res, 400, { error: "That's too much for one go. Try splitting it up." });
-      try { return sendJSON(res, 200, await sortDump(key, body)); }
+      try { return sendJSON(res, 200, await sortDump(a, body)); }
       catch (e) { return sendJSON(res, e instanceof ClaudeError ? e.status : 500, { error: (e as Error).message }); }
     }
 
@@ -112,8 +142,10 @@ export function createPraxisServer(opts: ServerOptions) {
       let cfg: unknown;
       try { cfg = JSON.parse(await readBody(req)); } catch { return sendJSON(res, 400, { error: "Invalid JSON" }); }
       if (!cfg || typeof cfg !== "object" || Array.isArray(cfg)) return sendJSON(res, 400, { error: "Settings must be an object" });
-      store.writeConfig(cfg as Record<string, unknown>);
-      return sendJSON(res, 200, cfg);
+      const next = cfg as Record<string, unknown>, cur = store.readConfig();
+      if (cur.ai && !("ai" in next)) next.ai = cur.ai; // set by the Claude dialog; a window with older settings mustn't drop it
+      store.writeConfig(next);
+      return sendJSON(res, 200, next);
     }
 
     if (route === "GET /api/calendar") {
