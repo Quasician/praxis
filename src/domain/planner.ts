@@ -5,7 +5,7 @@
 //      then priority and overdue age; the hardest work gets the earliest slots.
 import { ceilTo, minOfDay, parseDue, sameDay, startOfToday, toMin } from "../lib/dates";
 import { isMilestone, willpower } from "../lib/tasks";
-import type { CalEvent, Config, PlannerSettings, Task } from "../lib/types";
+import type { CalEvent, Config, Energy, PlannerSettings, Task } from "../lib/types";
 import { layoutBlocks, visibleEvents } from "./layout";
 import { learnedMinutes, type Learned } from "./progress";
 
@@ -63,7 +63,7 @@ export function freeIntervals(cfg: PlannerSettings, todayTasks: Task[], events: 
 }
 
 export interface Candidate { task: Task; source: "today" | "milestone"; overdueDays: number; milestone?: Task; target?: string }
-export interface PlanItem extends Candidate { start: number; dur: number; committed?: boolean; star?: boolean }
+export interface PlanItem extends Candidate { start: number; dur: number; committed?: boolean; star?: boolean; tiny?: string }
 export interface Plan { items: PlanItem[]; unplaced: Candidate[]; freeMin: number }
 
 export interface PlanInput {
@@ -76,6 +76,8 @@ export interface PlanInput {
   seed?: number;              // non-zero = reshuffle within willpower levels
   fill?: number;              // % of free time to fill (defaults to cfg.fill)
   learned?: Learned | null;   // best Deep hours + real durations
+  energy?: Energy;            // low: light work + tiny versions; slammed: one tiny thing
+  tiny?: Record<string, string>;
 }
 
 export function candidates({ cfg, today, active, tray }: PlanInput): Candidate[] {
@@ -107,13 +109,22 @@ export function candidates({ cfg, today, active, tray }: PlanInput): Candidate[]
 
 function rng(seed: number) { let s = seed || 1; return () => (s = (s * 16807) % 2147483647) / 2147483647; }
 
+export const TINY_MIN = 10;
+
 export function buildPlan(input: PlanInput): Plan {
-  const { cfg, slips } = input;
-  const cands = candidates(input);
+  const { slips } = input;
+  const energy = input.energy || "full";
+  // Low energy: two commitments, Deep work only as its tiny version. Slammed: one tiny thing, nothing else.
+  const cfg = energy === "full" ? input.cfg : { ...input.cfg, commitCount: energy === "low" ? Math.min(2, input.cfg.commitCount) : 1 };
+  const tinyOf = (t: Task) => input.tiny?.[t.id] || "";
+  let cands = candidates(input);
+  if (energy !== "full") cands = cands.filter((c) => willpower(c.task, cfg) < 3 || tinyOf(c.task));
   const rand = rng(input.seed || 0);
   const jitter = new Map(cands.map((c) => [c.task.id, input.seed ? rand() : 0]));
   // Tasks that slipped before rank higher so they stop sinking.
-  const rank = (c: Candidate) => willpower(c.task, cfg) + Math.min(1.5, 0.5 * slips(c.task.id)) + (c.overdueDays > 0 ? 0.25 : 0);
+  const rank = (c: Candidate) => energy === "slammed"
+    ? (tinyOf(c.task) ? 2 : 0) + (c.task.priority || 1) * 0.3 + (c.overdueDays > 0 ? 0.25 : 0)   // the easiest meaningful thing
+    : willpower(c.task, cfg) + Math.min(1.5, 0.5 * slips(c.task.id)) + (c.overdueDays > 0 ? 0.25 : 0);
   cands.sort((a, b) =>
     rank(b) - rank(a) ||
     willpower(b.task, cfg) - willpower(a.task, cfg) ||
@@ -131,7 +142,9 @@ export function buildPlan(input: PlanInput): Plan {
   const items: PlanItem[] = [], unplaced: Candidate[] = [];
   let committed = 0, deepCommitted = 0;
   for (const c of cands) {
-    const dur = learnedMinutes(c.task, cfg, learned);
+    if (energy === "slammed" && items.length >= 1) { unplaced.push(c); continue; }
+    const tiny = energy !== "full" && tinyOf(c.task) ? tinyOf(c.task) : "";
+    const dur = tiny ? TINY_MIN : energy === "slammed" ? Math.min(15, learnedMinutes(c.task, cfg, learned)) : learnedMinutes(c.task, cfg, learned);
     if (used + dur > budget) { unplaced.push(c); continue; }
     const deep = willpower(c.task, cfg) === 3;
     // Deep work goes as close as possible to the hours you actually finish Deep work; the rest takes the earliest slot.
@@ -154,7 +167,7 @@ export function buildPlan(input: PlanInput): Plan {
     // The first few you place are your commitments (at most one Deep); the rest are bonus.
     const commit = committed < cfg.commitCount && (!deep || deepCommitted === 0);
     if (commit) { committed++; if (deep) deepCommitted++; }
-    items.push({ ...c, start, dur, committed: commit });
+    items.push({ ...c, start, dur, committed: commit, ...(tiny ? { tiny } : {}) });
     used += dur;
     const pieces: [number, number][] = [];
     if (start - cfg.gap - a >= 15) pieces.push([a, start - cfg.gap]);

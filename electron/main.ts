@@ -194,6 +194,7 @@ function refreshTrayMenu() {
     { label: "Brain dump…", click: () => trigger("brain-dump") },
     { label: "Shut down the day…", click: () => trigger("shutdown") },
     { label: "Now (always on top)", click: () => openMini() },
+    { label: "Mark Now done", accelerator: NOW_DONE, click: nowDone },
     { label: "Full screen", accelerator: "F11", type: "checkbox", checked: !!win?.isFullScreen(), click: () => { showWindow(); toggleFullScreen(); } },
     { type: "separator" },
     { label: "Open at login", type: "checkbox", checked: app.getLoginItemSettings().openAtLogin, click: (item) => { setOpenAtLogin(item.checked); } },
@@ -211,6 +212,9 @@ function trigger(name: string) {
   win?.webContents.executeJavaScript(`window.dispatchEvent(new Event("praxis:${name}"))`).catch(() => undefined);
 }
 const quickAdd = () => trigger("quick-add");
+/** Ctrl+Alt+D anywhere: mark the Now task done without bringing Praxis forward. */
+const NOW_DONE = "CommandOrControl+Alt+D";
+const nowDone = () => win?.webContents.executeJavaScript('window.dispatchEvent(new Event("praxis:now-done"))').catch(() => undefined);
 
 // ---------- evening reminder ----------
 /** When Praxis is tucked away in the tray at shut-down time, a Windows notification nudges you (once a day). */
@@ -250,6 +254,7 @@ function setupJumpList() {
 }
 function registerQuickAdd() {
   if (!globalShortcut.register(QUICK_ADD, quickAdd)) log("couldn't register", QUICK_ADD, "(another app may be using it)");
+  if (!globalShortcut.register(NOW_DONE, nowDone)) log("couldn't register", NOW_DONE, "(another app may be using it)");
 }
 
 // ---------- open at login (on by default) ----------

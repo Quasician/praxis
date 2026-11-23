@@ -47,6 +47,7 @@ Your data stays on your computer in `%APPDATA%\Praxis` (`.env` holds the Todoist
 | `G` | Progress |
 | `?` | All keyboard shortcuts (and the version you're on) |
 | `Ctrl+Shift+Space` | Quick add from anywhere (desktop app) |
+| `Ctrl+Alt+D` | Mark the Now task done from anywhere (desktop app) |
 | `F11`, `Ctrl +/−/0` | Fullscreen, zoom (desktop app) |
 | `1` / `2` | Today / Inbox |
 | `Esc` | Leave the input, or cancel a drag |
@@ -137,6 +138,26 @@ Praxis is built around one number: how much of what you plan actually gets done.
 - **Progress (`G`)** shows planned vs. done for the last 28 days, week by week, by effort, by area, and your shutdown streak.
 - **Learning.** Praxis notices when you actually finish Deep work and schedules Deep tasks there. Timed Now
   sessions teach it how long things really take, and plans use those durations.
+
+## Low-energy and busy days
+
+The smallest possible day should still count.
+
+- **How's today?** The morning commit starts with *Full / Low / Slammed*.
+  - **Low:** two commitments, light work, and Deep tasks only as a 10-minute **tiny version**.
+  - **Slammed:** one small thing, and everything else due today is spread over the rest of the week.
+- **Tiny versions.** Claude writes a 2–5 minute version of your habits and Deep tasks ("Put on rowing shoes and
+  row 5 minutes"). On low days the Now card offers **✓ Tiny**. For a repeating task it counts as done; a one-off
+  stays open, but the day still counts.
+- **Never miss twice.** The streak in the top bar counts days where you did a committed thing (tiny counts) or
+  closed the day. One missed day is allowed, and the chip turns amber to say "keep it alive today". Two in a row ends it.
+- **Fresh start.** Come back after a couple of days away to a pile of overdue tasks, and Praxis offers one button:
+  spread them over the next week (or park them in Someday). Missed repeating tasks just start again today.
+- **Less friction.** Notifications when a planned block starts (click to open the Now pop-out). **Ctrl+Alt+D**
+  marks the Now task done from anywhere. **The one that matters** becomes p1 in Todoist for the day, so your phone
+  shows it first; it goes back at shutdown.
+- **Small rewards.** Confetti for the one that matters and for finishing every commitment. On Friday the Week view
+  opens with a recap: what got done, commitments kept, your streak, best day and top wins.
 
 ## Brain dump (Claude)
 
@@ -246,4 +267,5 @@ Pushes that don't change the version are only checked, not released.
 - ~~Day 5: brain-dump inbox with Claude~~ ✓
 - ~~Day 6: end-of-day shutdown~~ ✓
 - ~~Day 7: taskbar jump list, shortcut help, crash screen, repeating tasks count as done~~ ✓
+- ~~1.3: energy check-in, tiny versions, never-miss-twice streak, fresh start, block notifications, rewards~~ ✓
 - ~~1.1: morning commit, committed vs. bonus, adaptive plans, Now card, first steps, backlog cleanup, Progress, learning~~ ✓

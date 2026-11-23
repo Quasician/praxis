@@ -31,7 +31,8 @@ export function dayStats(config: Config | undefined, completed: Task[], days = 2
     const day = ymd(addDays(startOfToday(), -i));
     const planned = history[day]?.planned || [];
     const ids = new Set(planned.map((p) => p.id));
-    const isDone = (p: PlannedItem) => done.has(doneKey(p.id, day));
+    const tiny = new Set(history[day]?.tinyDone || []);
+    const isDone = (p: PlannedItem) => done.has(doneKey(p.id, day)) || tiny.has(p.id);
     out.push({
       day,
       planned: planned.length,
@@ -93,6 +94,33 @@ export function effectiveFill(cfg: PlannerSettings, config: Config | undefined, 
   if (r >= 0.8) return { fill: Math.min(85, cfg.fill + 10), why: `you finished ${Math.round(r * 100)}% of your commitments this week, so the plan is a bit fuller` };
   if (r < 0.5) return { fill: Math.max(45, cfg.fill - 10), why: `you finished ${Math.round(r * 100)}% of your commitments this week, so the plan is a bit lighter` };
   return { fill: cfg.fill, why: "" };
+}
+
+/**
+ * "Never miss twice": a day counts if you did at least one committed thing (a tiny version counts) or closed the day.
+ * One missed day doesn't break the streak; two in a row does. Today only counts once it's earned.
+ */
+export function habitStreak(config: Config | undefined, completed: Task[]) {
+  const h = config?.history || {};
+  const done = completionSet(completed);
+  const counts = (day: string) => {
+    const r = h[day];
+    if (!r) return false;
+    if (r.shutdown || (r.tinyDone || []).length) return true;
+    return r.planned.some((p) => p.committed && done.has(doneKey(p.id, day)));
+  };
+  const today = ymd(startOfToday());
+  let n = 0, misses = 0, d = startOfToday();
+  if (!counts(today)) d = addDays(d, -1);
+  for (let i = 0; i < 400; i++, d = addDays(d, -1)) {
+    const key = ymd(d);
+    if (!h[key] && !Object.keys(h).some((k) => k < key)) break; // before Praxis kept history
+    if (counts(key)) { n++; misses = 0; }
+    else if (++misses >= 2) break;
+  }
+  const todayDone = counts(today);
+  const yesterdayMissed = !counts(ymd(addDays(startOfToday(), -1)));
+  return { days: n, todayDone, atRisk: n > 0 && !todayDone && yesterdayMissed };
 }
 
 /** Days in a row (ending today or yesterday) that were closed with the shutdown, or committed in the morning. */

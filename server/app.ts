@@ -6,7 +6,7 @@ import fs from "fs";
 import path from "path";
 import { createStore } from "./store";
 import { eventsForRange, testCalendar } from "./calendar";
-import { ClaudeError, firstSteps, looksLikeKey, reviewBacklog, sortDump, verifyKey, type Auth, type BacklogTask, type SortContext, type StuckTask } from "./claude";
+import { ClaudeError, firstSteps, looksLikeKey, reviewBacklog, sortDump, tinyVersions, verifyKey, type Auth, type BacklogTask, type SortContext, type StuckTask } from "./claude";
 import { cachedCliStatus, cliStatus } from "./claudecode";
 
 export interface ServerOptions {
@@ -116,7 +116,7 @@ export function createPraxisServer(opts: ServerOptions) {
       return sendJSON(res, 200, { claude: true });
     }
     if (route === "DELETE /api/claude/key") { store.setClaudeKey(null); return sendJSON(res, 200, { claude: false }); }
-    if (route === "POST /api/claude/steps" || route === "POST /api/claude/backlog") {
+    if (route === "POST /api/claude/steps" || route === "POST /api/claude/backlog" || route === "POST /api/claude/tiny") {
       const a = await auth();
       if (!a) return sendJSON(res, 401, { error: NO_AUTH });
       let body: { tasks?: unknown[]; today?: string };
@@ -124,6 +124,7 @@ export function createPraxisServer(opts: ServerOptions) {
       if (!Array.isArray(body.tasks) || !body.tasks.length || body.tasks.length > 80) return sendJSON(res, 400, { error: "Send between 1 and 80 tasks." });
       const today = String(body.today || new Date().toDateString()).slice(0, 40);
       try {
+        if (route.endsWith("tiny")) return sendJSON(res, 200, await tinyVersions(a, body.tasks as StuckTask[], today));
         return sendJSON(res, 200, route.endsWith("steps") ? await firstSteps(a, body.tasks as StuckTask[], today) : await reviewBacklog(a, body.tasks as BacklogTask[], today));
       } catch (e) { return sendJSON(res, e instanceof ClaudeError ? e.status : 500, { error: (e as Error).message }); }
     }

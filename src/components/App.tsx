@@ -25,6 +25,8 @@ import { ShutdownDialog } from "./ShutdownDialog";
 import { HelpDialog } from "./HelpDialog";
 import { ProgressView } from "./ProgressView";
 import { MorningDialog } from "./MorningDialog";
+import { Celebration, FreshStartDialog, shouldFreshStart, useBlockNotifications, useDoneHotkey } from "./Habits";
+import { daysAway } from "../data/habits";
 import { BacklogDialog } from "./BacklogDialog";
 import { useMedia } from "./useNow";
 import { WeekView, useWeeklyAuto } from "./WeekView";
@@ -41,6 +43,8 @@ function Shell() {
   const view = useUi((s) => s.view);
   const wide = useMedia("(min-width: 2200px)"); // ultrawide: show areas beside the day
   useBackgroundJobs();
+  useBlockNotifications();
+  useDoneHotkey();
   useShortcuts();
   return (
     <div id="app" className="app">
@@ -58,6 +62,8 @@ function Shell() {
       <HelpDialog />
       <MorningDialog />
       <BacklogDialog />
+      <FreshStartDialog />
+      <Celebration />
       <Toast />
       <DragGhost />
     </div>
@@ -79,8 +85,14 @@ function useBackgroundJobs() {
     if (autoChecked.current || !todayQ.isSuccess || !configQ.isSuccess || !projectsQ.isSuccess || weeklyStarted === null) return;
     autoChecked.current = true;
     (async () => {
-      const cfg = plannerCfg(await ensureConfig());
+      const config = await ensureConfig();
+      const cfg = plannerCfg(config);
       const today = ymd(new Date());
+      // Back after days away to a pile of overdue tasks? Offer a fresh start first (it opens the morning commit after).
+      const fresh = shouldFreshStart(config, todayQ.data || []);
+      useUi.setState({ awayDays: daysAway(config) });
+      if (config.lastOpen !== today) await updateConfig((c) => ({ ...c, lastOpen: today }));
+      if (fresh && !weeklyStarted) { useUi.getState().openDialog("fresh"); await updateConfig((c) => ({ ...c, planner: { ...(c.planner || {}), lastAuto: today } })); return; }
       if (!cfg.auto || cfg.lastAuto === today || weeklyStarted) return;
       if (minOfDay(new Date()) > toMin(cfg.dayEnd) - 30) return;
       const plan = await computePlan();
@@ -113,6 +125,7 @@ function useBackgroundJobs() {
   // Hooks for automated tests (harmless in normal use).
   const { cfg } = useData();
   useEffect(() => {
+    window.__praxisToday = () => queryClient.getQueryData<Task[]>(qk.today) || [];
     (window as unknown as { __praxis: unknown }).__praxis = {
       planner: () => useUi.getState().plan,
       willpower: (t: Task) => willpower(t, cfg),

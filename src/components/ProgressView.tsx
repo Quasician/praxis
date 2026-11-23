@@ -1,4 +1,4 @@
-import { dayStats, effectiveFill, learn, rate, rateByArea, rateByWillpower, streak, type DayStat } from "../domain/progress";
+import { dayStats, effectiveFill, habitStreak, learn, rate, rateByArea, rateByWillpower, streak, type DayStat } from "../domain/progress";
 import { fmtMin, fromYmd } from "../lib/dates";
 import { colorOf } from "../lib/text";
 import { useActive, useCompleted } from "../data/queries";
@@ -38,7 +38,7 @@ export function ProgressView() {
         <Tile id="pv-today" label="Committed today" value={today.committed ? `${today.committedDone} / ${today.committed}` : "—"} sub={today.committed ? (today.committedDone === today.committed ? "All done. Anything else is a bonus." : "★ tasks in your list") : "Commit in the morning (M)"} />
         <Tile id="pv-week" label="Plan done this week" value={pct(wr)} sub={lr === null ? `${sum(thisWeek, "plannedDone")} of ${sum(thisWeek, "planned")} planned tasks` : `last week ${pct(lr)}`} trend={wr !== null && lr !== null ? Math.sign(wr - lr) : 0} />
         <Tile id="pv-extra" label="Done outside the plan" value={String(sum(thisWeek, "extra"))} sub="this week" />
-        <Tile id="pv-streak" label="Days closed" value={String(streak(config, "shutdown"))} sub={`in a row · mornings committed: ${streak(config, "committedAt")}`} />
+        <Tile id="pv-streak" label="Streak (never miss twice)" value={`${habitStreak(config, completed).days}`} sub={`days · closed ${streak(config, "shutdown")} in a row · mornings ${streak(config, "committedAt")}`} />
       </div>
 
       {!hasHistory && <div className="pv-empty" id="pv-empty">Nothing to show yet. Accept a plan or do the morning commit, and each day's plan vs. done fills in here.</div>}

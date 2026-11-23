@@ -7,6 +7,7 @@ import { useData } from "../data/useData";
 import { useUi, type View } from "../state/ui";
 import { useNow } from "./useNow";
 import { ShutdownPill } from "./ShutdownDialog";
+import { StreakChip } from "./Habits";
 import { RELEASE_URL, VERSION } from "../lib/version";
 import { updateConfig } from "../data/actions";
 
@@ -55,6 +56,7 @@ export function TopBar() {
         </>}
       </div>
       <div className="actions">
+        <StreakChip />
         <UpdatedChip />
         <span id="sync-status" className="sync-status">{status}</span>
         <ShutdownPill />

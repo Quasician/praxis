@@ -11,6 +11,7 @@ import { useActive, useCompleted, useEvents } from "../data/queries";
 import { useData } from "../data/useData";
 import { toast, useUi } from "../state/ui";
 import { Dialog } from "./common";
+import { unstarToday } from "../data/habits";
 import { useNow } from "./useNow";
 
 export function ShutdownDialog() {
@@ -67,6 +68,7 @@ function ShutdownBody() {
   });
 
   const finish = async () => {
+    unstarToday().catch(() => undefined); // the one goes back to its usual priority
     await updateConfig((c) => ({
       ...c, planner: { ...(c.planner || {}), lastShutdown: todayKey },
       history: { ...(c.history || {}), [todayKey]: { ...(c.history || {})[todayKey], planned: (c.history || {})[todayKey]?.planned || [], shutdown: true } },

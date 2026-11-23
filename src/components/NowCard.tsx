@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 import { SAMPLES_KEEP } from "../domain/progress";
-import { minOfDay, parseDue, sameDay, startOfToday } from "../lib/dates";
+import { minOfDay, parseDue, sameDay, startOfToday, ymd } from "../lib/dates";
 import { blockMinutes, sortTasks, willpower } from "../lib/tasks";
 import { plain } from "../lib/text";
 import type { Task } from "../lib/types";
-import { completeTask, updateConfigFresh as updateConfig } from "../data/actions";
+import { completeTask, scheduleTask, updateConfigFresh as updateConfig } from "../data/actions";
+import { doTiny, energyToday, tinyFor, needsTiny } from "../data/habits";
 import { queryClient, qk } from "../data/queries";
 import { useCommitted, useData } from "../data/useData";
 import { toast, useUi } from "../state/ui";
@@ -37,6 +38,11 @@ export function NowCard({ mini = false }: { mini?: boolean }) {
   const focusTask = focus ? today.find((t) => t.id === focus.taskId) || ({ id: focus.taskId, content: focus.content, project_id: "", priority: 1, due: null } as Task) : null;
   const task = focusTask || ranked[0];
   const next = ranked.find((t) => t.id !== task?.id);
+  const setNowTask = useUi((s) => s.setNowTask);
+  useEffect(() => { if (!mini) setNowTask(task?.id || null); }, [task?.id, mini]); // eslint-disable-line
+  const lowDay = energyToday(config || undefined) !== "full";
+  const plannedTiny = config?.history?.[ymd(new Date())]?.planned.find((p) => p.id === task?.id)?.tiny;
+  const tiny = task && (plannedTiny || (lowDay && needsTiny(task) ? tinyFor(task, config || undefined) : ""));
   const [tick, setTick] = useState(Date.now());
   const warned = useRef("");
 
@@ -66,15 +72,8 @@ export function NowCard({ mini = false }: { mini?: boolean }) {
   };
   const stop = () => updateConfig((c) => ({ ...c, focus: null }));
   const more = () => updateConfig((c) => (c.focus ? { ...c, focus: { ...c.focus, minutes: Math.ceil(elapsed / 60) + 5 } } : c));
-  const done = async () => {
-    const actual = focus && focus.taskId === task.id ? Math.round(elapsed / 60) : 0;
-    updateConfig((c) => ({
-      ...c, focus: null,
-      // A timed session teaches Praxis how long this kind of task really takes (ignore accidental 1-minute runs).
-      samples: actual >= 3 ? [...(c.samples || []), { wp: willpower(task, cfg), est: blockMinutes(task), actual: Math.min(actual, 600), at: new Date().toISOString() }].slice(-SAMPLES_KEEP) : c.samples,
-    }));
-    await completeTask(task);
-  };
+  const done = () => finishNow(task, cfg, focus, elapsed);
+  const snooze = () => { const dd = parseDue(task.due); if (dd?.hasTime) scheduleTask(task, minOfDay(dd.d) + 10, blockMinutes(task)); };
   const skip = () => setSkipped((s) => new Set([...s, task.id]));
   const running = !!focus && focus.taskId === task.id;
   const clock = (sec: number) => { const a = Math.abs(Math.round(sec)); return `${sec < 0 ? "+" : ""}${Math.floor(a / 60)}:${String(a % 60).padStart(2, "0")}`; };
@@ -86,6 +85,7 @@ export function NowCard({ mini = false }: { mini?: boolean }) {
       <div className="now-main">
         <span className="now-label">{running ? "Focusing" : "Now"}{c && <span className={`commit-star ${c.star ? "the-one" : ""}`}> ★</span>}</span>
         <span className="now-title" title={plain(task.content)}>{plain(task.content)}</span>
+        {tiny && <span className="now-tiny" id="now-tiny-text" title="On a low day, this counts">Tiny: {tiny}</span>}
         {!mini && <span className="now-meta">{d?.hasTime ? `${d.d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })} · ` : ""}{blockMinutes(task)}m{next ? <> · next: <span className="now-next">{plain(next.content).slice(0, 48)}</span></> : null}</span>}
       </div>
       <div className="now-actions">
@@ -97,6 +97,8 @@ export function NowCard({ mini = false }: { mini?: boolean }) {
         </> : <>
           <button id="now-start" className="now-btn start" title={`Start a ${FOCUS_MIN}-minute focus session`} onClick={start}>▶ Start</button>
           <button id="now-done" className="now-btn done" title="Already done" onClick={done}>✓</button>
+          {tiny && <button id="now-tiny" className="now-btn tiny" title={`I did the tiny version: ${tiny}`} onClick={() => doTiny(task)}>✓ Tiny</button>}
+          {d?.hasTime && sameDay(d.d, new Date()) && minOfDay(new Date()) >= minOfDay(d.d) - 10 && <button id="now-snooze" className="now-btn" title="Push this block 10 minutes later" onClick={snooze}>+10m</button>}
           {!focus && <button id="now-skip" className="now-btn" title="Not now: show the next one" onClick={skip}>↷</button>}
         </>}
         {!mini && isDesktop() && <button id="now-popout" className="now-btn" title="Keep this on top of other windows" onClick={() => window.open(`${location.origin}/?mini=1`, "praxis-now")}>⧉</button>}
@@ -120,4 +122,15 @@ export function NowMini() {
   useUi(); // keep the store alive for toasts
   if (!connected) return <div className="now-card mini empty"><span className="now-title">Open Praxis to connect first.</span></div>;
   return <NowCard mini />;
+}
+
+/** Finish the Now task: record how long a timed session took, clear the timer, complete it. */
+export async function finishNow(task: Task, cfg: ReturnType<typeof useData>["cfg"], focus: { taskId: string } | null, elapsedSec: number) {
+  const actual = focus && focus.taskId === task.id ? Math.round(elapsedSec / 60) : 0;
+  updateConfig((c) => ({
+    ...c, focus: null,
+    // A timed session teaches Praxis how long this kind of task really takes (ignore accidental 1-minute runs).
+    samples: actual >= 3 ? [...(c.samples || []), { wp: willpower(task, cfg), est: blockMinutes(task), actual: Math.min(actual, 600), at: new Date().toISOString() }].slice(-SAMPLES_KEEP) : c.samples,
+  }));
+  await completeTask(task);
 }

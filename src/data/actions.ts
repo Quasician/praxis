@@ -89,6 +89,8 @@ export async function completeTask(task: Task) {
     });
     if (task.due && task.due.is_recurring) reconcileSoon(500); // moves to its next date
     else reconcileSoon();
+    import("./habits").then((h) => h.celebrateIfEarned(task.id)).catch(() => undefined);
+    setTimeout(() => queryClient.invalidateQueries({ queryKey: qk.completed }), 800); // streak + progress update promptly
   } catch {
     undo();
     toast("Couldn't complete that task. Try again.");

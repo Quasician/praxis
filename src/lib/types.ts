@@ -86,8 +86,16 @@ export interface CalendarSetting { id: string; name: string; url: string; color:
 export interface TaskMemory { due: string; moves: number }
 
 /** What the plan held on a day (for the Progress view and adaptive planning). */
-export interface PlannedItem { id: string; content: string; wp: number; project: string; committed: boolean; star?: boolean }
-export interface DayRecord { planned: PlannedItem[]; committedAt?: string; shutdown?: boolean }
+export interface PlannedItem { id: string; content: string; wp: number; project: string; committed: boolean; star?: boolean; tiny?: string }
+export type Energy = "full" | "low" | "slammed";
+export interface DayRecord {
+  planned: PlannedItem[];
+  committedAt?: string;
+  shutdown?: boolean;
+  energy?: Energy;
+  tinyDone?: string[];                      // tasks whose tiny version you did today (counts as done for the day)
+  star?: { id: string; prevPriority: number }; // "the one" was raised to p1 in Todoist; put back the next morning
+}
 /** A finished focus session: how long a task really took vs. its estimate. */
 export interface Sample { wp: number; est: number; actual: number; at: string }
 export interface Focus { taskId: string; content: string; startedAt: string; minutes: number }
@@ -100,6 +108,8 @@ export interface Config {
   history?: Record<string, DayRecord>;
   samples?: Sample[];
   focus?: Focus | null;
+  tiny?: Record<string, string>;            // task id → its 2-minute version
+  lastOpen?: string;                        // ymd Praxis was last opened (for the fresh start)
   lastSeenVersion?: string;
   [key: string]: unknown;
 }

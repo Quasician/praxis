@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { DndContext, DragOverlay, PointerSensor, useDraggable, useDroppable, useSensor, useSensors, type DragEndEvent, type DragStartEvent } from "@dnd-kit/core";
 import { completedAt, computeArea, startOfWeek } from "../domain/areas";
+import { dayStats, habitStreak } from "../domain/progress";
+import { willpower } from "../lib/tasks";
 import { plannerCfg } from "../domain/planner";
 import { changed, dayLabel, dayLoad, draftWeek, dueOnDay, isNextWeek, targetWeek, weekKey, type Lane, type WeekCard, type WeekDay } from "../domain/week";
-import { addDays, fmtMin, fmtSpan, minOfDay, parseDue, toMin, ymd } from "../lib/dates";
+import { addDays, fmtMin, fmtSpan, fromYmd, minOfDay, parseDue, toMin, ymd } from "../lib/dates";
 import { itemUpdate, sync } from "../lib/api";
 import { SOMEDAY_LABEL } from "../lib/tasks";
 import { colorOf, plain } from "../lib/text";
@@ -117,24 +119,43 @@ export function WeekView() {
   );
 }
 
+/** Friday recap: what you got done this week, before planning the next one. */
 function LookBack() {
-  const { config, connected } = useData();
+  const { config, connected, cfg } = useData();
   const activeQ = useActive(connected), completedQ = useCompleted(connected);
   if (!config?.areas || !activeQ.data || !completedQ.data) return null;
-  const stats = config.areas.map((a) => computeArea(a, activeQ.data!, completedQ.data!));
-  const done = completedQ.data.filter((t) => completedAt(t) >= startOfWeek()).length;
+  const completed = completedQ.data;
+  const stats = config.areas.map((a) => computeArea(a, activeQ.data!, completed));
+  const week = completed.filter((t) => completedAt(t) >= startOfWeek());
+  const lastWeek = completed.filter((t) => completedAt(t) >= addDays(startOfWeek(), -7) && completedAt(t) < startOfWeek());
+  const done = week.length;
   const elsewhere = done - stats.reduce((s, x) => s + x.weekDone, 0);
   const quiet = stats.filter((x) => x.quiet).map((x) => x.area.name);
+  const days = dayStats(config, completed, 7);
+  const committed = days.reduce((s, d) => s + d.committed, 0), committedDone = days.reduce((s, d) => s + d.committedDone, 0);
+  const best = [...days].sort((a, b) => (b.plannedDone + b.extra) - (a.plannedDone + a.extra))[0];
+  const streakDays = habitStreak(config, completed).days;
+  const starred = new Set(Object.values(config.history || {}).flatMap((r) => r.planned.filter((p) => p.star || p.committed).map((p) => p.id)));
+  const wins = [...week].sort((a, b) => Number(starred.has(b.id)) - Number(starred.has(a.id)) || willpower(b, cfg) - willpower(a, cfg)).slice(0, 5);
+  const diff = done - lastWeek.length;
   return (
-    <div className="lookback" id="lookback">
-      <span className="lb-title">This week</span>
-      <span className="lb-total"><b>{done}</b> done</span>
-      {stats.map((x) => (
-        <span key={x.area.id} className={`lb-chip ${x.quiet ? "quiet" : ""}`} style={{ ["--c" as string]: colorOf(x.area.color) }}>
-          <i />{x.area.name} · {x.weekDone}{x.weekMin ? ` · ${fmtSpan(x.weekMin)}` : ""}
-        </span>
-      ))}
-      {elsewhere > 0 && <span className="lb-chip" title="Done in projects that aren't in an area (edit areas to include them)"><i />Outside areas · {elsewhere}</span>}
+    <div className="lookback recap" id="lookback">
+      <div className="recap-top">
+        <span className="lb-title">Your week</span>
+        <span className="recap-big"><b>{done}</b> done{lastWeek.length > 0 && <span className={`recap-diff ${diff >= 0 ? "up" : "down"}`}>{diff >= 0 ? `+${diff}` : diff} vs last week</span>}</span>
+        {committed > 0 && <span className="recap-stat"><b>{committedDone}/{committed}</b> commitments kept</span>}
+        {streakDays > 0 && <span className="recap-stat"><b>{streakDays}</b>-day streak</span>}
+        {best && best.plannedDone + best.extra > 0 && <span className="recap-stat">best day <b>{fromYmd(best.day).toLocaleDateString([], { weekday: "long" })}</b></span>}
+      </div>
+      {wins.length > 0 && <ul className="recap-wins">{wins.map((t, i) => <li key={t.id + i}>{starred.has(t.id) ? "★ " : "✓ "}{plain(t.content)}</li>)}</ul>}
+      <div className="recap-areas">
+        {stats.map((x) => (
+          <span key={x.area.id} className={`lb-chip ${x.quiet ? "quiet" : ""}`} style={{ ["--c" as string]: colorOf(x.area.color) }}>
+            <i />{x.area.name} · {x.weekDone}{x.weekMin ? ` · ${fmtSpan(x.weekMin)}` : ""}
+          </span>
+        ))}
+        {elsewhere > 0 && <span className="lb-chip" title="Done in projects that aren't in an area (edit areas to include them)"><i />Outside areas · {elsewhere}</span>}
+      </div>
       {quiet.length > 0 && <span className="lb-quiet">Gone quiet: {quiet.join(", ")}. Next week gives each one a task.</span>}
     </div>
   );

@@ -6,6 +6,7 @@ import { buildPlan, plannerCfg } from "../domain/planner";
 import { effectiveFill, learn, recordPlan } from "../domain/progress";
 import { willpower } from "../lib/tasks";
 import { ymd } from "../lib/dates";
+import { plain } from "../lib/text";
 import { updateConfig } from "./actions";
 import { triageItems } from "../domain/triage";
 import { fetchCompleted, queryClient, qk } from "./queries";
@@ -21,9 +22,16 @@ function inputs() {
   const memory = config.taskMemory || {};
   const cfg = plannerCfg(config);
   const completed = queryClient.getQueryData<Task[]>(qk.completed) || [];
-  const { fill, why } = effectiveFill(cfg, config, completed);
+  const fx = effectiveFill(cfg, config, completed);
+  const energy = config.history?.[ymd(new Date())]?.energy || "full";
+  const fill = energy === "low" ? Math.min(fx.fill, 40) : fx.fill;
+  const why = energy === "low" ? "a low-energy day: light work and tiny versions" : energy === "slammed" ? "a slammed day: one small thing" : fx.why;
+  // Tiny versions: Claude's, else a plain "5 minutes of …" for habits and Deep work.
+  const tiny: Record<string, string> = {};
+  for (const t of today) if (t.due?.is_recurring || willpower(t, cfg) === 3) tiny[t.id] = `Just 5 minutes: ${plain(t.content)}`;
+  Object.assign(tiny, config.tiny || {});
   return {
-    cfg, today, fill, fillWhy: why,
+    cfg, today, fill, fillWhy: why, energy, tiny,
     learned: learn(cfg, config.samples, completed),
     events: eventsData?.events || [],
     tray: new Set(triageItems(today, memory).map((x) => x.task.id)),
@@ -89,7 +97,7 @@ export async function acceptPlan(opts: { committed?: boolean } = {}) {
   updateConfig((c) => ({
     ...c,
     history: recordPlan(c.history, day, items.map((it) => ({
-      id: it.task.id, content: it.task.content, wp: willpower(it.task, cfg), project: it.task.project_id, committed: !!it.committed, ...(it.star ? { star: true } : {}),
+      id: it.task.id, content: it.task.content, wp: willpower(it.task, cfg), project: it.task.project_id, committed: !!it.committed, ...(it.star ? { star: true } : {}), ...(it.tiny ? { tiny: it.tiny } : {}),
     })), opts.committed),
   })).catch(() => undefined);
   const commands = items.map((it) => itemUpdate({ id: it.task.id, due: timedDue(it.task, new Date(), it.start), duration: { amount: it.dur, unit: "minute" } }));
