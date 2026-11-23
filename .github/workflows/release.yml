@@ -1,26 +1,66 @@
-# Builds the Windows installer and publishes it to GitHub Releases whenever a
-# version tag (v1.2.3) is pushed. Installed copies of Praxis update from there.
+# Publishes a new Praxis release whenever main gets a new version number.
+#
+# Bump "version" in package.json and push to main: this tags the commit (v1.2.3),
+# builds the Windows installer and publishes it to GitHub Releases, where installed
+# copies pick it up within about half an hour. Pushes that don't change the version
+# don't release anything. Pushing a v* tag yourself, or Run workflow, also works.
 name: Release
 
 on:
   push:
+    branches: [main]
     tags: ["v*"]
   workflow_dispatch:
 
 permissions:
   contents: write
 
+concurrency:
+  group: release
+  cancel-in-progress: false
+
 jobs:
+  version:
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.v.outputs.tag }}
+      release: ${{ steps.v.outputs.release }}
+    steps:
+      - uses: actions/checkout@v5
+      - id: v
+        name: Is this a new version?
+        run: |
+          tag="v$(node -p "require('./package.json').version")"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          if [ "$GITHUB_REF_TYPE" = "tag" ]; then
+            echo "release=true" >> "$GITHUB_OUTPUT"            # a tag pushed by hand
+          elif git ls-remote --exit-code --tags origin "refs/tags/$tag" >/dev/null; then
+            echo "$tag is already released; nothing to do."
+            echo "release=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "release=true" >> "$GITHUB_OUTPUT"
+          fi
+
   windows:
+    needs: version
+    if: needs.version.outputs.release == 'true'
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
           node-version: 22
           cache: npm
       - run: npm ci
       - run: npm run typecheck
+      - name: Tag the version
+        if: github.ref_type != 'tag'
+        shell: bash
+        run: |
+          tag="${{ needs.version.outputs.tag }}"
+          git ls-remote --exit-code --tags origin "refs/tags/$tag" >/dev/null && exit 0
+          git tag "$tag" "$GITHUB_SHA"
+          git push origin "refs/tags/$tag"
       - name: Build and publish installer
         run: npm run release
         env:
