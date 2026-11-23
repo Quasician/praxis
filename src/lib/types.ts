@@ -100,6 +100,8 @@ export interface DayRecord {
 export interface Sample { wp: number; est: number; actual: number; at: string }
 export interface Focus { taskId: string; content: string; startedAt: string; minutes: number }
 
+export interface Appearance { theme?: "auto" | "dark" | "light"; warmEvenings?: boolean; focus?: boolean }
+
 export interface Config {
   areas?: Area[];
   planner?: Partial<PlannerSettings>;
@@ -110,6 +112,7 @@ export interface Config {
   focus?: Focus | null;
   tiny?: Record<string, string>;            // task id → its 2-minute version
   lastOpen?: string;                        // ymd Praxis was last opened (for the fresh start)
+  ui?: Appearance;
   lastSeenVersion?: string;
   [key: string]: unknown;
 }

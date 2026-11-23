@@ -19,7 +19,7 @@ const VIEWS: { id: View; label: string; title: string }[] = [
 ];
 
 export function TopBar() {
-  const { today, trayIds, todayQ, loading } = useData();
+  const { today, trayIds, todayQ, loading, config } = useData();
   const { view, setView, openDialog } = useUi();
   const [menu, setMenu] = useState(false);
   const now = useNow();
@@ -74,6 +74,17 @@ export function TopBar() {
             <button id="claude-btn" onClick={() => { setMenu(false); openDialog("claude"); }}>Claude…</button>
             <button id="backlog-btn" onClick={() => { setMenu(false); openDialog("backlog"); }}>Clean up backlog with Claude…</button>
             <button id="shutdown-btn" onClick={() => { setMenu(false); openDialog("shutdown"); }}>Shut down the day… (S)</button>
+            <div className="menu-group" id="appearance">
+              <span className="menu-label">Theme</span>
+              <div className="seg" role="radiogroup" aria-label="Theme">
+                {(["auto", "dark", "light"] as const).map((t) => (
+                  <button key={t} role="radio" aria-checked={(config?.ui?.theme || "auto") === t} data-theme-opt={t} className={(config?.ui?.theme || "auto") === t ? "on" : ""}
+                    onClick={(e) => { e.stopPropagation(); updateConfig((c) => ({ ...c, ui: { ...(c.ui || {}), theme: t } })); }}>{t === "auto" ? "Auto" : t === "dark" ? "Dark" : "Light"}</button>
+                ))}
+              </div>
+              <label className="menu-switch" onClick={(e) => e.stopPropagation()}><input type="checkbox" id="warm-evenings" checked={config?.ui?.warmEvenings !== false} onChange={(e) => updateConfig((c) => ({ ...c, ui: { ...(c.ui || {}), warmEvenings: e.target.checked } }))} /> Warmer colors after 8 PM</label>
+              <label className="menu-switch" onClick={(e) => e.stopPropagation()}><input type="checkbox" id="focus-mode" checked={!!config?.ui?.focus} onChange={(e) => updateConfig((c) => ({ ...c, ui: { ...(c.ui || {}), focus: e.target.checked } }))} /> Focus mode (F): only what's next</label>
+            </div>
             <button id="help-btn" onClick={() => { setMenu(false); openDialog("help"); }}>Keyboard shortcuts (?)</button>
             <a href="https://app.todoist.com/app/today" target="_blank" rel="noopener">Open Todoist</a>
             <button id="disconnect-btn" onClick={async () => {

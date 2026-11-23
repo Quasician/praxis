@@ -11,6 +11,7 @@ const KEYS: [string, string][] = [
   ["M", "Morning commit: pick today's tasks"],
   ["S", "Shut down the day"],
   ["G", "Progress"],
+  ["F", "Focus mode: only what's next"],
   ["D · W · A", "Day, Week, Areas"],
   ["1 · 2", "Today, Inbox"],
   ["R", "Refresh from Todoist"],

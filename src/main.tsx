@@ -7,6 +7,10 @@ import { ErrorBoundary } from "./components/HelpDialog";
 import { NowMini } from "./components/NowCard";
 
 const mini = new URLSearchParams(location.search).has("mini");
+// Until settings load, follow Windows' light/dark choice.
+document.documentElement.dataset.theme = matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+import "@fontsource-variable/atkinson-hyperlegible-next";
+import "@fontsource-variable/bricolage-grotesque";
 import "./styles.css";
 
 createRoot(document.getElementById("root")!).render(

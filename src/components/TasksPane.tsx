@@ -6,17 +6,31 @@ import type { Task } from "../lib/types";
 import { completeTask, quickAdd } from "../data/actions";
 import { useCommitted, useData } from "../data/useData";
 import { NowCard } from "./NowCard";
+import { updateConfig } from "../data/actions";
 import { useUi } from "../state/ui";
 import { startDrag } from "./drag";
 
 type Ctx = "overdue" | "today" | "inbox";
 
 export function TasksPane() {
-  const { today, inbox, trayIds, loading } = useData();
+  const { today, inbox, trayIds, loading, config } = useData();
   const { tab, setTab, project, openDialog } = useUi();
   const { overdue, today: todayList } = useMemo(() => splitToday(today.filter((t) => !trayIds.has(t.id))), [today, trayIds]);
   const source = tab === "today" ? [...overdue, ...todayList] : inbox;
   const keep = (t: Task) => !project || t.project_id === project;
+  const nowId = useUi((s) => s.nowTaskId);
+
+  // Focus mode: just Now and the next three. Nothing else asks for attention.
+  if (config?.ui?.focus) {
+    const next = [...todayList, ...overdue].filter((t) => t.id !== nowId).slice(0, 3);
+    return (
+      <section className="tasks-pane focus-pane" id="focus-pane">
+        <NowCard />
+        {next.length > 0 && <><h3 className="focus-title">Up next</h3><ul className="tasks focus-list">{next.map((t) => <TaskRow key={t.id} t={t} ctx="today" />)}</ul></>}
+        <button className="ghost-btn focus-exit" id="focus-exit" onClick={() => updateConfig((c) => ({ ...c, ui: { ...(c.ui || {}), focus: false } }))}>Show everything (F)</button>
+      </section>
+    );
+  }
 
   return (
     <section className="tasks-pane">
@@ -41,7 +55,7 @@ export function TasksPane() {
                 <button className="tray-banner" id="open-triage" onClick={() => openDialog("triage")}>
                   <span className="tray-flag">⚑</span>
                   <span><b>{trayIds.size} task{trayIds.size === 1 ? "" : "s"}</b> need{trayIds.size === 1 ? "s" : ""} a decision</span>
-                  <span className="tray-go">Review →</span>
+                  <span className="tray-go">Review</span>
                 </button>
               )}
               <Group title="Overdue" ctx="overdue" tasks={overdue.filter(keep)} />
@@ -57,7 +71,7 @@ export function TasksPane() {
                   <button className="tray-banner dump-banner" id="file-inbox" onClick={() => openDialog("dump")}>
                     <span className="tray-flag">✦</span>
                     <span><b>{items.length} in your Inbox.</b> Let Claude file them: project, date, effort.</span>
-                    <span className="tray-go">Sort →</span>
+                    <span className="tray-go">Sort</span>
                   </button>
                   <ul className="tasks" style={{ marginTop: 6 }}>{items.map((t) => <TaskRow key={t.id} t={t} ctx="inbox" />)}</ul>
                 </>
@@ -117,7 +131,7 @@ function TaskRow({ t, ctx }: { t: Task; ctx: Ctx }) {
     e.preventDefault(); // no text selection while dragging
     startDrag(e, { kind: "new", task: t, start: 0, dur: blockMinutes(t), grab: 0 });
   };
-  const complete = () => { setDone(true); setTimeout(() => completeTask(t), 260); };
+  const complete = () => { setDone(true); setTimeout(() => completeTask(t), 520); }; // let the check pop and the row fold first
 
   return (
     <li className={`task p${t.priority || 1} ${t.parent_id ? "sub" : ""} ${done ? "done" : ""} ${lifting ? "lifting" : ""}`} data-id={t.id} onPointerDown={onPointerDown}>

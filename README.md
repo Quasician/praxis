@@ -104,6 +104,17 @@ they are:
 Groups with 3+ tasks get a one-click **Move all to Someday** for backlog cleanup. Tasks that slipped
 before rank higher in "Plan my day", so they stop sinking.
 
+## Look and feel (2.0)
+
+Praxis is built to be easy on the eyes on a big monitor all day:
+
+- **Theme**: follows Windows dark/light by default. Change it under ⋯ → Theme.
+- **Warmer colors after 8 PM**: the screen shifts warmer in the evening so it's gentler before bed (on by default).
+- **The sky**: the timeline is tinted by the time of day (dawn, daylight, golden hour, dusk, night), and the now line is a small sun. The Now card takes on the color of the current sky.
+- **Focus mode (F)**: hides everything except Now and the next three tasks. Press F again to see everything.
+- **Readable type**: Atkinson Hyperlegible for text (designed for legibility) and Bricolage Grotesque for headings, bundled so they work offline.
+- **Calm motion**: finishing a task fills the circle and folds the row away; the focus timer is a ring that fills. If Windows has "Show animations" turned off, Praxis stops animating too.
+
 ## Calendar
 
 Link your Google Calendar under **⋯ → Calendars…** and your events appear on the timeline;

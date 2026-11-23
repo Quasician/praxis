@@ -24,6 +24,7 @@ import { BrainDumpDialog, ClaudeDialog } from "./BrainDump";
 import { ShutdownDialog } from "./ShutdownDialog";
 import { HelpDialog } from "./HelpDialog";
 import { ProgressView } from "./ProgressView";
+import { useAppearance } from "./useAppearance";
 import { MorningDialog } from "./MorningDialog";
 import { Celebration, FreshStartDialog, shouldFreshStart, useBlockNotifications, useDoneHotkey } from "./Habits";
 import { daysAway } from "../data/habits";
@@ -43,6 +44,7 @@ function Shell() {
   const view = useUi((s) => s.view);
   const wide = useMedia("(min-width: 2200px)"); // ultrawide: show areas beside the day
   useBackgroundJobs();
+  useAppearance();
   useBlockNotifications();
   useDoneHotkey();
   useShortcuts();
@@ -161,6 +163,7 @@ function useShortcuts() {
       else if (e.key === "s") ui.openDialog("shutdown");
       else if (e.key === "?") ui.openDialog("help");
       else if (e.key === "m") ui.openDialog("morning");
+      else if (e.key === "f") updateConfig((c) => ({ ...c, ui: { ...(c.ui || {}), focus: !c.ui?.focus } }));
       else if (e.key === "Enter" && ui.plan.active && ui.plan.items.length) acceptPlan();
     };
     document.addEventListener("keydown", onKey);

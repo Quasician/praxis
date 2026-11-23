@@ -90,6 +90,8 @@ export function TimelinePane() {
 
       <div id="timeline" className="timeline" ref={tlRef}>
         <div className="tl-grid">
+          <div className="tl-sky" aria-hidden="true" />
+          {now.getHours() >= TL_START && <div className="tl-past" aria-hidden="true" style={{ height: Math.max(0, minToY(nowMin)) }} />}
           {hours.map((h) => <div key={h} className="tl-hour"><span>{new Date(2000, 0, 1, h).toLocaleTimeString([], { hour: "numeric" })}</span></div>)}
 
           {work && <div className="tl-band work" style={{ top: minToY(work[0]), height: ((work[1] - work[0]) / 60) * hourPx() }}><span>Work</span></div>}
