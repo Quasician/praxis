@@ -1,6 +1,7 @@
 import { Component, type ReactNode } from "react";
 import { useUi } from "../state/ui";
 import { Dialog } from "./common";
+import { RELEASE_URL, VERSION } from "../lib/version";
 
 const KEYS: [string, string][] = [
   ["Q  or  /", "Quick add"],
@@ -31,7 +32,7 @@ export function HelpDialog() {
         <dl className="keys">{DESKTOP.map(([k, v]) => <div key={k}><dt>{k.split("  ").map((x, i) => <kbd key={i}>{x}</kbd>)}</dt><dd>{v}</dd></div>)}</dl>
         <p className="dialog-sub">Right-click Praxis on the taskbar for Quick add, Brain dump, Shut down and Check for updates.</p>
         <div className="dialog-actions">
-          <span className="help-version" id="app-version">Praxis {__APP_VERSION__}</span>
+          <a className="help-version" id="app-version" href={RELEASE_URL} target="_blank" rel="noopener" title="What's new in this version">Praxis {VERSION}</a>
           <span className="spacer" />
           <a className="ghost-btn" href="https://github.com/Quasician/praxis#readme" target="_blank" rel="noopener">How it works</a>
           <button type="button" className="primary" onClick={() => close("help")}>Got it</button>

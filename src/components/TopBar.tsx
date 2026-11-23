@@ -7,6 +7,8 @@ import { useData } from "../data/useData";
 import { useUi, type View } from "../state/ui";
 import { useNow } from "./useNow";
 import { ShutdownPill } from "./ShutdownDialog";
+import { RELEASE_URL, VERSION } from "../lib/version";
+import { updateConfig } from "../data/actions";
 
 const VIEWS: { id: View; label: string; title: string }[] = [
   { id: "day", label: "Day", title: "Plan your day (D)" },
@@ -35,7 +37,7 @@ export function TopBar() {
   return (
     <header className="topbar">
       <div className="dateblock">
-        <div id="weekday" className="weekday">{now.toLocaleDateString([], { weekday: "long" })}</div>
+        <div id="weekday" className="weekday">{now.toLocaleDateString([], { weekday: "long" })}<span id="version-tag" className="version-tag" title={`Praxis ${VERSION}`}>v{VERSION}</span></div>
         <div id="fulldate" className="fulldate">{now.toLocaleDateString([], { month: "long", day: "numeric", year: "numeric" })}</div>
       </div>
       <nav className="views" role="tablist" aria-label="View">
@@ -52,6 +54,7 @@ export function TopBar() {
         </>}
       </div>
       <div className="actions">
+        <UpdatedChip />
         <span id="sync-status" className="sync-status">{status}</span>
         <ShutdownPill />
         <button id="dump-btn" className="ghost-btn dump-btn" title="Brain dump: Claude turns a messy list into tasks (B)" onClick={() => openDialog("dump")}>✦ Brain dump</button>
@@ -75,9 +78,28 @@ export function TopBar() {
               queryClient.removeQueries({ predicate: (q) => q.queryKey[0] !== qk.status[0] });
               queryClient.refetchQueries({ queryKey: qk.status });
             }}>Disconnect Todoist</button>
+            <div className="menu-foot" id="menu-version">
+              <span>Praxis <b>{VERSION}</b></span>
+              <a href={RELEASE_URL} target="_blank" rel="noopener">What's new</a>
+            </div>
           </div>
         </div>
       </div>
     </header>
+  );
+}
+
+/** After an update: "Updated to 1.0.1 · What's new" until you dismiss it. */
+function UpdatedChip() {
+  const { config } = useData();
+  const seen = config?.lastSeenVersion as string | undefined;
+  const dismiss = () => updateConfig((c) => ({ ...c, lastSeenVersion: VERSION })).catch(() => undefined);
+  useEffect(() => { if (config && !seen) dismiss(); }, [!!config, seen]); // first install: nothing to announce
+  if (!config || !seen || seen === VERSION) return null;
+  return (
+    <span className="updated-chip" id="updated-chip">
+      <a href={RELEASE_URL} target="_blank" rel="noopener" onClick={dismiss}>✦ Updated to {VERSION} · What's new</a>
+      <button aria-label="Dismiss" title="Dismiss" onClick={dismiss}>×</button>
+    </span>
   );
 }

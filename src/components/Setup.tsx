@@ -1,3 +1,4 @@
+import { RELEASES_URL, VERSION } from "../lib/version";
 import { useState } from "react";
 import { api } from "../lib/api";
 import { queryClient, qk } from "../data/queries";
@@ -33,6 +34,7 @@ export function Setup({ message = "" }: { message?: string }) {
           <button type="submit" className="primary" disabled={busy}>{busy ? "Checking…" : "Connect"}</button>
         </form>
         <p id="setup-error" className="error" role="alert">{error}</p>
+        <p className="setup-version">Praxis {VERSION} · <a href={RELEASES_URL} target="_blank" rel="noopener">releases</a></p>
       </div>
     </section>
   );
