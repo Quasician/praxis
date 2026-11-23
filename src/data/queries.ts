@@ -1,7 +1,7 @@
 // Todoist, calendar and settings data, cached and kept fresh by TanStack Query.
 import { QueryClient, useQuery } from "@tanstack/react-query";
 import { api, fetchAll } from "../lib/api";
-import { addDays, startOfToday } from "../lib/dates";
+import { addDays, parseDue, startOfToday } from "../lib/dates";
 import type { CalEvent, Config, Project, Task } from "../lib/types";
 import { HISTORY_DAYS } from "../domain/areas";
 
@@ -32,7 +32,13 @@ export const useProjects = (enabled: boolean) => useQuery({
 
 export const useToday = (enabled: boolean) => useQuery({
   queryKey: qk.today, enabled, refetchInterval: SYNC_EVERY,
-  queryFn: async () => open(await fetchAll<Task>(`/tasks/filter?query=${encodeURIComponent("today | overdue")}`)),
+  // Also ask for tomorrow, then keep what's due by tonight in *your* time: a time pinned to a time zone is
+  // stored in UTC, so Todoist can file this evening's 6 PM under tomorrow.
+  queryFn: async () => {
+    const tonight = +startOfToday() + 864e5;
+    return open(await fetchAll<Task>(`/tasks/filter?query=${encodeURIComponent("today | overdue | tomorrow")}`))
+      .filter((t) => { const d = parseDue(t.due); return !!d && +d.d < tonight; });
+  },
 });
 
 export const useInbox = (inboxId: string | undefined) => useQuery({

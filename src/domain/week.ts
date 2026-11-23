@@ -10,7 +10,7 @@
 //   • Overdue tasks go to the earliest day with room (spread so no day passes 60%); everything else to the lightest day.
 //   • Three of your oldest @someday tasks resurface as suggestions.
 import { addDays, ceilTo, daysOverdue, fromYmd, minOfDay, parseDue, startOfToday, toMin, ymd } from "../lib/dates";
-import { SOMEDAY_LABEL, blockMinutes, hasLabel, isMilestone, willpower } from "../lib/tasks";
+import { SOMEDAY_LABEL, blockMinutes, floatingDate, hasLabel, isMilestone, willpower } from "../lib/tasks";
 import type { Area, CalEvent, PlannerSettings, Task } from "../lib/types";
 import { computeArea } from "./areas";
 import { allDayEventsOn, eventSpanOn } from "./layout";
@@ -168,7 +168,7 @@ export const dayLoad = (cards: WeekCard[], key: string) => cards.filter((c) => c
 /** The new due for a card moved to a day (keeps a task's time of day and its repeat rule). */
 export function dueOnDay(task: Task, key: string) {
   const d = parseDue(task.due);
-  const date = d && d.hasTime ? `${key}T${(task.due!.date.split("T")[1] || "09:00:00").slice(0, 8)}` : key;
+  const date = d && d.hasTime ? `${key}T${floatingDate(d.d).slice(11)}` : key; // keep the local time of day
   const due: { date: string; string?: string; is_recurring?: boolean; lang?: string } = { date };
   if (task.due && task.due.is_recurring) { due.string = task.due.string; due.is_recurring = true; if (task.due.lang) due.lang = task.due.lang; }
   return due;

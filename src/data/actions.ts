@@ -2,7 +2,7 @@
 // (optimistic) and are rolled back if Todoist rejects them.
 import { api, closeTask, itemUpdate, reopenTask, syncOrThrow } from "../lib/api";
 import { parseDue, sameDay, startOfToday, ymd } from "../lib/dates";
-import { DROPPED_LABEL, MILESTONE_LABEL, SOMEDAY_LABEL, dueFor, timedDue } from "../lib/tasks";
+import { DROPPED_LABEL, MILESTONE_LABEL, SOMEDAY_LABEL, dueFor, floatingDate, isPinned, timedDue } from "../lib/tasks";
 import { plain } from "../lib/text";
 import type { Config, Due, Duration, Task } from "../lib/types";
 import { queryClient, qk } from "./queries";
@@ -108,6 +108,10 @@ export async function quickAdd(text: string, forToday: boolean) {
   }
   if (forToday && task && task.id && !task.due) {
     await api(`/api/todoist/tasks/${encodeURIComponent(task.id)}`, { method: "POST", body: { due_string: "today" } });
+  }
+  // "…6pm" comes back pinned to a time zone (stored in UTC); store it as local time so it stays on the right day.
+  if (task && task.id && isPinned(task) && !task.due!.is_recurring) {
+    await syncOrThrow([itemUpdate({ id: task.id, due: { date: floatingDate(new Date(task.due!.date)) } })]).catch(() => undefined);
   }
   toast("Added");
   reconcileSoon(0);

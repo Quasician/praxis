@@ -58,16 +58,22 @@ export function dueFor(task: Task, date: string): Due {
   return due;
 }
 
-/** Due for a time today/that day; UTC + zone if the task is pinned to a time zone. */
+/** Local wall-clock time, "2026-11-23T18:00:00", with no time zone attached. */
+export function floatingDate(d: Date) {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:00`;
+}
+
+/**
+ * Due for a time on a day, always as local ("floating") time. A time pinned to a time zone is stored in UTC,
+ * and Todoist's "today" filter then files a 6 PM task under tomorrow's date, so Praxis never pins.
+ */
 export function timedDue(task: Task, day: Date, minutes: number): Due {
   const start = new Date(day); start.setHours(0, minutes, 0, 0);
-  const tz = task.due && task.due.timezone;
-  const pad = (n: number) => String(n).padStart(2, "0");
-  const date = tz ? start.toISOString().replace(/\.\d{3}Z$/, "Z")
-    : `${start.getFullYear()}-${pad(start.getMonth() + 1)}-${pad(start.getDate())}T${pad(start.getHours())}:${pad(start.getMinutes())}:00`;
-  const due = dueFor(task, date);
-  if (tz) due.timezone = tz;
-  return due;
+  return dueFor(task, floatingDate(start));
 }
+
+/** A time pinned to a time zone ("…Z"), which can land on the wrong day in Todoist's filters. */
+export const isPinned = (t: Task) => !!t.due && t.due.date.length > 10 && (/Z$|[+-]\d\d:?\d\d$/.test(t.due.date) || !!t.due.timezone);
 
 export const isTimedToday = (t: Task) => { const d = parseDue(t.due); return !!(d && d.hasTime && sameDay(d.d, new Date())); };
