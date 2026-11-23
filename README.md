@@ -115,6 +115,24 @@ Praxis is built to be easy on the eyes on a big monitor all day:
 - **Readable type**: Atkinson Hyperlegible for text (designed for legibility) and Bricolage Grotesque for headings, bundled so they work offline.
 - **Calm motion**: finishing a task fills the circle and folds the row away; the focus timer is a ring that fills. If Windows has "Show animations" turned off, Praxis stops animating too.
 
+## Your sky (3.0)
+
+Progress opens on a night sky where your projects are constellations:
+
+- Every task labelled **@milestone** is a constellation, and its sub-tasks are its stars. Nothing to set up.
+- **Bright stars are done, faint ones are still to do.** You see a project's whole shape from day one and watch it fill in.
+- The **next step** has a gold ring, and it pulses when it's on today.
+- **Height is the deadline:** the closer it is, the lower the project sinks toward the horizon (amber when it's late).
+- **Bigger steps are brighter stars** (from the task's duration).
+- **Areas are regions of the sky**, left to right, so a quiet area shows as an empty patch.
+- **Finished projects** drift up into the Milky Way; finished tasks that aren't project steps become stardust.
+- Stars you've lit since your last look light up in front of you.
+- Click a constellation to see its steps, and send the next one to today.
+
+Todoist only keeps about three months of finished tasks, so Praxis keeps its own record of every star: old ones never go dark.
+
+In **focus mode (F)** the task you're doing is the sun, with the focus timer wrapped around it.
+
 ## Reminders that reach you (2.1)
 
 When you're deep in a full-screen app, Windows' Do Not Disturb hides ordinary notifications. So the desktop app shows its own small card at the top of the screen instead, on top of everything (full-screen apps too) and without taking your keyboard:
@@ -290,4 +308,9 @@ Pushes that don't change the version are only checked, not released.
 - ~~Day 6: end-of-day shutdown~~ ✓
 - ~~Day 7: taskbar jump list, shortcut help, crash screen, repeating tasks count as done~~ ✓
 - ~~1.3: energy check-in, tiny versions, never-miss-twice streak, fresh start, block notifications, rewards~~ ✓
+- ~~2.0: Daylight look; 2.1: reminders on top of full-screen apps~~ ✓
+- ~~3.0: the night sky (projects as constellations) and the sun in focus mode~~ ✓
+- 3.1: draw a constellation with Claude, "I'm stuck", guess the time
+- 3.2: the Horizon (the day left to right; zoom out for the week)
+- 3.3: ideas as clouds; the shut-down sunset
 - ~~1.1: morning commit, committed vs. bonus, adaptive plans, Now card, first steps, backlog cleanup, Progress, learning~~ ✓

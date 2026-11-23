@@ -114,6 +114,7 @@ export interface Config {
   lastOpen?: string;                        // ymd Praxis was last opened (for the fresh start)
   ui?: Appearance;
   reminders?: Partial<import("../domain/nudges").Reminders>;
+  sky?: import("../domain/sky").SkyRecord;
   lastSeenVersion?: string;
   [key: string]: unknown;
 }

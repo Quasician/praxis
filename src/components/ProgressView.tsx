@@ -3,6 +3,7 @@ import { fmtMin, fromYmd } from "../lib/dates";
 import { colorOf } from "../lib/text";
 import { useActive, useCompleted } from "../data/queries";
 import { useData } from "../data/useData";
+import { SkyView } from "./SkyView";
 
 const pct = (r: number | null) => (r === null ? "—" : `${Math.round(r * 100)}%`);
 const sum = (xs: DayStat[], k: keyof DayStat) => xs.reduce((s, d) => s + (d[k] as number), 0);
@@ -27,9 +28,10 @@ export function ProgressView() {
 
   return (
     <main id="progress-view" className="progress-view">
-      <div className="areas-head">
+      <SkyView />
+      <div className="areas-head pv-numbers-head">
         <div>
-          <h2>Progress</h2>
+          <h2>The numbers</h2>
           <p className="areas-sub">What you planned vs. what got done, over the last four weeks. Tick things off as you finish them (on your phone too) so this stays true.</p>
         </div>
       </div>

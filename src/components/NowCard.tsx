@@ -98,6 +98,7 @@ export function NowCard({ mini = false }: { mini?: boolean }) {
 
   return (
     <div className={`now-card ${mini ? "mini" : ""} ${running ? "running" : ""} ${running && left <= 0 ? "over" : ""}`} id={mini ? "now-mini" : "now-card"} data-id={task.id}>
+      {!mini && <span className="now-sun" aria-hidden="true" />}
       <div className="now-main">
         <span className="now-label">{running ? "Focusing" : "Now"}{c && <span className={`commit-star ${c.star ? "the-one" : ""}`}> ★</span>}</span>
         <span className="now-title" title={plain(task.content)}>{plain(task.content)}</span>
