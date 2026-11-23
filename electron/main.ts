@@ -159,6 +159,7 @@ function refreshTrayMenu() {
     { label: "Open Praxis", click: showWindow },
     { label: "Quick add…", accelerator: QUICK_ADD, click: quickAdd },
     { label: "Brain dump…", click: () => trigger("brain-dump") },
+    { label: "Shut down the day…", click: () => trigger("shutdown") },
     { label: "Full screen", accelerator: "F11", type: "checkbox", checked: !!win?.isFullScreen(), click: () => { showWindow(); toggleFullScreen(); } },
     { type: "separator" },
     { label: "Open at login", type: "checkbox", checked: app.getLoginItemSettings().openAtLogin, click: (item) => { setOpenAtLogin(item.checked); } },

@@ -6,6 +6,7 @@ import { queryClient, qk, refreshAll } from "../data/queries";
 import { useData } from "../data/useData";
 import { useUi, type View } from "../state/ui";
 import { useNow } from "./useNow";
+import { ShutdownPill } from "./ShutdownDialog";
 
 const VIEWS: { id: View; label: string; title: string }[] = [
   { id: "day", label: "Day", title: "Plan your day (D)" },
@@ -52,6 +53,7 @@ export function TopBar() {
       </div>
       <div className="actions">
         <span id="sync-status" className="sync-status">{status}</span>
+        <ShutdownPill />
         <button id="dump-btn" className="ghost-btn dump-btn" title="Brain dump: Claude turns a messy list into tasks (B)" onClick={() => openDialog("dump")}>✦ Brain dump</button>
         <button id="refresh-btn" className={`icon-btn ${todayQ.isFetching ? "spinning" : ""}`} title="Refresh (R)" aria-label="Refresh" onClick={() => refreshAll(true)}>
           <svg viewBox="0 0 24 24" width="18" height="18"><path fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" d="M20 11a8 8 0 1 0-2.3 5.7M20 5v6h-6" /></svg>
@@ -64,6 +66,7 @@ export function TopBar() {
             <button id="planner-settings-btn" onClick={() => { setMenu(false); openDialog("planner"); }}>Planner settings…</button>
             <button id="calendars-btn" onClick={() => { setMenu(false); openDialog("calendars"); }}>Calendars…</button>
             <button id="claude-btn" onClick={() => { setMenu(false); openDialog("claude"); }}>Claude…</button>
+            <button id="shutdown-btn" onClick={() => { setMenu(false); openDialog("shutdown"); }}>Shut down the day… (S)</button>
             <a href="https://app.todoist.com/app/today" target="_blank" rel="noopener">Open Todoist</a>
             <button id="disconnect-btn" onClick={async () => {
               if (!confirm("Disconnect Todoist? Your tasks stay in Todoist; Praxis just forgets the token.")) return;

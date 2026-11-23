@@ -69,9 +69,9 @@ export const useCompleted = (enabled: boolean) => useQuery({
   queryKey: qk.completed, enabled, staleTime: 60_000,
   queryFn: async () => {
     const since = addDays(startOfToday(), -HISTORY_DAYS).toISOString(), until = new Date(Date.now() + 60_000).toISOString();
-    try {
-      return await fetchAll<Task>(`/tasks/completed/by_completion_date?since=${encodeURIComponent(since)}&until=${encodeURIComponent(until)}`);
-    } catch { return [] as Task[]; }
+    let done: Task[] = [];
+    try { done = await fetchAll<Task>(`/tasks/completed/by_completion_date?since=${encodeURIComponent(since)}&until=${encodeURIComponent(until)}`); } catch { /* offline: show what we can */ }
+    return [...done, ...(await recurringCompletions(done))];
   },
 });
 
@@ -82,4 +82,29 @@ export const inboxOf = (ps: Project[] | undefined) => (ps || []).find((p) => p.i
 export function refreshAll(force = false) {
   if (force) calendarRefresh.force = true;
   return Promise.all([qk.projects, qk.today, qk.inbox, ["events"]].map((k) => queryClient.invalidateQueries({ queryKey: k })));
+}
+
+interface Activity { object_id: string; event_date: string; parent_project_id?: string; extra_data?: { content?: string } }
+const ACTIVITY_DAYS = 14;
+
+/**
+ * Todoist's completed list leaves out repeating tasks (they never really finish), so
+ * "Rowing" ticked off three times wouldn't count. The activity log has every tick:
+ * add those for the last two weeks (enough for "today" and "this week").
+ */
+async function recurringCompletions(done: Task[]): Promise<Task[]> {
+  const from = addDays(startOfToday(), -ACTIVITY_DAYS).toISOString();
+  let events: Activity[];
+  try { events = await fetchAll<Activity>(`/activities?object_type=item&event_type=completed&date_from=${encodeURIComponent(from)}`, 100); }
+  catch { return []; } // older plans may not have the activity log
+  const known = new Set(done.map((t) => t.id));
+  const active = queryClient.getQueryData<Task[]>(qk.active) || [];
+  const byId = new Map(active.map((t) => [t.id, t]));
+  return events.filter((e) => e.object_id && !known.has(e.object_id)).map((e) => {
+    const t = byId.get(e.object_id);
+    return {
+      id: e.object_id, content: e.extra_data?.content || t?.content || "", project_id: e.parent_project_id || t?.project_id || "",
+      priority: t?.priority || 1, due: null, labels: t?.labels || [], duration: t?.duration || null, completed_at: e.event_date, recurring: true,
+    } as Task;
+  });
 }

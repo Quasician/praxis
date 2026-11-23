@@ -26,6 +26,7 @@ export interface Task {
   is_deleted?: boolean;
   completed_at?: string;
   added_at?: string;
+  recurring?: boolean;       // a completion of a repeating task (from the activity log)
 }
 
 export interface Project {
@@ -72,6 +73,8 @@ export interface PlannerSettings {
   weeklyDay: number;
   lastWeekPlan: string | null;
   lastWeekPrompt: string | null;
+  shutdownAt: string;          // "21:00": when the shut-down reminder appears
+  lastShutdown: string | null; // ymd of the last day closed
 }
 
 export interface CalendarSetting { id: string; name: string; url: string; color: string; enabled?: boolean }

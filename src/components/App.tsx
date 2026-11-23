@@ -21,6 +21,7 @@ import { TimelinePane } from "./Timeline";
 import { TopBar } from "./TopBar";
 import { TriageDialog } from "./TriageDialog";
 import { BrainDumpDialog, ClaudeDialog } from "./BrainDump";
+import { ShutdownDialog } from "./ShutdownDialog";
 import { useMedia } from "./useNow";
 import { WeekView, useWeeklyAuto } from "./WeekView";
 
@@ -48,6 +49,7 @@ function Shell() {
       <CalendarsDialog />
       <BrainDumpDialog />
       <ClaudeDialog />
+      <ShutdownDialog />
       <Toast />
       <DragGhost />
     </div>
@@ -133,18 +135,22 @@ function useShortcuts() {
       else if (e.key === "a") ui.setView("areas");
       else if (e.key === "p") proposePlan();
       else if (e.key === "b") { e.preventDefault(); ui.openDialog("dump"); }
+      else if (e.key === "s") ui.openDialog("shutdown");
       else if (e.key === "Enter" && ui.plan.active && ui.plan.items.length) acceptPlan();
     };
     document.addEventListener("keydown", onKey);
     // Desktop app: global quick-add hotkey.
     const onQuickAdd = () => useUi.getState().focusQuickAdd();
     const onDump = () => useUi.getState().openDialog("dump");
+    const onShutdown = () => useUi.getState().openDialog("shutdown");
     window.addEventListener("praxis:quick-add", onQuickAdd);
     window.addEventListener("praxis:brain-dump", onDump);
+    window.addEventListener("praxis:shutdown", onShutdown);
     return () => {
       document.removeEventListener("keydown", onKey);
       window.removeEventListener("praxis:quick-add", onQuickAdd);
       window.removeEventListener("praxis:brain-dump", onDump);
+      window.removeEventListener("praxis:shutdown", onShutdown);
     };
   }, []);
 }

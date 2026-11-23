@@ -41,6 +41,7 @@ Your data stays on your computer in `%APPDATA%\Praxis` (`.env` holds the Todoist
 | `Enter` | Accept the proposed plan |
 | `D` / `W` / `A` | Day / Week / Areas view |
 | `B` | Brain dump |
+| `S` | Shut down the day |
 | `Ctrl+Shift+Space` | Quick add from anywhere (desktop app) |
 | `F11`, `Ctrl +/−/0` | Fullscreen, zoom (desktop app) |
 | `1` / `2` | Today / Inbox |
@@ -123,6 +124,19 @@ goes to Todoist in one batch.
 - Uses your own Anthropic API key (⋯ → **Claude…**). It's pay-as-you-go, and a dump costs well under a cent.
   The key is stored next to your Todoist token and never reaches the window.
 
+## Shutting down the day
+
+From 9 PM (change it in Planner settings) a **☾ Shut down the day** pill appears; or press `S` any time.
+It takes two minutes:
+
+1. **Done today:** everything you ticked off, repeating tasks included, and the time it took.
+2. **Still open:** give each leftover a home: Done, Tomorrow, Next week, Someday or Drop (repeating
+   tasks: Done, Tomorrow or Skip). **Spread over the week** puts them on the first days with room, so
+   tomorrow doesn't overflow; **All to tomorrow** does what it says.
+3. **Tomorrow:** what's on it, your calendar, and whether it fits in your free time.
+
+Then **Close the day**. Nothing stays overdue by accident, so the Friday plan has less to clean up.
+
 ## Weekly planner
 
 Press `W` (or click **Week**). On **Friday after work** Praxis opens a draft of next week by itself
@@ -200,5 +214,5 @@ Pushes that don't change the version are only checked, not released.
 - ~~Weekly planner: Friday draft, look-back, every overdue task gets a home~~ ✓
 - ~~Ultrawide layout, fullscreen and zoom; releases publish themselves~~ ✓
 - ~~Day 5: brain-dump inbox with Claude~~ ✓
-- Day 6: end-of-day shutdown
+- ~~Day 6: end-of-day shutdown~~ ✓
 - Day 7: polish, more shortcuts, open it like a real app

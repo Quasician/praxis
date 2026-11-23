@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { DndContext, DragOverlay, PointerSensor, useDraggable, useDroppable, useSensor, useSensors, type DragEndEvent, type DragStartEvent } from "@dnd-kit/core";
-import { computeArea } from "../domain/areas";
+import { completedAt, computeArea, startOfWeek } from "../domain/areas";
 import { plannerCfg } from "../domain/planner";
 import { changed, dayLabel, dayLoad, draftWeek, dueOnDay, isNextWeek, targetWeek, weekKey, type Lane, type WeekCard, type WeekDay } from "../domain/week";
 import { addDays, fmtMin, fmtSpan, minOfDay, parseDue, toMin, ymd } from "../lib/dates";
@@ -122,7 +122,8 @@ function LookBack() {
   const activeQ = useActive(connected), completedQ = useCompleted(connected);
   if (!config?.areas || !activeQ.data || !completedQ.data) return null;
   const stats = config.areas.map((a) => computeArea(a, activeQ.data!, completedQ.data!));
-  const done = stats.reduce((s, x) => s + x.weekDone, 0);
+  const done = completedQ.data.filter((t) => completedAt(t) >= startOfWeek()).length;
+  const elsewhere = done - stats.reduce((s, x) => s + x.weekDone, 0);
   const quiet = stats.filter((x) => x.quiet).map((x) => x.area.name);
   return (
     <div className="lookback" id="lookback">
@@ -133,6 +134,7 @@ function LookBack() {
           <i />{x.area.name} · {x.weekDone}{x.weekMin ? ` · ${fmtSpan(x.weekMin)}` : ""}
         </span>
       ))}
+      {elsewhere > 0 && <span className="lb-chip" title="Done in projects that aren't in an area (edit areas to include them)"><i />Outside areas · {elsewhere}</span>}
       {quiet.length > 0 && <span className="lb-quiet">Gone quiet: {quiet.join(", ")}. Next week gives each one a task.</span>}
     </div>
   );

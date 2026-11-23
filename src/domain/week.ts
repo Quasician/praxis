@@ -181,3 +181,29 @@ export function changed(c: WeekCard) {
   return c.day !== c.origDay || c.source === "someday";       // a new day (or out of Someday)
 }
 export const dayLabel = (key: string) => fromYmd(key).toLocaleDateString([], { weekday: "short", month: "short", day: "numeric" });
+
+/**
+ * Spread leftover tasks over the next days instead of piling them all onto tomorrow:
+ * each goes to the earliest day that stays under 80% full (deep ones: at most one per work day).
+ */
+export function spreadTasks(cfg: PlannerSettings, tasks: Task[], days: Date[], active: Task[], events: CalEvent[]): [Task, string][] {
+  const moving = new Set(tasks.map((t) => t.id));
+  const info = days.map((date) => {
+    const key = ymd(date);
+    const onDay = active.filter((t) => !moving.has(t.id) && parseDue(t.due) && ymd(parseDue(t.due)!.d) === key);
+    const evs = events.filter((e) => !e.allDay && eventSpanOn(e, date));
+    const cap = dayCapacity(cfg, date, evs, onDay.filter((t) => parseDue(t.due)!.hasTime));
+    return { key, cap, load: onDay.filter((t) => !parseDue(t.due)!.hasTime).reduce((s, t) => s + blockMinutes(t), 0),
+      deep: onDay.filter((t) => willpower(t, cfg) === 3).length, deepMax: workBand(cfg, date) ? 1 : 2 };
+  });
+  const out: [Task, string][] = [];
+  for (const t of [...tasks].sort((a, b) => willpower(b, cfg) - willpower(a, cfg))) {
+    const dur = blockMinutes(t), deep = willpower(t, cfg) === 3;
+    const ok = info.filter((d) => !deep || d.deep < d.deepMax);
+    const pick = ok.find((d) => d.load + dur <= d.cap * 0.8)
+      || [...(ok.length ? ok : info)].sort((a, b) => a.load / Math.max(1, a.cap) - b.load / Math.max(1, b.cap))[0];
+    pick.load += dur; if (deep) pick.deep++;
+    out.push([t, pick.key]);
+  }
+  return out;
+}

@@ -236,3 +236,24 @@ export async function doToday(task: Task) {
     reconcileSoon(0);
   } catch (e) { undo(); toast(`Couldn't add it to today: ${errMsg(e)}`); }
 }
+
+/** Move several tasks to one date in a single batch (repeating ones keep their repeat). */
+export const bulkMove = (tasks: Task[], date: string, label: string) => bulkPlace(tasks.map((t) => [t, date]), `to ${label}`);
+
+/** Give each task its own date, all in one batch. */
+export async function bulkPlace(pairs: [Task, string][], label: string) {
+  const tasks = pairs.map(([t]) => t);
+  const olds = tasks.map((t) => ({ id: t.id, due: t.due }));
+  const undos = pairs.map(([t, date]) => patchTask(t.id, () => ({ due: { ...dueFor(t, date) } as Due })));
+  try {
+    await syncOrThrow(pairs.map(([t, date]) => itemUpdate({ id: t.id, due: dueFor(t, date) })));
+    toast(`Moved ${tasks.length} task${tasks.length === 1 ? "" : "s"} ${label}`, {
+      label: "Undo",
+      run: async () => {
+        await syncOrThrow(olds.map((o) => itemUpdate({ id: o.id, due: o.due ? { date: o.due.date, ...(o.due.is_recurring ? { string: o.due.string, is_recurring: true } : {}) } : null }))).catch((e) => toast(errMsg(e)));
+        reconcileSoon(0);
+      },
+    });
+    reconcileSoon();
+  } catch (e) { undos.forEach((u) => u()); toast(`Couldn't move them: ${errMsg(e)}`); }
+}

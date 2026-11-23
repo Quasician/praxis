@@ -43,6 +43,7 @@ function Body() {
         <label>Day ends <input type="time" name="dayEnd" step={900} value={s.dayEnd} onChange={(e) => set("dayEnd", e.target.value)} /></label>
         <label>Work starts <input type="time" name="workStart" step={900} value={s.workStart} onChange={(e) => set("workStart", e.target.value)} /></label>
         <label>Work ends <input type="time" name="workEnd" step={900} value={s.workEnd} onChange={(e) => set("workEnd", e.target.value)} /></label>
+        <label>Shut-down reminder <input type="time" name="shutdownAt" step={900} value={s.shutdownAt} onChange={(e) => set("shutdownAt", e.target.value)} /></label>
       </div>
       <div className="form-row"><span className="form-label">Work days</span>
         <div id="work-days" className="day-picks">

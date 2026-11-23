@@ -33,7 +33,7 @@ export function seedAreas(projects: Project[]): Area[] {
   return areas.sort((a, b) => order.indexOf(a.name) - order.indexOf(b.name));
 }
 
-const startOfWeek = () => { const d = startOfToday(); return addDays(d, -((d.getDay() + 6) % 7)); };
+export const startOfWeek = () => { const d = startOfToday(); return addDays(d, -((d.getDay() + 6) % 7)); };
 export const completedAt = (t: Task) => new Date(t.completed_at || 0);
 const effortMin = (t: Task) => { const m = durationMinutes(t); return m && m < 1440 ? m : 0; };
 

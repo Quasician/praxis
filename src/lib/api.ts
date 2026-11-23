@@ -24,12 +24,12 @@ export async function api<T = unknown>(path: string, opts: { method?: string; bo
 }
 
 /** Todoist v1 list endpoints are paginated with next_cursor. */
-export async function fetchAll<T>(path: string): Promise<T[]> {
+export async function fetchAll<T>(path: string, limit = 200): Promise<T[]> {
   const out: T[] = [];
   let cursor: string | null = null;
   do {
     const sep = path.includes("?") ? "&" : "?";
-    const data: unknown = await api(`/api/todoist${path}${sep}limit=200${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ""}`);
+    const data: unknown = await api(`/api/todoist${path}${sep}limit=${limit}${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ""}`);
     if (Array.isArray(data)) { out.push(...data); break; }
     const page = data as { results?: T[]; items?: T[]; next_cursor?: string | null };
     out.push(...(page.results || page.items || []));
