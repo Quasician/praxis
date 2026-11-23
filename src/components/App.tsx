@@ -23,6 +23,9 @@ import { TriageDialog } from "./TriageDialog";
 import { BrainDumpDialog, ClaudeDialog } from "./BrainDump";
 import { ShutdownDialog } from "./ShutdownDialog";
 import { HelpDialog } from "./HelpDialog";
+import { ProgressView } from "./ProgressView";
+import { MorningDialog } from "./MorningDialog";
+import { BacklogDialog } from "./BacklogDialog";
 import { useMedia } from "./useNow";
 import { WeekView, useWeeklyAuto } from "./WeekView";
 
@@ -45,6 +48,7 @@ function Shell() {
       {view === "day" && <main className={`layout${wide ? " wide" : ""}`}><TasksPane /><TimelinePane />{wide && <AreasView side />}</main>}
       {view === "week" && <WeekView />}
       {view === "areas" && <AreasView />}
+      {view === "progress" && <ProgressView />}
       <TriageDialog />
       <PlannerSettingsDialog />
       <CalendarsDialog />
@@ -52,6 +56,8 @@ function Shell() {
       <ClaudeDialog />
       <ShutdownDialog />
       <HelpDialog />
+      <MorningDialog />
+      <BacklogDialog />
       <Toast />
       <DragGhost />
     </div>
@@ -81,7 +87,8 @@ function useBackgroundJobs() {
       await updateConfig((c) => ({ ...c, planner: { ...(c.planner || {}), lastAuto: today } }));
       if (plan.items.length) {
         useUi.getState().setPlan({ ...plan, active: true });
-        toast("Here's a plan for the rest of today. Accept it, adjust it, or discard it.");
+        if (cfg.morningCommit) useUi.getState().openDialog("morning");
+        else toast("Here's a plan for the rest of today. Accept it, adjust it, or discard it.");
       }
     })().catch((e) => console.warn("Auto-plan skipped:", e));
   }, [todayQ.isSuccess, configQ.isSuccess, projectsQ.isSuccess, weeklyStarted]);
@@ -135,10 +142,12 @@ function useShortcuts() {
       else if (e.key === "d") ui.setView("day");
       else if (e.key === "w") ui.setView("week");
       else if (e.key === "a") ui.setView("areas");
+      else if (e.key === "g") ui.setView("progress");
       else if (e.key === "p") proposePlan();
       else if (e.key === "b") { e.preventDefault(); ui.openDialog("dump"); }
       else if (e.key === "s") ui.openDialog("shutdown");
       else if (e.key === "?") ui.openDialog("help");
+      else if (e.key === "m") ui.openDialog("morning");
       else if (e.key === "Enter" && ui.plan.active && ui.plan.items.length) acceptPlan();
     };
     document.addEventListener("keydown", onKey);
@@ -149,11 +158,15 @@ function useShortcuts() {
     window.addEventListener("praxis:quick-add", onQuickAdd);
     window.addEventListener("praxis:brain-dump", onDump);
     window.addEventListener("praxis:shutdown", onShutdown);
+    // The Now pop-out writes settings too; pick up its changes when you come back to this window.
+    const onFocus = () => queryClient.invalidateQueries({ queryKey: qk.config });
+    window.addEventListener("focus", onFocus);
     return () => {
       document.removeEventListener("keydown", onKey);
       window.removeEventListener("praxis:quick-add", onQuickAdd);
       window.removeEventListener("praxis:brain-dump", onDump);
       window.removeEventListener("praxis:shutdown", onShutdown);
+      window.removeEventListener("focus", onFocus);
     };
   }, []);
 }

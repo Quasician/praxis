@@ -67,7 +67,10 @@ function ShutdownBody() {
   });
 
   const finish = async () => {
-    await updateConfig((c) => ({ ...c, planner: { ...(c.planner || {}), lastShutdown: todayKey } }));
+    await updateConfig((c) => ({
+      ...c, planner: { ...(c.planner || {}), lastShutdown: todayKey },
+      history: { ...(c.history || {}), [todayKey]: { ...(c.history || {})[todayKey], planned: (c.history || {})[todayKey]?.planned || [], shutdown: true } },
+    }));
     close("shutdown");
     toast(open.length ? `Day closed. ${open.length} task${open.length === 1 ? " stays" : "s stay"} where ${open.length === 1 ? "it is" : "they are"}.` : "Day closed. Nothing left hanging. See you tomorrow.");
   };

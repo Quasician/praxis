@@ -7,7 +7,7 @@ import { colorOf, plain } from "../lib/text";
 import type { Task } from "../lib/types";
 import { completeTask } from "../data/actions";
 import { acceptPlan, discardPlan, proposePlan } from "../data/planActions";
-import { useData } from "../data/useData";
+import { useCommitted, useData } from "../data/useData";
 import { useUi } from "../state/ui";
 import { hourPx, minToY, pointerMin, startDrag } from "./drag";
 import { useHourHeight, useNow } from "./useNow";
@@ -98,12 +98,13 @@ export function TimelinePane() {
           {plan.active && plan.items.map((it, i) => {
             const wp = willpower(it.task, cfg), compact = it.dur < 45;
             return (
-              <div key={`p${i}`} className={`tl-block proposed ${compact ? "compact" : ""} ${lifting(it.task, i) ? "lifting" : ""}`} data-idx={i}
+              <div key={`p${i}`} className={`tl-block proposed ${it.committed ? "committed" : "bonus"} ${compact ? "compact" : ""} ${lifting(it.task, i) ? "lifting" : ""}`} data-idx={i} data-committed={it.committed ? "1" : "0"}
                    style={blockStyle(it.start, it.dur, color(it.task))} onPointerDown={(e) => onProposalDown(e, i)}>
                 <div className="blk-body">
-                  <div className="blk-title">{plain(it.task.content)}</div>
+                  <div className="blk-title">{it.committed ? <span className="commit-star" title="Committed">★ </span> : null}{plain(it.task.content)}</div>
                   <div className="blk-time">
                     {fmtMin(it.start)} – {fmtMin(it.start + it.dur)}{compact ? "" : ` · ${fmtSpan(it.dur)}`}{" "}
+                    {!it.committed && <span className="pbadge bonus">Bonus</span>}
                     {it.source === "milestone" && it.milestone ? <span className="pbadge ms">◆ {plain(it.milestone.content).slice(0, 28)}</span>
                       : wp === 3 ? <span className="pbadge wp3">Deep</span> : wp === 1 ? <span className="pbadge wp1">Light</span> : null}
                   </div>
@@ -144,6 +145,7 @@ export function TimelinePane() {
 }
 
 function TaskBlock({ b, color, past, lifting, onPointerDown }: { b: Block; color: string; past: boolean; lifting: boolean; onPointerDown: (e: PointerEvent) => void }) {
+  const committed = useCommitted();
   const t = b.task!;
   const compact = b.dur < 45;
   const rec = t.due && t.due.is_recurring;
@@ -152,7 +154,7 @@ function TaskBlock({ b, color, past, lifting, onPointerDown }: { b: Block; color
          style={blockStyle(b.start, b.dur, color, b.col, b.cols)} title={`${plain(t.content)} · ${fmtMin(b.start)}–${fmtMin(b.end)}`} onPointerDown={onPointerDown}>
       <button className="blk-check" title="Complete" aria-label="Complete task" onClick={() => completeTask(t)}><CheckIcon /></button>
       <div className="blk-body">
-        <div className="blk-title">{plain(t.content)}{rec ? <span className="rec" title="Repeats"> ↻</span> : null}</div>
+        <div className="blk-title">{committed.has(t.id) && <span className={`commit-star ${committed.get(t.id)!.star ? "the-one" : ""}`}>★ </span>}{plain(t.content)}{rec ? <span className="rec" title="Repeats"> ↻</span> : null}</div>
         <div className="blk-time">{fmtMin(b.start)} – {fmtMin(b.end)}{compact ? "" : ` · ${fmtSpan(b.dur)}`}</div>
       </div>
       <div className="tl-resize" title="Drag to change length" />
@@ -169,11 +171,11 @@ function PlanBanner() {
   return (
     <div id="plan-banner" className="plan-banner">
       <div className="plan-line">
-        <div className="plan-text"><b>Proposed plan</b> · {plan.items.length} block{plan.items.length === 1 ? "" : "s"} · {fmtSpan(mins)}{deep ? ` · ${deep} deep-focus first` : " · hardest first"}</div>
+        <div className="plan-text"><b>Proposed plan</b> · <span id="plan-committed">★ {plan.items.filter((it) => it.committed).length} committed</span>{plan.items.some((it) => !it.committed) ? ` + ${plan.items.filter((it) => !it.committed).length} bonus` : ""} · {fmtSpan(mins)}{deep ? ` · ${deep} deep-focus first` : " · hardest first"}</div>
         <div className="plan-actions">
           <button id="plan-discard" className="ghost-btn" onClick={discardPlan}>Discard</button>
           <button id="plan-reshuffle" className="ghost-btn" title="Try a different order within each willpower level" onClick={() => proposePlan(true)}>Reshuffle</button>
-          <button id="plan-accept" className="primary" disabled={!plan.items.length} onClick={acceptPlan}>Accept</button>
+          <button id="plan-accept" className="primary" disabled={!plan.items.length} onClick={() => acceptPlan()}>Accept</button>
         </div>
       </div>
       {plan.unplaced.length > 0 && (
@@ -182,7 +184,8 @@ function PlanBanner() {
           {plan.unplaced.length > 6 && <span>+{plan.unplaced.length - 6} more</span>}
         </div>
       )}
-      <div className="plan-hint">Drag dashed blocks to adjust, or drag one onto the list to leave it out.</div>
+      {plan.fillWhy && <div className="plan-hint" id="plan-fill-why">Lighter or fuller than usual: {plan.fillWhy}.</div>}
+      <div className="plan-hint">★ = what you commit to; bonus blocks are only if you have energy left. Drag blocks to adjust, or onto the list to leave one out.</div>
     </div>
   );
 }

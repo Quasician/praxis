@@ -65,15 +65,15 @@ export const useActive = (enabled: boolean) => useQuery({
   queryFn: async () => open(await fetchAll<Task>("/tasks")),
 });
 
-export const useCompleted = (enabled: boolean) => useQuery({
-  queryKey: qk.completed, enabled, staleTime: 60_000,
-  queryFn: async () => {
+/** Everything finished in the last ~3 months (plus repeating-task ticks from the activity log). */
+export async function fetchCompleted(): Promise<Task[]> {
     const since = addDays(startOfToday(), -HISTORY_DAYS).toISOString(), until = new Date(Date.now() + 60_000).toISOString();
     let done: Task[] = [];
     try { done = await fetchAll<Task>(`/tasks/completed/by_completion_date?since=${encodeURIComponent(since)}&until=${encodeURIComponent(until)}`); } catch { /* offline: show what we can */ }
     return [...done, ...(await recurringCompletions(done))];
-  },
-});
+  }
+
+export const useCompleted = (enabled: boolean) => useQuery({ queryKey: qk.completed, enabled, staleTime: 60_000, queryFn: fetchCompleted });
 
 export const projectMap = (ps: Project[] | undefined) => new Map((ps || []).map((p) => [p.id, p]));
 export const inboxOf = (ps: Project[] | undefined) => (ps || []).find((p) => p.inbox_project || p.is_inbox_project) || (ps || []).find((p) => p.name === "Inbox");

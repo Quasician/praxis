@@ -24,7 +24,7 @@ let restoreState: (() => void) | null = null;
 // ---------- small persisted desktop settings ----------
 const prefsFile = () => path.join(app.getPath("userData"), "desktop.json");
 type Bounds = { x: number; y: number; width: number; height: number };
-type Prefs = { openAtLogin?: boolean; toldAboutTray?: boolean; bounds?: Bounds; maximized?: boolean; fullscreen?: boolean; zoom?: number };
+type Prefs = { openAtLogin?: boolean; toldAboutTray?: boolean; bounds?: Bounds; maximized?: boolean; fullscreen?: boolean; zoom?: number; miniBounds?: Bounds };
 const readPrefs = (): Prefs => { try { return JSON.parse(fs.readFileSync(prefsFile(), "utf8")); } catch { return {}; } };
 const writePrefs = (p: Prefs) => { try { fs.writeFileSync(prefsFile(), JSON.stringify({ ...readPrefs(), ...p }, null, 2)); } catch { /* ignore */ } };
 const log = (...a: unknown[]) => { try { fs.appendFileSync(path.join(app.getPath("userData"), "praxis.log"), `${new Date().toISOString()} ${a.map(String).join(" ")}\n`); } catch { /* ignore */ } };
@@ -119,7 +119,11 @@ function createWindow() {
   for (const ev of ["resize", "move", "maximize", "unmaximize", "enter-full-screen", "leave-full-screen"] as const) win.on(ev as "resize", saveSoon);
 
   // Links (Todoist, Google Calendar…) open in your normal browser, never inside Praxis.
-  win.webContents.setWindowOpenHandler(({ url }) => { shell.openExternal(url); return { action: "deny" }; });
+  win.webContents.setWindowOpenHandler(({ url }) => {
+    if (url.startsWith(baseUrl) && new URL(url).searchParams.has("mini")) { openMini(); return { action: "deny" }; }
+    shell.openExternal(url);
+    return { action: "deny" };
+  });
   win.webContents.on("will-navigate", (e, url) => { if (!url.startsWith(baseUrl)) { e.preventDefault(); shell.openExternal(url); } });
 
   // Closing the window keeps Praxis running in the tray (so the hotkey and reminders keep working).
@@ -133,6 +137,30 @@ function createWindow() {
       writePrefs({ toldAboutTray: true });
     }
   });
+}
+
+// ---------- the Now pop-out: a small always-on-top window ----------
+let mini: BrowserWindow | null = null;
+function openMini() {
+  if (mini && !mini.isDestroyed()) { mini.show(); mini.focus(); return; }
+  const wa = screen.getPrimaryDisplay().workArea;
+  const saved = readPrefs().miniBounds;
+  mini = new BrowserWindow({
+    width: 380, height: 116, minWidth: 280, minHeight: 90, x: saved?.x ?? wa.x + wa.width - 400, y: saved?.y ?? wa.y + wa.height - 140,
+    ...(saved ? { width: saved.width, height: saved.height } : {}),
+    alwaysOnTop: true, frame: false, resizable: true, maximizable: false, minimizable: false, fullscreenable: false,
+    skipTaskbar: true, title: "Praxis · Now", icon: asset("icon-256.png"),
+    backgroundColor: nativeTheme.shouldUseDarkColors ? "#1f1c19" : "#fffdf9",
+    webPreferences: { contextIsolation: true, sandbox: true },
+  });
+  mini.setAlwaysOnTop(true, "floating");
+  mini.removeMenu();
+  mini.loadURL(`${baseUrl}/?mini=1`);
+  mini.webContents.setWindowOpenHandler(({ url }) => { shell.openExternal(url); return { action: "deny" }; });
+  mini.webContents.on("will-navigate", (e, url) => { if (!url.startsWith(baseUrl)) e.preventDefault(); });
+  const keep = () => { if (mini && !mini.isDestroyed()) writePrefs({ miniBounds: mini.getBounds() }); };
+  mini.on("moved", keep); mini.on("resized", keep);
+  mini.on("closed", () => { mini = null; });
 }
 
 function toggleFullScreen() {
@@ -165,6 +193,7 @@ function refreshTrayMenu() {
     { label: "Quick add…", accelerator: QUICK_ADD, click: quickAdd },
     { label: "Brain dump…", click: () => trigger("brain-dump") },
     { label: "Shut down the day…", click: () => trigger("shutdown") },
+    { label: "Now (always on top)", click: () => openMini() },
     { label: "Full screen", accelerator: "F11", type: "checkbox", checked: !!win?.isFullScreen(), click: () => { showWindow(); toggleFullScreen(); } },
     { type: "separator" },
     { label: "Open at login", type: "checkbox", checked: app.getLoginItemSettings().openAtLogin, click: (item) => { setOpenAtLogin(item.checked); } },

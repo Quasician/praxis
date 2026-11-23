@@ -75,16 +75,32 @@ export interface PlannerSettings {
   lastWeekPrompt: string | null;
   shutdownAt: string;          // "21:00": when the shut-down reminder appears
   lastShutdown: string | null; // ymd of the last day closed
+  fill: number;                // % of free time the daily plan fills (starting point; adapts)
+  adaptive: boolean;           // nudge `fill` up or down with your recent completion rate
+  commitCount: number;         // tasks you commit to each day (at most one Deep); the rest are bonus
+  morningCommit: boolean;      // open the one-minute morning commit instead of a bare plan
+  learn: boolean;              // schedule Deep work in your best hours, scale durations to reality
 }
 
 export interface CalendarSetting { id: string; name: string; url: string; color: string; enabled?: boolean }
 export interface TaskMemory { due: string; moves: number }
+
+/** What the plan held on a day (for the Progress view and adaptive planning). */
+export interface PlannedItem { id: string; content: string; wp: number; project: string; committed: boolean; star?: boolean }
+export interface DayRecord { planned: PlannedItem[]; committedAt?: string; shutdown?: boolean }
+/** A finished focus session: how long a task really took vs. its estimate. */
+export interface Sample { wp: number; est: number; actual: number; at: string }
+export interface Focus { taskId: string; content: string; startedAt: string; minutes: number }
 
 export interface Config {
   areas?: Area[];
   planner?: Partial<PlannerSettings>;
   calendars?: CalendarSetting[];
   taskMemory?: Record<string, TaskMemory>;
+  history?: Record<string, DayRecord>;
+  samples?: Sample[];
+  focus?: Focus | null;
+  lastSeenVersion?: string;
   [key: string]: unknown;
 }
 

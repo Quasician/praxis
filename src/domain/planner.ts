@@ -4,9 +4,10 @@
 //   3. Rank by willpower (@deep > unlabelled > @light) + a boost for tasks that slipped before,
 //      then priority and overdue age; the hardest work gets the earliest slots.
 import { ceilTo, minOfDay, parseDue, sameDay, startOfToday, toMin } from "../lib/dates";
-import { blockMinutes, isMilestone, willpower } from "../lib/tasks";
+import { isMilestone, willpower } from "../lib/tasks";
 import type { CalEvent, Config, PlannerSettings, Task } from "../lib/types";
 import { layoutBlocks, visibleEvents } from "./layout";
+import { learnedMinutes, type Learned } from "./progress";
 
 export const PLANNER_DEFAULTS: PlannerSettings = {
   auto: true,
@@ -28,6 +29,11 @@ export const PLANNER_DEFAULTS: PlannerSettings = {
   lastWeekPrompt: null,
   shutdownAt: "21:00",
   lastShutdown: null,
+  fill: 60,
+  adaptive: true,
+  commitCount: 3,
+  morningCommit: true,
+  learn: true,
 };
 export const plannerCfg = (config?: Config | null): PlannerSettings => ({ ...PLANNER_DEFAULTS, ...((config && config.planner) || {}) });
 
@@ -57,7 +63,7 @@ export function freeIntervals(cfg: PlannerSettings, todayTasks: Task[], events: 
 }
 
 export interface Candidate { task: Task; source: "today" | "milestone"; overdueDays: number; milestone?: Task; target?: string }
-export interface PlanItem extends Candidate { start: number; dur: number }
+export interface PlanItem extends Candidate { start: number; dur: number; committed?: boolean; star?: boolean }
 export interface Plan { items: PlanItem[]; unplaced: Candidate[]; freeMin: number }
 
 export interface PlanInput {
@@ -68,6 +74,8 @@ export interface PlanInput {
   tray: Set<string>;          // tasks that need a decision first
   slips: (id: string) => number;
   seed?: number;              // non-zero = reshuffle within willpower levels
+  fill?: number;              // % of free time to fill (defaults to cfg.fill)
+  learned?: Learned | null;   // best Deep hours + real durations
 }
 
 export function candidates({ cfg, today, active, tray }: PlanInput): Candidate[] {
@@ -117,18 +125,41 @@ export function buildPlan(input: PlanInput): Plan {
 
   const free = freeIntervals(cfg, input.today, input.events);
   const freeMin = free.reduce((s, [a, z]) => s + (z - a), 0);
-  const budget = Math.floor(freeMin * (1 - cfg.keepFree / 100));
+  const budget = Math.floor(freeMin * ((input.fill ?? cfg.fill) / 100));
+  const learned = cfg.learn ? input.learned : null;
   let used = 0;
   const items: PlanItem[] = [], unplaced: Candidate[] = [];
+  let committed = 0, deepCommitted = 0;
   for (const c of cands) {
-    const dur = blockMinutes(c.task);
-    const slot = used + dur <= budget ? free.findIndex(([a, z]) => z - a >= dur) : -1;
+    const dur = learnedMinutes(c.task, cfg, learned);
+    if (used + dur > budget) { unplaced.push(c); continue; }
+    const deep = willpower(c.task, cfg) === 3;
+    // Deep work goes as close as possible to the hours you actually finish Deep work; the rest takes the earliest slot.
+    const pref = deep && learned?.deepHour != null ? learned.deepHour : null;
+    let slot = -1, start = 0;
+    if (pref === null) {
+      slot = free.findIndex(([a, z]) => z - a >= dur);
+      if (slot !== -1) start = free[slot][0];
+    } else {
+      let bestDist = Infinity;
+      free.forEach(([a, z], i) => {
+        if (z - a < dur) return;
+        const s0 = Math.min(ceilTo(Math.min(Math.max(pref, a), z - dur), 5), z - dur);
+        const dist = Math.abs(s0 - pref);
+        if (dist < bestDist) { bestDist = dist; slot = i; start = s0; }
+      });
+    }
     if (slot === -1) { unplaced.push(c); continue; }
     const [a, z] = free[slot];
-    items.push({ ...c, start: a, dur });
+    // The first few you place are your commitments (at most one Deep); the rest are bonus.
+    const commit = committed < cfg.commitCount && (!deep || deepCommitted === 0);
+    if (commit) { committed++; if (deep) deepCommitted++; }
+    items.push({ ...c, start, dur, committed: commit });
     used += dur;
-    const rest: [number, number][] = z - (a + dur + cfg.gap) >= 15 ? [[ceilTo(a + dur + cfg.gap, 5), z]] : [];
-    free.splice(slot, 1, ...rest);
+    const pieces: [number, number][] = [];
+    if (start - cfg.gap - a >= 15) pieces.push([a, start - cfg.gap]);
+    if (z - (start + dur + cfg.gap) >= 15) pieces.push([ceilTo(start + dur + cfg.gap, 5), z]);
+    free.splice(slot, 1, ...pieces);
   }
   items.sort((x, y) => x.start - y.start);
   return { items, unplaced, freeMin };

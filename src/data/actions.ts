@@ -257,3 +257,12 @@ export async function bulkPlace(pairs: [Task, string][], label: string) {
     reconcileSoon();
   } catch (e) { undos.forEach((u) => u()); toast(`Couldn't move them: ${errMsg(e)}`); }
 }
+
+/** Like updateConfig, but starts from what's on disk right now: the Now pop-out and the main window both write. */
+export async function updateConfigFresh(fn: (c: Config) => Config) {
+  const cur = await api<Config>("/api/config");
+  const next = fn(cur);
+  queryClient.setQueryData(qk.config, next);
+  await api("/api/config", { method: "POST", body: next });
+  return next;
+}

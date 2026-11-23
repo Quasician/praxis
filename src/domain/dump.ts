@@ -2,6 +2,7 @@
 import { uuid } from "../lib/api";
 import { addDays, fromYmd, startOfToday, ymd } from "../lib/dates";
 import type { PlannerSettings, Project, SyncCommand, Task } from "../lib/types";
+import { MILESTONE_LABEL } from "../lib/tasks";
 
 export type Willpower = "deep" | "medium" | "light";
 export interface Proposal {
@@ -20,6 +21,7 @@ export interface Proposal {
   priority: number;
   labels: string[];
   note: string;
+  firstStep: string;          // "" = none; else the task becomes a milestone with this as its first step
 }
 
 export const DURATIONS = [10, 15, 30, 45, 60, 90, 120, 180, 240];
@@ -63,6 +65,7 @@ export function cleanProposals(raw: unknown[], projects: Project[], inboxId: str
       priority: [1, 2, 3, 4].includes(Number(x.priority)) ? Number(x.priority) : 1,
       labels: Array.isArray(x.labels) ? x.labels.filter((l): l is string => typeof l === "string" && labels.has(l.toLowerCase())) : [],
       note: str(x.note, 120),
+      firstStep: recurring ? "" : str(x.first_step, 200),
     });
   }
   return out;
@@ -105,15 +108,24 @@ export function proposalCommands(ps: Proposal[], cfg: PlannerSettings, inbox: Ta
       due: dueOf(p),
       ...(withDeadlines && p.deadline ? { deadline: { date: p.deadline } } : {}),
     };
+    // With a first step, the task becomes a milestone (no date) and the step carries the date instead.
+    const step = p.firstStep.trim() && !p.recurring ? p.firstStep.trim() : "";
+    const stepDue = step ? dueOf(p) : null;
+    if (step) { fields.labels = [...new Set([...(fields.labels as string[]), MILESTONE_LABEL])]; fields.due = null; }
+    let parentId: string;
     if (p.sourceId) {
       const src = byId.get(p.sourceId);
-      if (src && sameDue(p, src)) delete fields.due;   // untouched date: leave it (and any repeat) exactly as it is
+      if (!step && src && sameDue(p, src)) delete fields.due;   // untouched date: leave it (and any repeat) exactly as it is
       push(p, { type: "item_update", uuid: uuid(), args: { id: p.sourceId, ...fields } });
       if (src && src.project_id !== p.projectId) push(p, { type: "item_move", uuid: uuid(), args: { id: p.sourceId, project_id: p.projectId } });
+      parentId = p.sourceId;
     } else {
       if (!fields.due) delete fields.due;
-      push(p, { type: "item_add", uuid: uuid(), temp_id: uuid(), args: { ...fields, project_id: p.projectId } });
+      const temp = uuid();
+      push(p, { type: "item_add", uuid: uuid(), temp_id: temp, args: { ...fields, project_id: p.projectId } });
+      parentId = temp;
     }
+    if (step) push(p, { type: "item_add", uuid: uuid(), temp_id: uuid(), args: { content: step, project_id: p.projectId, parent_id: parentId, duration: { amount: 15, unit: "minute" }, ...(stepDue ? { due: stepDue } : {}) } });
   }
   return { cmds, owner };
 }

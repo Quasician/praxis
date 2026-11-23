@@ -1,12 +1,18 @@
-import { useState } from "react";
+import { createContext, useContext, useState } from "react";
 import { ageText, nextDate, SLIP_LIMIT, TRIAGE_GROUPS, type TriageItem } from "../domain/triage";
 import { willpower } from "../lib/tasks";
 import { Inline, colorOf } from "../lib/text";
 import { breakDown, bulkSomeday, finishTask, moveToSomeday, setTaskDate } from "../data/actions";
 import { useData } from "../data/useData";
-import { useUi } from "../state/ui";
+import { toast, useUi } from "../state/ui";
 import { Dialog } from "./common";
 import { ymd } from "../lib/dates";
+import { api } from "../lib/api";
+import { plain } from "../lib/text";
+import { useStatus } from "../data/queries";
+
+/** Claude's suggested first step per task id (filled by "Suggest first steps"). */
+const Steps = createContext<Map<string, string>>(new Map());
 
 export function TriageDialog() {
   return (
@@ -17,8 +23,27 @@ export function TriageDialog() {
 }
 
 function TriageBody() {
-  const { tray } = useData();
+  const { tray, projects } = useData();
   const close = useUi((s) => s.closeDialog);
+  const status = useStatus();
+  const [steps, setSteps] = useState<Map<string, string>>(new Map());
+  const [busy, setBusy] = useState(false);
+  const stuck = tray.filter((x) => !x.recurring);
+  const suggest = async () => {
+    setBusy(true);
+    try {
+      const res = await api<{ steps: { id: string; step: string }[] }>("/api/claude/steps", {
+        method: "POST",
+        body: {
+          today: new Date().toDateString(),
+          tasks: stuck.slice(0, 40).map((x) => ({ id: x.task.id, content: plain(x.task.content), description: x.task.description || "", project: projects.get(x.task.project_id)?.name, overdueDays: x.days, moves: x.moves })),
+        },
+      });
+      const ids = new Set(stuck.map((x) => x.task.id));
+      setSteps(new Map(res.steps.filter((s) => ids.has(s.id) && typeof s.step === "string" && s.step.trim()).map((s) => [s.id, s.step.trim().slice(0, 200)])));
+    } catch (e) { toast((e as Error).message); }
+    finally { setBusy(false); }
+  };
   return (
     <form className="triage-form" onSubmit={(e) => e.preventDefault()}>
       <div className="triage-head">
@@ -26,8 +51,12 @@ function TriageBody() {
           <h2>Needs a decision</h2>
           <p className="dialog-sub">Tasks that are 2+ days overdue or keep getting pushed back. Give each one a decision so nothing gets lost.</p>
         </div>
-        <span id="triage-count" className="triage-count">{tray.length ? `${tray.length} to decide` : "All clear"}</span>
+        <div className="triage-side">
+          {status.data?.claude && stuck.length > 0 && <button type="button" id="suggest-steps" className="ghost-btn" disabled={busy} title="Claude writes one small, concrete first step for each stuck task" onClick={suggest}>{busy ? "Thinking…" : "✦ Suggest first steps"}</button>}
+          <span id="triage-count" className="triage-count">{tray.length ? `${tray.length} to decide` : "All clear"}</span>
+        </div>
       </div>
+      <Steps.Provider value={steps}>
       <div id="triage-body" className="triage-body">
         {!tray.length ? <div className="empty"><div className="big">Nothing waiting on you.</div>Every overdue task has a decision. Nice.</div>
           : TRIAGE_GROUPS.map((g) => {
@@ -49,6 +78,7 @@ function TriageBody() {
             );
           })}
       </div>
+      </Steps.Provider>
       <div className="dialog-actions"><button type="button" value="close" className="ghost-btn" onClick={() => close("triage")}>Close</button></div>
     </form>
   );
@@ -58,6 +88,7 @@ function TriageRow({ x }: { x: TriageItem }) {
   const { projects, cfg } = useData();
   const [breaking, setBreaking] = useState(false);
   const [step, setStep] = useState("");
+  const suggested = useContext(Steps).get(x.task.id);
   const t = x.task;
   const proj = projects.get(t.project_id);
   const wp = willpower(t, cfg);
@@ -85,7 +116,14 @@ function TriageRow({ x }: { x: TriageItem }) {
           {x.moves > 0 && <span className="slips" title={`Pushed back ${x.moves} times`}>moved {x.moves}×</span>}
           {wp === 3 && <span className="pbadge wp3">Deep</span>}
         </div>
-        {x.moves >= SLIP_LIMIT && !x.recurring && <div className="tri-hint">This keeps slipping. It may be too big or unclear. Try <b>Break down</b> into one small first step.</div>}
+        {suggested && !breaking && (
+          <div className="tri-step" data-step>
+            <span className="tri-step-label">✦ First step</span> <span className="tri-step-text">{suggested}</span>
+            <button type="button" className="mini" data-act="use-step" title="Make this a milestone with this as today's first step" onClick={() => breakDown(t, suggested)}>Use it</button>
+            <button type="button" className="mini ghost-on" data-act="edit-step" onClick={() => { setStep(suggested); setBreaking(true); }}>Edit</button>
+          </div>
+        )}
+        {x.moves >= SLIP_LIMIT && !x.recurring && !suggested && <div className="tri-hint">This keeps slipping. It may be too big or unclear. Try <b>Break down</b> into one small first step.</div>}
       </div>
       <div className="tri-actions">
         {breaking ? (

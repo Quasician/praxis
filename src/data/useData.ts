@@ -34,3 +34,12 @@ export function useData() {
     loading: todayQ.isPending || projectsQ.isPending,
   };
 }
+
+/** Today's committed tasks (★), from the plan you accepted or committed to this morning. */
+export function useCommitted(): Map<string, { star: boolean }> {
+  const { config } = useData();
+  const day = new Date();
+  const key = `${day.getFullYear()}-${String(day.getMonth() + 1).padStart(2, "0")}-${String(day.getDate()).padStart(2, "0")}`;
+  const planned = config?.history?.[key]?.planned || [];
+  return new Map(planned.filter((p) => p.committed).map((p) => [p.id, { star: !!p.star }]));
+}

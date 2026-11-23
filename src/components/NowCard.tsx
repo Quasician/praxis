@@ -1,0 +1,123 @@
+import { useEffect, useRef, useState } from "react";
+import { SAMPLES_KEEP } from "../domain/progress";
+import { minOfDay, parseDue, sameDay, startOfToday } from "../lib/dates";
+import { blockMinutes, sortTasks, willpower } from "../lib/tasks";
+import { plain } from "../lib/text";
+import type { Task } from "../lib/types";
+import { completeTask, updateConfigFresh as updateConfig } from "../data/actions";
+import { queryClient, qk } from "../data/queries";
+import { useCommitted, useData } from "../data/useData";
+import { toast, useUi } from "../state/ui";
+
+export const FOCUS_MIN = 25;
+const isDesktop = () => /Electron/i.test(navigator.userAgent);
+
+/** What to work on now: the running focus task, else the block happening now, else your next commitment, else the top of today's list. */
+function useQueue(skipped: Set<string>) {
+  const { today, trayIds } = useData();
+  const committed = useCommitted();
+  const now = new Date();
+  const open = today.filter((t) => { const d = parseDue(t.due); return d && d.d <= new Date(+startOfToday() + 864e5) && !trayIds.has(t.id) && !skipped.has(t.id); });
+  const timedNow = (t: Task) => { const d = parseDue(t.due)!; if (!d.hasTime || !sameDay(d.d, now)) return Infinity; const s = minOfDay(d.d); return minOfDay(now) >= s - 10 && minOfDay(now) < s + blockMinutes(t) ? -1 : s; };
+  const score = (t: Task) => {
+    const at = timedNow(t);
+    if (at === -1) return -2e4;                                   // its block is happening now
+    if (committed.has(t.id)) return -1e4 + (committed.get(t.id)!.star ? -500 : 0) + (at === Infinity ? 9000 : at);
+    return at === Infinity ? 0 : at - 5000;                       // upcoming blocks before the rest
+  };
+  const ranked = sortTasks(open, "today").map((t, i) => ({ t, k: score(t) + i / 1000 })).sort((a, b) => a.k - b.k).map((x) => x.t);
+  return { ranked, committed };
+}
+
+export function NowCard({ mini = false }: { mini?: boolean }) {
+  const { config, cfg, today } = useData();
+  const [skipped, setSkipped] = useState<Set<string>>(new Set());
+  const { ranked, committed } = useQueue(skipped);
+  const focus = config?.focus || null;
+  const focusTask = focus ? today.find((t) => t.id === focus.taskId) || ({ id: focus.taskId, content: focus.content, project_id: "", priority: 1, due: null } as Task) : null;
+  const task = focusTask || ranked[0];
+  const next = ranked.find((t) => t.id !== task?.id);
+  const [tick, setTick] = useState(Date.now());
+  const warned = useRef("");
+
+  useEffect(() => {
+    if (!focus) return;
+    const id = setInterval(() => setTick(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, [focus?.taskId, focus?.startedAt]);
+
+  const elapsed = focus ? Math.max(0, (tick - Date.parse(focus.startedAt)) / 1000) : 0;
+  const left = focus ? focus.minutes * 60 - elapsed : 0;
+  useEffect(() => {
+    if (!focus || left > 0 || warned.current === focus.startedAt) return;
+    warned.current = focus.startedAt;
+    toast(`Time's up on “${plain(focus.content).slice(0, 50)}”. Done, or 5 more minutes?`);
+    try { if ("Notification" in window && Notification.permission === "granted") new Notification("Praxis: time's up", { body: plain(focus.content) }); } catch { /* ignore */ }
+  }, [left <= 0, focus?.startedAt]); // eslint-disable-line
+
+  if (!task) {
+    if (mini) return <div className="now-card mini empty"><span className="now-label">Now</span><span className="now-title">Nothing left for today.</span></div>;
+    return null;
+  }
+
+  const start = () => {
+    try { if ("Notification" in window && Notification.permission === "default") Notification.requestPermission(); } catch { /* ignore */ }
+    updateConfig((c) => ({ ...c, focus: { taskId: task.id, content: task.content, startedAt: new Date().toISOString(), minutes: FOCUS_MIN } }));
+  };
+  const stop = () => updateConfig((c) => ({ ...c, focus: null }));
+  const more = () => updateConfig((c) => (c.focus ? { ...c, focus: { ...c.focus, minutes: Math.ceil(elapsed / 60) + 5 } } : c));
+  const done = async () => {
+    const actual = focus && focus.taskId === task.id ? Math.round(elapsed / 60) : 0;
+    updateConfig((c) => ({
+      ...c, focus: null,
+      // A timed session teaches Praxis how long this kind of task really takes (ignore accidental 1-minute runs).
+      samples: actual >= 3 ? [...(c.samples || []), { wp: willpower(task, cfg), est: blockMinutes(task), actual: Math.min(actual, 600), at: new Date().toISOString() }].slice(-SAMPLES_KEEP) : c.samples,
+    }));
+    await completeTask(task);
+  };
+  const skip = () => setSkipped((s) => new Set([...s, task.id]));
+  const running = !!focus && focus.taskId === task.id;
+  const clock = (sec: number) => { const a = Math.abs(Math.round(sec)); return `${sec < 0 ? "+" : ""}${Math.floor(a / 60)}:${String(a % 60).padStart(2, "0")}`; };
+  const c = committed.get(task.id);
+  const d = parseDue(task.due);
+
+  return (
+    <div className={`now-card ${mini ? "mini" : ""} ${running ? "running" : ""} ${running && left <= 0 ? "over" : ""}`} id={mini ? "now-mini" : "now-card"} data-id={task.id}>
+      <div className="now-main">
+        <span className="now-label">{running ? "Focusing" : "Now"}{c && <span className={`commit-star ${c.star ? "the-one" : ""}`}> ★</span>}</span>
+        <span className="now-title" title={plain(task.content)}>{plain(task.content)}</span>
+        {!mini && <span className="now-meta">{d?.hasTime ? `${d.d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })} · ` : ""}{blockMinutes(task)}m{next ? <> · next: <span className="now-next">{plain(next.content).slice(0, 48)}</span></> : null}</span>}
+      </div>
+      <div className="now-actions">
+        {running ? <>
+          <span className="now-clock" id="now-clock">{clock(left)}</span>
+          <button id="now-done" className="now-btn done" title="Done" onClick={done}>✓</button>
+          <button id="now-more" className="now-btn" title="5 more minutes" onClick={more}>+5</button>
+          <button id="now-stop" className="now-btn" title="Stop the timer" onClick={stop}>■</button>
+        </> : <>
+          <button id="now-start" className="now-btn start" title={`Start a ${FOCUS_MIN}-minute focus session`} onClick={start}>▶ Start</button>
+          <button id="now-done" className="now-btn done" title="Already done" onClick={done}>✓</button>
+          {!focus && <button id="now-skip" className="now-btn" title="Not now: show the next one" onClick={skip}>↷</button>}
+        </>}
+        {!mini && isDesktop() && <button id="now-popout" className="now-btn" title="Keep this on top of other windows" onClick={() => window.open(`${location.origin}/?mini=1`, "praxis-now")}>⧉</button>}
+        {mini && <button className="now-btn close" title="Close" onClick={() => window.close()}>×</button>}
+      </div>
+    </div>
+  );
+}
+
+/** The always-on-top pop-out (desktop app): just the Now card, kept in sync with the main window. */
+export function NowMini() {
+  const { connected } = useData();
+  useEffect(() => {
+    document.body.classList.add("mini-body");
+    const id = setInterval(() => {
+      queryClient.invalidateQueries({ queryKey: qk.config });
+      queryClient.invalidateQueries({ queryKey: qk.today });
+    }, 4000);
+    return () => clearInterval(id);
+  }, []);
+  useUi(); // keep the store alive for toasts
+  if (!connected) return <div className="now-card mini empty"><span className="now-title">Open Praxis to connect first.</span></div>;
+  return <NowCard mini />;
+}

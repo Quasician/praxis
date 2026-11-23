@@ -36,6 +36,9 @@ function Body() {
       <p className="dialog-sub">“Plan my day” fills your free time with today's tasks, hardest first. Tag tasks in Todoist with <b>@deep</b> (needs willpower) or <b>@light</b> (easy). Everything else counts as medium; priority breaks ties.</p>
 
       <label className="switch-row"><input type="checkbox" name="auto" checked={s.auto} onChange={(e) => set("auto", e.target.checked)} /> <span>Propose a plan automatically the first time I open Praxis each day</span></label>
+      <label className="switch-row"><input type="checkbox" name="morningCommit" checked={s.morningCommit} onChange={(e) => set("morningCommit", e.target.checked)} /> <span>Start each day with a one-minute commit (pick today's {s.commitCount})</span></label>
+      <label className="switch-row"><input type="checkbox" name="adaptive" checked={s.adaptive} onChange={(e) => set("adaptive", e.target.checked)} /> <span>Make plans lighter or fuller based on how much I finished last week</span></label>
+      <label className="switch-row"><input type="checkbox" name="learn" checked={s.learn} onChange={(e) => set("learn", e.target.checked)} /> <span>Learn from my history: Deep work in my best hours, durations from how long things really take</span></label>
       <label className="switch-row"><input type="checkbox" name="weeklyAuto" checked={s.weeklyAuto} onChange={(e) => set("weeklyAuto", e.target.checked)} /> <span>Draft next week's plan automatically on Friday after work</span></label>
 
       <div className="form-grid">
@@ -59,6 +62,8 @@ function Body() {
         <label>Break after work <span className="unit"><input type="number" name="afterWork" min={0} max={180} step={5} value={s.afterWork} onChange={(e) => set("afterWork", num(e.target.value, 0, 180, 30))} /> min</span></label>
         <label>Gap between blocks <span className="unit"><input type="number" name="gap" min={0} max={60} step={5} value={s.gap} onChange={(e) => set("gap", num(e.target.value, 0, 60, 10))} /> min</span></label>
         <label>Keep free <span className="unit"><input type="number" name="keepFree" min={0} max={80} step={5} value={s.keepFree} onChange={(e) => set("keepFree", num(e.target.value, 0, 80, 20))} /> %</span></label>
+        <label>Fill free time <span className="unit"><input type="number" name="fill" min={30} max={90} step={5} value={s.fill} onChange={(e) => set("fill", num(e.target.value, 30, 90, 60))} /> %</span></label>
+        <label>Commit to <span className="unit"><input type="number" name="commitCount" min={1} max={6} value={s.commitCount} onChange={(e) => set("commitCount", num(e.target.value, 1, 6, 3))} /> tasks a day</span></label>
         <label>Milestone steps per day <input type="number" name="milestoneSteps" min={0} max={10} value={s.milestoneSteps} onChange={(e) => set("milestoneSteps", num(e.target.value, 0, 10, 2))} /></label>
         <label>High-willpower label <span className="unit">@<input type="text" name="deepLabel" value={s.deepLabel} onChange={(e) => set("deepLabel", e.target.value)} /></span></label>
         <label>Low-willpower label <span className="unit">@<input type="text" name="lightLabel" value={s.lightLabel} onChange={(e) => set("lightLabel", e.target.value)} /></span></label>

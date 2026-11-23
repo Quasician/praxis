@@ -19,7 +19,8 @@ export function ClaudeDialog() {
 
 function DumpBody() {
   const status = useStatus();
-  const { inbox } = useData();
+  const { inbox: inboxAll } = useData();
+  const inbox = inboxAll.filter((t) => !t.parent_id); // steps stay with their milestone
   const { dump, setDump, closeDialog } = useUi();
   const [busy, setBusy] = useState<"" | "sort" | "inbox" | "save">("");
   const [error, setError] = useState("");
@@ -121,6 +122,13 @@ function ProposalRow({ p }: { p: Proposal }) {
           {p.priority > 1 && <span className={`dump-prio p${p.priority}`} title="Priority">P{5 - p.priority}</span>}
           {p.note && <span className="dump-note">{p.note}</span>}
         </div>
+        {p.firstStep !== "" && !p.recurring && (
+          <div className="dump-step">
+            <span className="dump-step-label" title="The task becomes a milestone; this small step gets the date">First step</span>
+            <input className="dump-step-input" value={p.firstStep} onChange={(e) => edit({ firstStep: e.target.value })} aria-label="First step" />
+            <button type="button" aria-label="No first step" title="Keep it as one task" onClick={() => edit({ firstStep: "" })}>×</button>
+          </div>
+        )}
       </div>
     </li>
   );

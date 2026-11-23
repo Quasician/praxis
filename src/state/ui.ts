@@ -5,8 +5,8 @@ import type { Task } from "../lib/types";
 import type { WeekCard, WeekDay } from "../domain/week";
 import type { Proposal } from "../domain/dump";
 
-export type View = "day" | "week" | "areas";
-export type DialogName = "triage" | "planner" | "calendars" | "areas" | "dump" | "claude" | "shutdown" | "help";
+export type View = "day" | "week" | "areas" | "progress";
+export type DialogName = "triage" | "planner" | "calendars" | "areas" | "dump" | "claude" | "shutdown" | "help" | "morning" | "backlog";
 
 export interface Toast { id: number; msg: string; action?: { label: string; run: () => void } }
 
@@ -24,7 +24,7 @@ export interface DragState {
   unschedule: boolean;
 }
 
-export interface PlanState { active: boolean; items: PlanItem[]; unplaced: Candidate[]; freeMin: number; seed: number }
+export interface PlanState { active: boolean; items: PlanItem[]; unplaced: Candidate[]; freeMin: number; seed: number; fillWhy?: string }
 
 interface UiState {
   view: View; setView: (v: View) => void;
@@ -58,7 +58,7 @@ export const useUi = create<UiState>((set) => ({
     toastTimer = setTimeout(() => set({ toast: null }), 5000);
   },
   hideToast: () => set({ toast: null }),
-  dialogs: { triage: false, planner: false, calendars: false, areas: false, dump: false, claude: false, shutdown: false, help: false },
+  dialogs: { triage: false, planner: false, calendars: false, areas: false, dump: false, claude: false, shutdown: false, help: false, morning: false, backlog: false },
   openDialog: (d) => set((s) => ({ dialogs: { ...s.dialogs, [d]: true } })),
   closeDialog: (d) => set((s) => ({ dialogs: { ...s.dialogs, [d]: false } })),
   plan: EMPTY_PLAN,

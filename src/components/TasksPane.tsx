@@ -4,7 +4,8 @@ import { blockMinutes, sortTasks, splitToday } from "../lib/tasks";
 import { Inline, colorOf, plain } from "../lib/text";
 import type { Task } from "../lib/types";
 import { completeTask, quickAdd } from "../data/actions";
-import { useData } from "../data/useData";
+import { useCommitted, useData } from "../data/useData";
+import { NowCard } from "./NowCard";
 import { useUi } from "../state/ui";
 import { startDrag } from "./drag";
 
@@ -19,6 +20,7 @@ export function TasksPane() {
 
   return (
     <section className="tasks-pane">
+      <NowCard />
       <nav className="tabs" role="tablist">
         <button role="tab" data-tab="today" className={`tab ${tab === "today" ? "active" : ""}`} onClick={() => setTab("today")}>
           Today <span className="count" id="count-today">{loading ? "" : overdue.length + todayList.length || ""}</span>
@@ -101,6 +103,7 @@ function Group({ title, ctx, tasks }: { title: string; ctx: Ctx; tasks: Task[] }
 }
 
 function TaskRow({ t, ctx }: { t: Task; ctx: Ctx }) {
+  const committed = useCommitted();
   const { projects } = useData();
   const lifting = useUi((s) => !!s.drag && s.drag.proposalIdx === undefined && s.drag.task.id === t.id);
   const [done, setDone] = useState(false);
@@ -122,7 +125,7 @@ function TaskRow({ t, ctx }: { t: Task; ctx: Ctx }) {
         <svg viewBox="0 0 24 24" width="12" height="12"><path fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" d="M5 12.5l4.5 4.5L19 7.5" /></svg>
       </button>
       <div className="body">
-        <div className="content"><Inline text={t.content} /></div>
+        <div className="content">{committed.has(t.id) && <span className={`commit-star ${committed.get(t.id)!.star ? "the-one" : ""}`} title={committed.get(t.id)!.star ? "The one that matters today" : "Committed today"}>★ </span>}<Inline text={t.content} /></div>
         {t.description && <div className="desc">{plain(t.description.split("\n")[0])}</div>}
         <div className="meta">
           {due && ctx === "overdue" && <span className="late">{fmtDayShort(due.d)}{due.hasTime ? " " + fmtTime(due.d) : ""}</span>}

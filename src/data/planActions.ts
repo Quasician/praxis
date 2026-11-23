@@ -3,8 +3,12 @@ import { itemUpdate, sync } from "../lib/api";
 import { timedDue } from "../lib/tasks";
 import type { Config, Task } from "../lib/types";
 import { buildPlan, plannerCfg } from "../domain/planner";
+import { effectiveFill, learn, recordPlan } from "../domain/progress";
+import { willpower } from "../lib/tasks";
+import { ymd } from "../lib/dates";
+import { updateConfig } from "./actions";
 import { triageItems } from "../domain/triage";
-import { queryClient, qk } from "./queries";
+import { fetchCompleted, queryClient, qk } from "./queries";
 import { reconcileSoon } from "./actions";
 import { toast, useUi } from "../state/ui";
 import { fetchAll } from "../lib/api";
@@ -15,8 +19,12 @@ function inputs() {
   const today = queryClient.getQueryData<Task[]>(qk.today) || [];
   const eventsData = queryClient.getQueriesData<EventsResult>({ queryKey: ["events"] }).map(([, d]) => d).find(Boolean);
   const memory = config.taskMemory || {};
+  const cfg = plannerCfg(config);
+  const completed = queryClient.getQueryData<Task[]>(qk.completed) || [];
+  const { fill, why } = effectiveFill(cfg, config, completed);
   return {
-    cfg: plannerCfg(config), today,
+    cfg, today, fill, fillWhy: why,
+    learned: learn(cfg, config.samples, completed),
     events: eventsData?.events || [],
     tray: new Set(triageItems(today, memory).map((x) => x.task.id)),
     slips: (id: string) => (memory[id] && memory[id].moves) || 0,
@@ -36,8 +44,10 @@ async function activeTasks(): Promise<Task[]> {
 export async function computePlan(reshuffle = false) {
   const ui = useUi.getState();
   const seed = reshuffle ? (ui.plan.seed || 7) * 31 + 17 : 0;
-  const plan = buildPlan({ ...inputs(), active: await activeTasks(), seed });
-  return { ...plan, seed };
+  await queryClient.ensureQueryData({ queryKey: qk.completed, queryFn: fetchCompleted }).catch(() => undefined); // for adaptive fill + learning
+  const inp = inputs();
+  const plan = buildPlan({ ...inp, active: await activeTasks(), seed });
+  return { ...plan, seed, fillWhy: inp.fillWhy };
 }
 
 export async function proposePlan(reshuffle = false) {
@@ -70,9 +80,18 @@ export function adjustProposal(idx: number, target: { start: number; dur: number
   }
 }
 
-export async function acceptPlan() {
+/** Saves the plan's times to Todoist and remembers what was planned (and committed) today. */
+export async function acceptPlan(opts: { committed?: boolean } = {}) {
   const items = useUi.getState().plan.items.slice();
   if (!items.length) return discardPlan();
+  const cfg = plannerCfg(queryClient.getQueryData<Config>(qk.config));
+  const day = ymd(new Date());
+  updateConfig((c) => ({
+    ...c,
+    history: recordPlan(c.history, day, items.map((it) => ({
+      id: it.task.id, content: it.task.content, wp: willpower(it.task, cfg), project: it.task.project_id, committed: !!it.committed, ...(it.star ? { star: true } : {}),
+    })), opts.committed),
+  })).catch(() => undefined);
   const commands = items.map((it) => itemUpdate({ id: it.task.id, due: timedDue(it.task, new Date(), it.start), duration: { amount: it.dur, unit: "minute" } }));
   try {
     const rejected = await sync(commands);

@@ -6,7 +6,7 @@ import fs from "fs";
 import path from "path";
 import { createStore } from "./store";
 import { eventsForRange, testCalendar } from "./calendar";
-import { ClaudeError, looksLikeKey, sortDump, verifyKey, type SortContext } from "./claude";
+import { ClaudeError, firstSteps, looksLikeKey, reviewBacklog, sortDump, verifyKey, type BacklogTask, type SortContext, type StuckTask } from "./claude";
 
 export interface ServerOptions {
   dataDir: string;
@@ -86,6 +86,17 @@ export function createPraxisServer(opts: ServerOptions) {
       return sendJSON(res, 200, { claude: true });
     }
     if (route === "DELETE /api/claude/key") { store.setClaudeKey(null); return sendJSON(res, 200, { claude: false }); }
+    if (route === "POST /api/claude/steps" || route === "POST /api/claude/backlog") {
+      const key = store.getClaudeKey();
+      if (!key) return sendJSON(res, 401, { error: "Add your Anthropic API key first (⋯ → Claude)." });
+      let body: { tasks?: unknown[]; today?: string };
+      try { body = JSON.parse(await readBody(req)); } catch { return sendJSON(res, 400, { error: "Invalid JSON" }); }
+      if (!Array.isArray(body.tasks) || !body.tasks.length || body.tasks.length > 80) return sendJSON(res, 400, { error: "Send between 1 and 80 tasks." });
+      const today = String(body.today || new Date().toDateString()).slice(0, 40);
+      try {
+        return sendJSON(res, 200, route.endsWith("steps") ? await firstSteps(key, body.tasks as StuckTask[], today) : await reviewBacklog(key, body.tasks as BacklogTask[], today));
+      } catch (e) { return sendJSON(res, e instanceof ClaudeError ? e.status : 500, { error: (e as Error).message }); }
+    }
     if (route === "POST /api/claude/sort") {
       const key = store.getClaudeKey();
       if (!key) return sendJSON(res, 401, { error: "Add your Anthropic API key first (⋯ → Claude)." });

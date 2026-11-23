@@ -42,7 +42,9 @@ Your data stays on your computer in `%APPDATA%\Praxis` (`.env` holds the Todoist
 | `Enter` | Accept the proposed plan |
 | `D` / `W` / `A` | Day / Week / Areas view |
 | `B` | Brain dump |
+| `M` | Morning commit |
 | `S` | Shut down the day |
+| `G` | Progress |
 | `?` | All keyboard shortcuts (and the version you're on) |
 | `Ctrl+Shift+Space` | Quick add from anywhere (desktop app) |
 | `F11`, `Ctrl +/−/0` | Fullscreen, zoom (desktop app) |
@@ -113,6 +115,28 @@ Link your Google Calendar under **⋯ → Calendars…** and your events appear 
 Praxis only reads the calendar. The link is a secret, so it's stored only in `praxis.config.json` on
 this computer (never committed) and masked on screen. Changes in Google can take a few minutes to show.
 Events that duplicate a Todoist task at the same time (from Todoist's own calendar sync) are hidden.
+
+## Finishing more of what you plan
+
+Praxis is built around one number: how much of what you plan actually gets done.
+
+- **Morning commit (`M`, or it opens on your first visit each day).** You get today's plan with **3 committed** tasks
+  (★, at most one Deep) and the rest as **bonus**. Swap any in or out, pick **the one that matters**, then **Commit**.
+  A day you can win beats a day you can't.
+- **Plans fill 60% of your free time**, not 80%. If you finished 80%+ of last week's commitments, plans get fuller.
+  Under 50%, they get lighter. (Planner settings: *Fill free time*, *Commit to N tasks*, and the switches.)
+- **The Now card** at the top of the Day view shows one task: what's happening now, else your next commitment.
+  **▶ Start** runs a 25-minute timer, **✓** finishes, **↷** shows the next. In the desktop app, **⧉** pops it out
+  into a small always-on-top window.
+- **First steps.** Big or vague tasks stall because there's no obvious first move. In **Needs a decision**, ✦ *Suggest
+  first steps* has Claude write a concrete 10–15 minute starting action for each stuck task. *Use it* turns the task
+  into a milestone with that step on today. Brain dumps suggest first steps for big tasks too.
+- **Clean up backlog with Claude** (⋯ menu): Claude reviews every open task and suggests Keep, Someday, Merge or
+  Drop. You review, change anything, then apply. Dropped and merged tasks are completed and tagged @dropped, so
+  nothing is lost.
+- **Progress (`G`)** shows planned vs. done for the last 28 days, week by week, by effort, by area, and your shutdown streak.
+- **Learning.** Praxis notices when you actually finish Deep work and schedules Deep tasks there. Timed Now
+  sessions teach it how long things really take, and plans use those durations.
 
 ## Brain dump (Claude)
 
@@ -218,3 +242,4 @@ Pushes that don't change the version are only checked, not released.
 - ~~Day 5: brain-dump inbox with Claude~~ ✓
 - ~~Day 6: end-of-day shutdown~~ ✓
 - ~~Day 7: taskbar jump list, shortcut help, crash screen, repeating tasks count as done~~ ✓
+- ~~1.1: morning commit, committed vs. bonus, adaptive plans, Now card, first steps, backlog cleanup, Progress, learning~~ ✓

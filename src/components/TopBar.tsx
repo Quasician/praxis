@@ -14,6 +14,7 @@ const VIEWS: { id: View; label: string; title: string }[] = [
   { id: "day", label: "Day", title: "Plan your day (D)" },
   { id: "week", label: "Week", title: "Plan your week (W)" },
   { id: "areas", label: "Areas", title: "Life areas and milestones (A)" },
+  { id: "progress", label: "Progress", title: "Planned vs. done, and what Praxis has learned (G)" },
 ];
 
 export function TopBar() {
@@ -69,6 +70,7 @@ export function TopBar() {
             <button id="planner-settings-btn" onClick={() => { setMenu(false); openDialog("planner"); }}>Planner settings…</button>
             <button id="calendars-btn" onClick={() => { setMenu(false); openDialog("calendars"); }}>Calendars…</button>
             <button id="claude-btn" onClick={() => { setMenu(false); openDialog("claude"); }}>Claude…</button>
+            <button id="backlog-btn" onClick={() => { setMenu(false); openDialog("backlog"); }}>Clean up backlog with Claude…</button>
             <button id="shutdown-btn" onClick={() => { setMenu(false); openDialog("shutdown"); }}>Shut down the day… (S)</button>
             <button id="help-btn" onClick={() => { setMenu(false); openDialog("help"); }}>Keyboard shortcuts (?)</button>
             <a href="https://app.todoist.com/app/today" target="_blank" rel="noopener">Open Todoist</a>
