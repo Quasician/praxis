@@ -10,3 +10,9 @@ Thumbs.db
 # Your areas and planner settings (personal)
 praxis.config.json
 praxis.config.json.tmp
+
+# Build output and dependencies
+node_modules/
+dist/
+release/
+.praxis-data/

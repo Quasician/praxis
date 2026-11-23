@@ -6,16 +6,25 @@ A desktop planner built on top of Todoist that connects the big picture
 (life areas and milestones) to the small one (today's time blocks). Your
 phone keeps using the Todoist app, and Praxis reads and writes the same tasks.
 
-## Run it
+## Install
 
-1. Install **Node.js LTS** from https://nodejs.org if you don't have it.
-2. Double-click **Start Praxis.bat**. A small black window opens (that's
-   the app's server, so leave it open) and your browser opens
-   http://localhost:4321.
-3. The first time, paste your Todoist API token (Todoist → Settings →
+1. Download **Praxis-Setup-x.y.z.exe** from the [latest release](https://github.com/Quasician/praxis/releases/latest) and run it.
+   Windows may say "Windows protected your PC" because the installer isn't code-signed: click
+   **More info → Run anyway**.
+2. Praxis opens in its own window. Paste your Todoist API token (Todoist → Settings →
    Integrations → Developer → Copy API token).
+3. Right-click Praxis on the taskbar → **Pin to taskbar**.
 
-The token is saved in a `.env` file in this folder. Never share or upload that file.
+From then on:
+
+- **Updates install themselves.** Praxis checks GitHub Releases every few hours, downloads new
+  versions in the background, and asks to restart (or updates the next time you quit).
+- **Opens at login** (turn it off in the tray menu).
+- **Closing the window keeps Praxis in the system tray**, so the hotkey keeps working. Quit from the tray icon.
+- **Ctrl+Shift+Space** from anywhere opens Praxis with the quick-add box focused.
+
+Your data stays on your computer in `%APPDATA%\Praxis` (`.env` holds the Todoist token,
+`praxis.config.json` your settings). Nothing is sent anywhere except Todoist and your calendar links.
 
 ## Shortcuts
 
@@ -25,7 +34,8 @@ The token is saved in a `.env` file in this folder. Never share or upload that f
 | `R` | Refresh |
 | `P` | Plan my day (auto-fill free time) |
 | `Enter` | Accept the proposed plan |
-| `D` / `A` | Day view / Areas view |
+| `D` / `W` / `A` | Day / Week / Areas view |
+| `Ctrl+Shift+Space` | Quick add from anywhere (desktop app) |
 | `1` / `2` | Today / Inbox |
 | `Esc` | Leave the input, or cancel a drag |
 
@@ -118,11 +128,29 @@ Switch to **Areas** (top of the window, or press `A`) for the bigger picture.
 - Timeline with drag-to-schedule, move, resize and unschedule, side-by-side overlaps, and a "now" line
 - Auto-refresh every 2 minutes and whenever you switch back to the window
 
-## Files
+## Development
 
-- `server.js`: local server that relays requests to the Todoist API (v1) and reads your calendars. No npm install needed.
-- `lib/ics.js`: small iCalendar reader (time zones, repeating events, exceptions)
-- `public/`: the app (HTML, CSS, JS)
+Built with React + TypeScript (Vite), TanStack Query and Zustand; the local server and the
+Electron shell are TypeScript too.
+
+```
+npm install
+npm run serve     # build + run the server, then open http://localhost:4321 in a browser
+npm start         # build + run the desktop app
+npm run dev       # live-reloading UI (run `npm run serve` alongside for the API)
+npm run typecheck
+npm run dist      # build a Windows installer into release/
+```
+
+**Releasing:** bump `version` in `package.json`, commit, then tag and push (`git tag v0.6.0 && git push --tags`).
+GitHub Actions builds the Windows installer and publishes the release; installed copies update themselves.
+
+| Folder | What's in it |
+| --- | --- |
+| `src/` | The UI: `components/` (views and dialogs), `domain/` (planner, triage, areas, timeline layout), `data/` (Todoist queries and changes), `lib/`, `state/` |
+| `server/` | Local server: Todoist relay, settings, calendar reader (`ics.ts`) |
+| `electron/` | Desktop shell: window, tray, hotkey, open at login, auto-update |
+| `.github/workflows/` | Build checks and the release pipeline |
 
 ## Roadmap
 
@@ -131,6 +159,8 @@ Switch to **Areas** (top of the window, or press `A`) for the bigger picture.
 - ~~Auto-planner: fills free time, hardest tasks first~~ ✓
 - ~~Day 4: Google Calendar events on the timeline (and the planner works around them)~~ ✓
 - ~~"Needs a decision" tray so overdue tasks never get lost~~ ✓
+- ~~Rebuild on React + TypeScript, desktop app with auto-updates~~ ✓
+- Next: weekly planner (Friday draft + review)
 - Day 5: brain-dump inbox powered by Claude
 - Day 6: end-of-day shutdown, plus the Friday weekly plan and review (zero overdue every week)
 - Day 7: polish, more shortcuts, open it like a real app

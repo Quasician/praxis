@@ -1,0 +1,82 @@
+{
+  "name": "praxis",
+  "productName": "Praxis",
+  "version": "0.5.0",
+  "description": "Turn ideas into action: a desktop planner on top of Todoist.",
+  "author": "Quasician",
+  "private": true,
+  "main": "dist/electron/main.cjs",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Quasician/praxis.git"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build:renderer": "vite build",
+    "build:node": "node scripts/build-node.mjs",
+    "build": "npm run build:renderer && npm run build:node",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "serve": "npm run build && node dist/server/standalone.cjs",
+    "start": "npm run build && electron .",
+    "dist": "npm run build && electron-builder --win --publish never",
+    "release": "npm run build && electron-builder --win --publish always"
+  },
+  "build": {
+    "appId": "com.quasician.praxis",
+    "productName": "Praxis",
+    "files": [
+      "dist/**/*",
+      "package.json"
+    ],
+    "directories": {
+      "output": "release",
+      "buildResources": "build"
+    },
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.png"
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Praxis",
+      "runAfterFinish": true
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "Quasician",
+        "repo": "praxis",
+        "releaseType": "release"
+      }
+    ]
+  },
+  "dependencies": {
+    "electron-updater": "^6.8.11"
+  },
+  "devDependencies": {
+    "@dnd-kit/core": "^6.3.1",
+    "@tanstack/react-query": "^5.108.3",
+    "@types/node": "^22.20.5",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^5.2.0",
+    "electron": "^45.4.1",
+    "electron-builder": "^26.18.0",
+    "esbuild": "^0.28.2",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "typescript": "^5.9.3",
+    "vite": "^7.3.8",
+    "zustand": "^5.1.0"
+  }
+}
