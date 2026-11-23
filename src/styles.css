@@ -592,6 +592,7 @@ li:hover > .mini.ghost, .ms-steps li:hover .mini.ghost { opacity: 1; }
 
 /* ---------- Week ---------- */
 .week-view { flex: 1; min-height: 0; overflow-y: auto; padding: 0 28px 32px; display: flex; flex-direction: column; gap: 14px; }
+.week-view > * { flex-shrink: 0; } /* scroll the page instead of squeezing the board under the lanes */
 .week-head { display: flex; align-items: flex-end; gap: 16px; margin-top: 4px; }
 .week-head h2 { font: 600 22px var(--serif); margin: 0 0 2px; }
 .week-actions { margin-left: auto; display: flex; gap: 8px; }
@@ -619,7 +620,8 @@ li:hover > .mini.ghost, .ms-steps li:hover .mini.ghost { opacity: 1; }
 .cap-text { font-size: 11px; color: var(--ink-3); }
 .day-allday, .day-event { --c: var(--ink-3); font-size: 11.5px; color: var(--ink-2); padding: 3px 7px; border-left: 3px solid var(--c); background: color-mix(in srgb, var(--c) 8%, transparent); border-radius: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .day-event b { font-weight: 600; }
-.day-cards, .lane-cards { display: flex; flex-direction: column; gap: 6px; }
+.day-cards { display: flex; flex-direction: column; gap: 6px; }
+.lane-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 6px; max-height: 360px; overflow-y: auto; align-content: start; padding-right: 2px; }
 
 .wk-card { --c: var(--accent); background: var(--bg); border: 1px solid var(--line); border-left: 3px solid var(--c); border-radius: 8px; padding: 7px 8px; cursor: grab; user-select: none; touch-action: none; }
 .wk-card:hover { border-color: var(--ink-3); border-left-color: var(--c); }
