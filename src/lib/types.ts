@@ -71,6 +71,7 @@ export interface PlannerSettings {
   weeklyAuto: boolean;
   weeklyDay: number;
   lastWeekPlan: string | null;
+  lastWeekPrompt: string | null;
 }
 
 export interface CalendarSetting { id: string; name: string; url: string; color: string; enabled?: boolean }

@@ -25,6 +25,7 @@ export const PLANNER_DEFAULTS: PlannerSettings = {
   weeklyAuto: true,
   weeklyDay: 5,
   lastWeekPlan: null,
+  lastWeekPrompt: null,
 };
 export const plannerCfg = (config?: Config | null): PlannerSettings => ({ ...PLANNER_DEFAULTS, ...((config && config.planner) || {}) });
 

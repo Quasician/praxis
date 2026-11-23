@@ -17,8 +17,13 @@ phone keeps using the Todoist app, and Praxis reads and writes the same tasks.
 
 From then on:
 
-- **Updates install themselves.** Praxis checks GitHub Releases every few hours, downloads new
-  versions in the background, and asks to restart (or updates the next time you quit).
+- **Updates install themselves.** Praxis checks GitHub Releases every 30 minutes (and when you bring
+  the window up), downloads new versions in the background and asks to restart. If it's sitting in
+  the tray, it just updates.
+- **Fullscreen and zoom:** `F11` toggles fullscreen; `Ctrl +` / `Ctrl −` / `Ctrl 0` zoom. Praxis remembers
+  both, plus the window's size and position.
+- **Wide screens:** on an ultrawide (2200 px wide or more, e.g. a 5K2K monitor) the Day view shows your
+  areas in a third column, and the timeline grows to fill the screen's height.
 - **Opens at login** (turn it off in the tray menu).
 - **Closing the window keeps Praxis in the system tray**, so the hotkey keeps working. Quit from the tray icon.
 - **Ctrl+Shift+Space** from anywhere opens Praxis with the quick-add box focused.
@@ -36,6 +41,7 @@ Your data stays on your computer in `%APPDATA%\Praxis` (`.env` holds the Todoist
 | `Enter` | Accept the proposed plan |
 | `D` / `W` / `A` | Day / Week / Areas view |
 | `Ctrl+Shift+Space` | Quick add from anywhere (desktop app) |
+| `F11`, `Ctrl +/−/0` | Fullscreen, zoom (desktop app) |
 | `1` / `2` | Today / Inbox |
 | `Esc` | Leave the input, or cancel a drag |
 
@@ -104,6 +110,23 @@ Praxis only reads the calendar. The link is a secret, so it's stored only in `pr
 this computer (never committed) and masked on screen. Changes in Google can take a few minutes to show.
 Events that duplicate a Todoist task at the same time (from Todoist's own calendar sync) are hidden.
 
+## Weekly planner
+
+Press `W` (or click **Week**). On **Friday after work** Praxis opens a draft of next week by itself
+(it catches up on Saturday or Sunday if you missed it). Midweek, the same view plans the rest of this week.
+
+- **A look-back strip** shows what each area got this week, and which ones went quiet.
+- **Each day shows its capacity**: free time after work and calendar events, minus the slack you keep free.
+- **The draft decides the day; each morning's plan picks the time.** It:
+  - keeps everything already dated that week (repeating tasks are locked),
+  - gives **every overdue task** a day (spread so no day passes 60% full), and parks ones overdue for
+    60+ days in **Someday**,
+  - schedules each milestone's next step and one task for each area that went quiet,
+  - puts `@deep` tasks on the roomiest days, at most one per work day.
+- **Resurfaced from Someday** offers your three oldest parked tasks; drag one onto a day to bring it back.
+- Drag cards between days, into **Someday** (no date, tagged `@someday`) or **Didn't fit**, then **Accept**:
+  every change goes to Todoist in one batch. **Redraft** starts over.
+
 ## Areas and milestones
 
 Switch to **Areas** (top of the window, or press `A`) for the bigger picture.
@@ -142,8 +165,9 @@ npm run typecheck
 npm run dist      # build a Windows installer into release/
 ```
 
-**Releasing:** bump `version` in `package.json`, commit, then tag and push (`git tag v0.6.0 && git push --tags`).
-GitHub Actions builds the Windows installer and publishes the release; installed copies update themselves.
+**Releasing:** bump `version` in `package.json` and push to `main`. GitHub Actions tags the commit,
+builds the Windows installer and publishes the release; installed copies update within about half an hour.
+Pushes that don't change the version are only checked, not released.
 
 | Folder | What's in it |
 | --- | --- |
@@ -160,7 +184,8 @@ GitHub Actions builds the Windows installer and publishes the release; installed
 - ~~Day 4: Google Calendar events on the timeline (and the planner works around them)~~ ✓
 - ~~"Needs a decision" tray so overdue tasks never get lost~~ ✓
 - ~~Rebuild on React + TypeScript, desktop app with auto-updates~~ ✓
-- Next: weekly planner (Friday draft + review)
+- ~~Weekly planner: Friday draft, look-back, every overdue task gets a home~~ ✓
+- ~~Ultrawide layout, fullscreen and zoom; releases publish themselves~~ ✓
 - Day 5: brain-dump inbox powered by Claude
-- Day 6: end-of-day shutdown, plus the Friday weekly plan and review (zero overdue every week)
+- Day 6: end-of-day shutdown
 - Day 7: polish, more shortcuts, open it like a real app

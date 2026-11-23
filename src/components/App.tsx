@@ -20,6 +20,7 @@ import { TasksPane } from "./TasksPane";
 import { TimelinePane } from "./Timeline";
 import { TopBar } from "./TopBar";
 import { TriageDialog } from "./TriageDialog";
+import { useMedia } from "./useNow";
 import { WeekView, useWeeklyAuto } from "./WeekView";
 
 export function App() {
@@ -32,12 +33,13 @@ export function App() {
 
 function Shell() {
   const view = useUi((s) => s.view);
+  const wide = useMedia("(min-width: 2200px)"); // ultrawide: show areas beside the day
   useBackgroundJobs();
   useShortcuts();
   return (
     <div id="app" className="app">
       <TopBar />
-      {view === "day" && <main className="layout"><TasksPane /><TimelinePane /></main>}
+      {view === "day" && <main className={`layout${wide ? " wide" : ""}`}><TasksPane /><TimelinePane />{wide && <AreasView side />}</main>}
       {view === "week" && <WeekView />}
       {view === "areas" && <AreasView />}
       <TriageDialog />

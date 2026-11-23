@@ -1,13 +1,208 @@
-// Weekly planner (placeholder until it's built on the new foundation).
+import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { DndContext, DragOverlay, PointerSensor, useDraggable, useDroppable, useSensor, useSensors, type DragEndEvent, type DragStartEvent } from "@dnd-kit/core";
+import { computeArea } from "../domain/areas";
+import { plannerCfg } from "../domain/planner";
+import { changed, dayLabel, dayLoad, draftWeek, dueOnDay, isNextWeek, targetWeek, weekKey, type Lane, type WeekCard, type WeekDay } from "../domain/week";
+import { addDays, fmtMin, fmtSpan, minOfDay, parseDue, toMin, ymd } from "../lib/dates";
+import { itemUpdate, sync } from "../lib/api";
+import { SOMEDAY_LABEL } from "../lib/tasks";
+import { colorOf, plain } from "../lib/text";
+import { reconcileSoon, updateConfig } from "../data/actions";
+import { useActive, useCompleted, useEvents } from "../data/queries";
+import { useData } from "../data/useData";
+import { toast, useUi } from "../state/ui";
+
+// ---------- automatic Friday draft ----------
+/** true if the weekly draft was opened automatically (the daily auto-plan then waits), false if not, null while deciding. */
+export function useWeeklyAuto(): boolean | null {
+  const { configQ, todayQ } = useData();
+  const [started, setStarted] = useState<boolean | null>(null);
+  useEffect(() => {
+    if (started !== null || !configQ.isSuccess || !todayQ.isSuccess) return;
+    const cfg = plannerCfg(configQ.data);
+    const days = targetWeek();
+    const key = weekKey(days);
+    const now = new Date(), dow = now.getDay();
+    const afterWork = !cfg.workDays.includes(dow) || minOfDay(now) >= toMin(cfg.workEnd) + cfg.afterWork;
+    const planningDay = (dow === cfg.weeklyDay && afterWork) || (isNextWeek(days) && dow !== cfg.weeklyDay); // Fri after work, or catch up over the weekend
+    const due = cfg.weeklyAuto && isNextWeek(days) && planningDay && cfg.lastWeekPlan !== key && cfg.lastWeekPrompt !== key;
+    if (due) {
+      useUi.getState().setView("week");
+      updateConfig((c) => ({ ...c, planner: { ...(c.planner || {}), lastWeekPrompt: key } })).catch(() => undefined);
+      toast("Here's a draft of next week. Drag things around, then accept it.");
+    }
+    setStarted(due);
+  }, [configQ.isSuccess, todayQ.isSuccess, started]); // eslint-disable-line
+  return started;
+}
+
+// ---------- accepting ----------
+async function acceptWeek(cards: WeekCard[], key: string) {
+  const todo = cards.filter(changed);
+  const commands = todo.map((c) => {
+    const labels = c.task.labels || [];
+    if (c.lane === "someday") return itemUpdate({ id: c.task.id, due: null, labels: [...new Set([...labels, SOMEDAY_LABEL])] });
+    return itemUpdate({ id: c.task.id, due: dueOnDay(c.task, c.day!), ...(c.source === "someday" ? { labels: labels.filter((l) => l.toLowerCase() !== SOMEDAY_LABEL) } : {}) });
+  });
+  try {
+    const rejected = commands.length ? await sync(commands) : [];
+    await updateConfig((c) => ({ ...c, planner: { ...(c.planner || {}), lastWeekPlan: key } }));
+    const placed = todo.filter((c) => c.day).length, parked = todo.filter((c) => c.lane === "someday").length;
+    toast(rejected.length ? `Saved ${commands.length - rejected.length} of ${commands.length} changes. Todoist rejected ${rejected.length}.`
+      : `Week planned: ${placed} task${placed === 1 ? "" : "s"} placed${parked ? `, ${parked} parked in Someday` : ""}. Each morning's plan picks the times.`);
+    useUi.getState().setWeek(null);
+    reconcileSoon(0);
+  } catch (e) { toast(`Couldn't save the week: ${(e as Error).message}`); }
+}
+
+// ---------- the view ----------
 export function WeekView() {
+  const { cfg, config, connected } = useData();
+  const days = useMemo(() => targetWeek(), []);
+  const key = weekKey(days);
+  const activeQ = useActive(connected);
+  const completedQ = useCompleted(connected);
+  const eventsQ = useEvents(connected, days[0], addDays(days[days.length - 1], 1));
+  const week = useUi((s) => s.week);
+  const setWeek = useUi((s) => s.setWeek);
+  const ready = activeQ.isSuccess && completedQ.isSuccess && eventsQ.isSuccess && !!config;
+
+  const redraft = () => setWeek({ key, ...draftWeek({ cfg, days, active: activeQ.data!, completed: completedQ.data!, events: eventsQ.data!.events, areas: config!.areas || [] }) });
+  useEffect(() => { if (ready && (!week || week.key !== key)) redraft(); }, [ready, key, week]); // eslint-disable-line
+
+  const [dragging, setDragging] = useState<WeekCard | null>(null);
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
+
+  if (!week) return <main id="week-view" className="week-view"><div className="empty"><div className="big">Drafting your week…</div></div></main>;
+
+  const move = (id: string, dest: string) => {
+    const [kind, value] = dest.split(":");
+    setWeek({ ...week, cards: week.cards.map((c) => (c.task.id !== id ? c : kind === "day" ? { ...c, day: value, lane: null } : { ...c, day: null, lane: value as Lane })) });
+  };
+  const onStart = (e: DragStartEvent) => setDragging(week.cards.find((c) => c.task.id === e.active.id) || null);
+  const onEnd = (e: DragEndEvent) => { setDragging(null); if (e.over) move(String(e.active.id), String(e.over.id)); };
+
+  const changes = week.cards.filter(changed).length;
+  const lane = (l: Lane) => week.cards.filter((c) => c.lane === l);
+  const next = isNextWeek(days);
+  const range = `${dayLabel(week.days[0].key)} – ${dayLabel(week.days[week.days.length - 1].key)}`;
+
   return (
-    <main id="week-view" className="areas-view">
-      <div className="empty"><div className="big">Weekly planner</div>Coming next.</div>
+    <main id="week-view" className="week-view">
+      <div className="week-head">
+        <div>
+          <h2>{next ? "Plan next week" : "Plan the rest of this week"}</h2>
+          <p className="areas-sub" id="week-range">{range}</p>
+        </div>
+        <div className="week-actions">
+          <button id="week-redraft" className="ghost-btn" title="Start over from a fresh draft" onClick={redraft}>Redraft</button>
+          <button id="week-accept" className="primary" onClick={() => acceptWeek(week.cards, key)}>{changes ? `Accept (${changes} change${changes === 1 ? "" : "s"})` : "Accept"}</button>
+        </div>
+      </div>
+
+      {next && <LookBack />}
+
+      <DndContext sensors={sensors} onDragStart={onStart} onDragEnd={onEnd} onDragCancel={() => setDragging(null)}>
+        <div className="week-board" style={{ gridTemplateColumns: `repeat(${week.days.length}, minmax(150px, 1fr))` }}>
+          {week.days.map((d) => <DayColumn key={d.key} day={d} cards={week.cards.filter((c) => c.day === d.key)} load={dayLoad(week.cards, d.key)} />)}
+        </div>
+        <div className="week-lanes">
+          <LaneBox id="unplaced" title="Didn't fit" hint="Drag onto a day, or leave for later." cards={lane("unplaced")} />
+          <LaneBox id="someday" title="Someday" hint="Parked on purpose: no date, tagged @someday." cards={lane("someday")} />
+          <LaneBox id="resurfaced" title="Resurfaced from Someday" hint="Your oldest parked tasks. Drag one onto a day to bring it back." cards={lane("resurfaced")} />
+        </div>
+        <DragOverlay>{dragging ? <Card c={dragging} overlay /> : null}</DragOverlay>
+      </DndContext>
     </main>
   );
 }
 
-/** Returns true if the weekly auto-draft started (so the daily auto-plan should wait), false if not, null while deciding. */
-export function useWeeklyAuto(): boolean | null {
-  return false;
+function LookBack() {
+  const { config, connected } = useData();
+  const activeQ = useActive(connected), completedQ = useCompleted(connected);
+  if (!config?.areas || !activeQ.data || !completedQ.data) return null;
+  const stats = config.areas.map((a) => computeArea(a, activeQ.data!, completedQ.data!));
+  const done = stats.reduce((s, x) => s + x.weekDone, 0);
+  const quiet = stats.filter((x) => x.quiet).map((x) => x.area.name);
+  return (
+    <div className="lookback" id="lookback">
+      <span className="lb-title">This week</span>
+      <span className="lb-total"><b>{done}</b> done</span>
+      {stats.map((x) => (
+        <span key={x.area.id} className={`lb-chip ${x.quiet ? "quiet" : ""}`} style={{ ["--c" as string]: colorOf(x.area.color) }}>
+          <i />{x.area.name} · {x.weekDone}{x.weekMin ? ` · ${fmtSpan(x.weekMin)}` : ""}
+        </span>
+      ))}
+      {quiet.length > 0 && <span className="lb-quiet">Gone quiet: {quiet.join(", ")}. Next week gives each one a task.</span>}
+    </div>
+  );
+}
+
+function DayColumn({ day, cards, load }: { day: WeekDay; cards: WeekCard[]; load: number }) {
+  const { setNodeRef, isOver } = useDroppable({ id: `day:${day.key}` });
+  const pct = day.capacity ? Math.min(130, Math.round((load / day.capacity) * 100)) : load ? 130 : 0;
+  const sorted = [...cards].sort((a, b) => {
+    const da = parseDue(a.task.due), db = parseDue(b.task.due);
+    const ta = da?.hasTime ? minOfDay(da.d) : 9999, tb = db?.hasTime ? minOfDay(db.d) : 9999;
+    return ta - tb || b.wp - a.wp;
+  });
+  const isToday = day.key === ymd(new Date());
+  return (
+    <section ref={setNodeRef} className={`day-col ${isOver ? "over" : ""} ${isToday ? "today" : ""}`} data-day={day.key}>
+      <header className="day-head">
+        <div className="day-name">{day.date.toLocaleDateString([], { weekday: "short" })}<span>{day.date.toLocaleDateString([], { month: "short", day: "numeric" })}</span></div>
+        {day.work && <span className="day-work" title="Work hours">Work {fmtMin(day.work[0])}–{fmtMin(day.work[1])}</span>}
+        <div className={`cap ${pct > 100 ? "over" : pct > 80 ? "full" : ""}`} title={`${fmtSpan(load)} planned of ${fmtSpan(day.capacity)} free`}>
+          <i style={{ width: `${Math.min(100, pct)}%` }} />
+        </div>
+        <div className="cap-text">{fmtSpan(load)} / {fmtSpan(day.capacity)}</div>
+      </header>
+      {day.allDay.map((e, i) => <div key={`a${i}`} className="day-allday" style={{ ["--c" as string]: e.color || "var(--ink-3)" }}>{e.title}</div>)}
+      {day.events.filter((e) => !e.transparent).map((e, i) => (
+        <div key={`e${i}`} className="day-event" style={{ ["--c" as string]: e.color || "var(--ink-3)" }} title={e.calendar || ""}>
+          <b>{new Date(e.start).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}</b> {e.title}
+        </div>
+      ))}
+      <div className="day-cards">{sorted.map((c) => <DraggableCard key={c.task.id} c={c} />)}</div>
+    </section>
+  );
+}
+
+function LaneBox({ id, title, hint, cards }: { id: Lane; title: string; hint: string; cards: WeekCard[] }) {
+  const { setNodeRef, isOver } = useDroppable({ id: `lane:${id}` });
+  return (
+    <section ref={setNodeRef} className={`lane ${isOver ? "over" : ""}`} data-lane={id}>
+      <header><h3>{title} <span className="n">{cards.length}</span></h3><span className="lane-hint">{hint}</span></header>
+      <div className="lane-cards">{cards.map((c) => <DraggableCard key={c.task.id} c={c} />)}</div>
+    </section>
+  );
+}
+
+function DraggableCard({ c }: { c: WeekCard }) {
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: c.task.id, disabled: c.locked });
+  return <Card c={c} innerRef={setNodeRef} dragProps={{ ...attributes, ...listeners }} dragging={isDragging} />;
+}
+
+const SOURCE_LABEL: Record<WeekCard["source"], string> = { fixed: "", overdue: "Overdue", stale: "Stale", milestone: "Milestone", quiet: "Quiet area", someday: "Someday" };
+
+function Card({ c, innerRef, dragProps, dragging, overlay }: { c: WeekCard; innerRef?: (el: HTMLElement | null) => void; dragProps?: Record<string, unknown>; dragging?: boolean; overlay?: boolean }) {
+  const { projects } = useData();
+  const proj = projects.get(c.task.project_id);
+  const d = parseDue(c.task.due);
+  const moved = changed(c);
+  const badge: ReactNode = c.wp === 3 ? <span className="pbadge wp3">Deep</span> : c.wp === 1 ? <span className="pbadge wp1">Light</span> : null;
+  return (
+    <div ref={innerRef} {...dragProps} data-id={c.task.id}
+         className={`wk-card src-${c.source} ${c.locked ? "locked" : ""} ${moved ? "moved" : ""} ${dragging ? "dragging" : ""} ${overlay ? "overlay" : ""}`}
+         style={{ ["--c" as string]: colorOf(proj?.color) }} title={c.note || ""}>
+      <div className="wk-title">{plain(c.task.content)}</div>
+      <div className="wk-meta">
+        {d?.hasTime && <span className="wk-time">{d.d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}</span>}
+        <span>{fmtSpan(c.dur)}</span>
+        {badge}
+        {c.source !== "fixed" && <span className={`wk-src ${c.source}`}>{c.source === "overdue" && c.note ? c.note : SOURCE_LABEL[c.source]}</span>}
+        {c.locked && <span title="Repeats: keeps its own schedule">↻</span>}
+      </div>
+    </div>
+  );
 }

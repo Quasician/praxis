@@ -10,7 +10,7 @@ import { acceptPlan, discardPlan, proposePlan } from "../data/planActions";
 import { useData } from "../data/useData";
 import { useUi } from "../state/ui";
 import { hourPx, minToY, pointerMin, startDrag } from "./drag";
-import { useNow } from "./useNow";
+import { useHourHeight, useNow } from "./useNow";
 
 const blockStyle = (start: number, dur: number, color: string, col = 0, cols = 1, minH = 20): CSSProperties => ({
   top: minToY(start), height: Math.max((dur / 60) * hourPx() - 2, minH),
@@ -26,6 +26,7 @@ export function TimelinePane() {
   const plan = useUi((s) => s.plan);
   const drag = useUi((s) => s.drag);
   const now = useNow();
+  useHourHeight();
   const tlRef = useRef<HTMLDivElement>(null);
   const scrolled = useRef(false);
 

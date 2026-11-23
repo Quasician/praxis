@@ -2,6 +2,7 @@
 import { create } from "zustand";
 import type { Candidate, PlanItem } from "../domain/planner";
 import type { Task } from "../lib/types";
+import type { WeekCard, WeekDay } from "../domain/week";
 
 export type View = "day" | "week" | "areas";
 export type DialogName = "triage" | "planner" | "calendars" | "areas";
@@ -33,6 +34,7 @@ interface UiState {
   plan: PlanState; setPlan: (p: Partial<PlanState>) => void; clearPlan: () => void;
   drag: DragState | null; setDrag: (d: DragState | null) => void;
   quickAddFocus: number; focusQuickAdd: () => void;
+  week: { key: string; days: WeekDay[]; cards: WeekCard[] } | null; setWeek: (w: UiState["week"]) => void;
 }
 
 const EMPTY_PLAN: PlanState = { active: false, items: [], unplaced: [], freeMin: 0, seed: 0 };
@@ -57,6 +59,7 @@ export const useUi = create<UiState>((set) => ({
   clearPlan: () => set((s) => ({ plan: { ...EMPTY_PLAN, seed: s.plan.seed } })),
   drag: null, setDrag: (drag) => set({ drag }),
   quickAddFocus: 0, focusQuickAdd: () => set((s) => ({ quickAddFocus: s.quickAddFocus + 1, view: "day" })),
+  week: null, setWeek: (week) => set({ week }),
 }));
 
 export const toast = (msg: string, action?: Toast["action"]) => useUi.getState().showToast(msg, action);

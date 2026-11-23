@@ -12,7 +12,8 @@ import { Dialog } from "./common";
 
 const onToday = (t: Task) => { const d = parseDue(t.due); return !!(d && sameDay(d.d, new Date())); };
 
-export function AreasView() {
+/** side = the narrow column shown next to the day view on very wide screens. */
+export function AreasView({ side = false }: { side?: boolean } = {}) {
   const { config, connected } = useData();
   const activeQ = useActive(connected);
   const completedQ = useCompleted(connected);
@@ -27,10 +28,10 @@ export function AreasView() {
   const msCount = computed.reduce((s, c) => s + c.milestones.length, 0);
 
   return (
-    <main id="areas-view" className="areas-view">
+    <main id={side ? "areas-side" : "areas-view"} className={`areas-view${side ? " side" : ""}`}>
       <div className="areas-head">
         <div>
-          <h2>Areas of your life</h2>
+          <h2>{side ? "Areas" : "Areas of your life"}</h2>
           <p id="areas-sub" className="areas-sub">
             {ready && <>
               This week: <b>{totalDone}</b> done{totalMin ? <> · <b>{fmtSpan(totalMin)}</b> timed</> : null}
