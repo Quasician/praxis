@@ -50,7 +50,7 @@ async function fetchAll(path) {
     const url = `/api/todoist${path}${sep}limit=200${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ""}`;
     const data = await api(url);
     if (Array.isArray(data)) { out.push(...data); break; }
-    out.push(...(data.results || []));
+    out.push(...(data.results || data.items || []));
     cursor = data.next_cursor || null;
   } while (cursor);
   return out;
@@ -748,7 +748,11 @@ $("#quick-add").addEventListener("submit", (e) => {
   const text = $("#quick-input").value.trim();
   if (text) quickAdd(text);
 });
-$("#refresh-btn").addEventListener("click", () => loadAll());
+$("#refresh-btn").addEventListener("click", () => refreshCurrent());
+function refreshCurrent() {
+  if (typeof areasState !== "undefined" && areasState.view === "areas") loadAreas({ force: true });
+  loadAll();
+}
 $("#menu-btn").addEventListener("click", (e) => { e.stopPropagation(); $("#menu").hidden = !$("#menu").hidden; });
 document.addEventListener("click", () => ($("#menu").hidden = true));
 $("#disconnect-btn").addEventListener("click", async () => {
@@ -758,16 +762,18 @@ $("#disconnect-btn").addEventListener("click", async () => {
 });
 
 document.addEventListener("keydown", (e) => {
-  const typing = /INPUT|TEXTAREA/.test(document.activeElement.tagName);
+  const typing = /INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName) || document.querySelector("dialog[open]");
   if (e.key === "Escape") {
     if (drag) { cancelDrag(); return; }
     document.activeElement.blur(); $("#menu").hidden = true; return;
   }
   if (typing || e.ctrlKey || e.metaKey || e.altKey || $("#app").hidden) return;
-  if (e.key === "q" || e.key === "/") { e.preventDefault(); $("#quick-input").focus(); }
-  else if (e.key === "r") loadAll();
+  if (e.key === "q" || e.key === "/") { e.preventDefault(); if (areasState.view !== "plan") setView("plan"); $("#quick-input").focus(); }
+  else if (e.key === "r") refreshCurrent();
   else if (e.key === "1") setTab("today");
   else if (e.key === "2") setTab("inbox");
+  else if (e.key === "d") setView("plan");
+  else if (e.key === "a") setView("areas");
 });
 
 // Stay fresh: re-sync when you come back to the window, and every 2 minutes.

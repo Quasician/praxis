@@ -33,6 +33,10 @@
         <div id="weekday" class="weekday"></div>
         <div id="fulldate" class="fulldate"></div>
       </div>
+      <nav class="views" role="tablist" aria-label="View">
+        <button role="tab" data-view="plan" class="view-btn active" title="Plan your day (D)">Day</button>
+        <button role="tab" data-view="areas" class="view-btn" title="Life areas and milestones (A)">Areas</button>
+      </nav>
       <div class="summary" id="summary"></div>
       <div class="actions">
         <span id="sync-status" class="sync-status"></span>
@@ -79,10 +83,37 @@
         <div id="timeline" class="timeline"></div>
       </section>
     </main>
+
+    <!-- Areas: the bigger picture -->
+    <main id="areas-view" class="areas-view" hidden>
+      <div class="areas-head">
+        <div>
+          <h2>Areas of your life</h2>
+          <p id="areas-sub" class="areas-sub"></p>
+        </div>
+        <button id="edit-areas-btn" class="ghost-btn">Edit areas</button>
+      </div>
+      <div id="areas-grid" class="areas-grid"></div>
+    </main>
   </div>
+
+  <!-- Area editor -->
+  <dialog id="areas-dialog" class="dialog">
+    <form method="dialog" id="areas-form">
+      <h2>Edit areas</h2>
+      <p class="dialog-sub">Group your Todoist projects into areas of your life. A project can belong to one area.</p>
+      <div id="areas-editor"></div>
+      <button type="button" id="add-area-btn" class="ghost-btn">+ Add area</button>
+      <div class="dialog-actions">
+        <button value="cancel" class="ghost-btn">Cancel</button>
+        <button value="save" id="save-areas-btn" class="primary">Save</button>
+      </div>
+    </form>
+  </dialog>
 
   <div id="toast" class="toast" hidden></div>
 
   <script src="app.js"></script>
+  <script src="areas.js"></script>
 </body>
 </html>

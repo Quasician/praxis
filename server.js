@@ -12,7 +12,19 @@ const PORT = Number(process.env.PORT) || 4321;
 const HOST = "127.0.0.1";
 const TODOIST_BASE = process.env.TODOIST_BASE || "https://api.todoist.com/api/v1";
 const ENV_FILE = path.join(__dirname, ".env");
+const CONFIG_FILE = process.env.PRAXIS_CONFIG || path.join(__dirname, "praxis.config.json");
 const PUBLIC_DIR = path.join(__dirname, "public");
+
+// ---------- your Praxis settings (areas, etc.) in praxis.config.json ----------
+function readConfig() {
+  try { return JSON.parse(fs.readFileSync(CONFIG_FILE, "utf8")); } catch { return {}; }
+}
+function writeConfig(cfg) {
+  // Write to a temp file first so a crash mid-write can't corrupt your settings.
+  const tmp = CONFIG_FILE + ".tmp";
+  fs.writeFileSync(tmp, JSON.stringify(cfg, null, 2) + "\n");
+  fs.renameSync(tmp, CONFIG_FILE);
+}
 
 // ---------- token storage (.env in this folder) ----------
 function readEnv() {
@@ -121,6 +133,18 @@ const server = http.createServer(async (req, res) => {
         env = rest;
         writeEnv(env);
         return sendJSON(res, 200, { connected: false });
+      }
+
+      // Praxis settings
+      if (url.pathname === "/api/config" && req.method === "GET") {
+        return sendJSON(res, 200, readConfig());
+      }
+      if (url.pathname === "/api/config" && req.method === "POST") {
+        let cfg;
+        try { cfg = JSON.parse(await readBody(req)); } catch { return sendJSON(res, 400, { error: "Invalid JSON" }); }
+        if (!cfg || typeof cfg !== "object" || Array.isArray(cfg)) return sendJSON(res, 400, { error: "Settings must be an object" });
+        writeConfig(cfg);
+        return sendJSON(res, 200, cfg);
       }
 
       // Relay everything under /api/todoist/* to Todoist

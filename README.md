@@ -23,6 +23,7 @@ The token is saved in a `.env` file in this folder. Never share or upload that f
 | --- | --- |
 | `Q` or `/` | Quick add (Todoist's natural language works: "call landlord tomorrow 3pm #Errands p1") |
 | `R` | Refresh |
+| `D` / `A` | Day view / Areas view |
 | `1` / `2` | Today / Inbox |
 | `Esc` | Leave the input, or cancel a drag |
 
@@ -37,6 +38,20 @@ The token is saved in a `.env` file in this folder. Never share or upload that f
 Every change saves the time and duration to Todoist, so your phone reminds you when a block starts.
 Repeating tasks keep repeating: moving today's "every day at 7pm" only moves today's occurrence.
 They can't be unscheduled, since the repeat rule needs a time.
+
+## Areas and milestones
+
+Switch to **Areas** (top of the window, or press `A`) for the bigger picture.
+
+- **Areas** group your Todoist projects into parts of your life (Career, Health, Hobbies, Home…).
+  Praxis guesses them from your project names the first time; change them with **Edit areas**.
+  They're saved in `praxis.config.json` in this folder (kept out of git).
+- Each area shows **time and tasks done this week**, a **7-day activity strip**, and a nudge when
+  it has **gone quiet** for a week or more.
+- **Milestones** are Todoist tasks labelled `@milestone`; their sub-tasks are the steps. Each one
+  shows a progress bar, its target date (Todoist deadline), and the **next step** with a
+  **Do today** button that puts it on today's list, ready to drag onto the timeline.
+- Add milestones and steps right from the card; they're created in Todoist, so they're on your phone too.
 
 ## What's in it
 
@@ -56,7 +71,8 @@ They can't be unscheduled, since the repeat rule needs a time.
 ## Roadmap
 
 - ~~Day 2: drag tasks onto the timeline to time-block them~~ ✓
-- Day 3: life areas and milestones (an Areas page with progress, time spent per area, and nudges for neglected areas)
+- ~~Day 3: life areas and milestones~~ ✓
+- Next: auto-planner that fills your free time, hardest tasks first
 - Day 4: Google Calendar events on the timeline
 - Day 5: brain-dump inbox powered by Claude
 - Day 6: end-of-day shutdown and a weekly review that checks in on each area
