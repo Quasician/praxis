@@ -15,7 +15,7 @@
   --p1: #a59d94;
   --shadow: 0 1px 2px rgba(40, 30, 20, .06), 0 8px 24px rgba(40, 30, 20, .06);
   --radius: 12px;
-  --hour: 56px;
+  --hour: 64px;
   --serif: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
   --sans: "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system, Roboto, sans-serif;
 }
@@ -222,26 +222,83 @@ kbd {
 @keyframes shimmer { to { background-position: -200% 0; } }
 
 /* ---------- Timeline ---------- */
-.timeline-head { display: flex; align-items: baseline; gap: 12px; padding: 16px 20px 10px; border-bottom: 1px solid var(--line); }
+.timeline-head { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 12px; padding: 16px 20px 10px; border-bottom: 1px solid var(--line); }
 .timeline-head h2 { font: 600 18px var(--serif); margin: 0; }
-.timeline-head .hint { color: var(--ink-3); font-size: 12px; }
+.timeline-head .tl-summary { color: var(--ink-2); font-size: 12.5px; font-weight: 500; }
+.timeline-head .hint { color: var(--ink-3); font-size: 12px; margin-left: auto; }
 .timeline { flex: 1; overflow-y: auto; position: relative; }
-.tl-grid { position: relative; margin: 8px 20px 24px 64px; }
+.tl-grid { position: relative; margin: 10px 20px 24px 64px; }
 .tl-hour { height: var(--hour); border-top: 1px solid var(--line-2); position: relative; }
+.tl-hour::after { content: ""; position: absolute; left: 0; right: 0; top: 50%; border-top: 1px dashed var(--line-2); opacity: .7; }
 .tl-hour span {
   position: absolute; left: -56px; top: -8px; width: 46px; text-align: right;
   font-size: 11px; color: var(--ink-3);
 }
-.tl-now { position: absolute; left: -6px; right: 0; height: 2px; background: var(--now); z-index: 3; }
+.tl-now { position: absolute; left: -6px; right: 0; height: 2px; background: var(--now); z-index: 4; pointer-events: none; }
 .tl-now::before { content: ""; position: absolute; left: -4px; top: -4px; width: 10px; height: 10px; border-radius: 50%; background: var(--now); }
+
 .tl-block {
+  --c: var(--accent);
   position: absolute; left: 4px; right: 4px; z-index: 2;
-  border-radius: 8px; padding: 5px 10px; overflow: hidden;
-  background: var(--accent-soft); border-left: 3px solid var(--accent);
+  display: flex; gap: 7px; align-items: flex-start;
+  border-radius: 8px; padding: 5px 8px 5px 8px; overflow: hidden;
+  background: color-mix(in srgb, var(--c) 14%, var(--panel));
+  border: 1px solid color-mix(in srgb, var(--c) 28%, transparent);
+  border-left: 3px solid var(--c);
   font-size: 12.5px; line-height: 1.3;
+  cursor: grab; user-select: none; touch-action: none;
+  transition: box-shadow .15s, opacity .15s;
 }
-.tl-block .t { color: var(--ink-2); font-size: 11px; }
+.tl-block:hover { box-shadow: 0 2px 10px rgba(0, 0, 0, .10); z-index: 3; }
 .tl-block.past { opacity: .55; }
+.tl-block.compact { align-items: center; padding-top: 2px; padding-bottom: 2px; }
+.tl-block.compact .blk-body { display: flex; gap: 8px; align-items: baseline; min-width: 0; }
+.blk-body { flex: 1; min-width: 0; }
+.blk-title { font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.blk-title .rec { color: var(--ink-3); font-weight: 400; }
+.blk-time { color: var(--ink-2); font-size: 11px; white-space: nowrap; }
+.blk-check {
+  flex: none; width: 14px; height: 14px; margin-top: 1px; padding: 0; border-radius: 50%;
+  border: 1.5px solid color-mix(in srgb, var(--c) 70%, var(--ink-3)); background: var(--panel);
+  display: grid; place-items: center; color: transparent; cursor: pointer;
+}
+.blk-check:hover { color: var(--ink-2); }
+.tl-block.done { opacity: 0; transition: opacity .25s; }
+.tl-resize {
+  position: absolute; left: 0; right: 0; bottom: 0; height: 8px; cursor: ns-resize;
+}
+.tl-resize::after {
+  content: ""; position: absolute; left: 50%; bottom: 2px; width: 22px; height: 3px; margin-left: -11px;
+  border-radius: 2px; background: color-mix(in srgb, var(--c) 55%, transparent); opacity: 0; transition: opacity .15s;
+}
+.tl-block:hover .tl-resize::after { opacity: 1; }
+
+/* ---------- Dragging ---------- */
+.task { cursor: grab; touch-action: none; }
+.task .check, .task a { cursor: pointer; }
+body.dragging, body.dragging * { cursor: grabbing !important; user-select: none; }
+body.resizing, body.resizing * { cursor: ns-resize !important; }
+.lifting { opacity: .35; }
+.tl-block.preview {
+  z-index: 5; left: 4px; width: auto; right: 4px; pointer-events: none;
+  background: color-mix(in srgb, var(--accent) 18%, var(--panel));
+  border: 1.5px dashed var(--accent); border-left-width: 3px; border-left-style: solid;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, .12);
+}
+.drag-ghost {
+  position: fixed; left: 0; top: 0; z-index: 100; pointer-events: none;
+  max-width: 260px; padding: 6px 10px; border-radius: 8px;
+  background: var(--ink); color: var(--panel); font-size: 12.5px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, .2);
+}
+.drag-ghost.faint { opacity: .35; }
+.tasks-pane { position: relative; }
+.tasks-pane.drop-unschedule { outline: 2px dashed var(--accent); outline-offset: -6px; }
+.tasks-pane.drop-unschedule::after {
+  content: "Drop to unschedule (stays due today)"; position: absolute; left: 50%; bottom: 18px; transform: translateX(-50%);
+  background: var(--accent); color: #fff; font-size: 12px; font-weight: 600; padding: 6px 12px; border-radius: 999px;
+}
 
 /* ---------- Toast ---------- */
 .toast {

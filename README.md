@@ -24,16 +24,28 @@ The token is saved in a `.env` file in this folder. Never share or upload that f
 | `Q` or `/` | Quick add (Todoist's natural language works: "call landlord tomorrow 3pm #Errands p1") |
 | `R` | Refresh |
 | `1` / `2` | Today / Inbox |
-| `Esc` | Leave the input |
+| `Esc` | Leave the input, or cancel a drag |
 
-## What's in it (Day 1)
+## Planning your day
+
+- **Block time:** drag any task (from Today, Overdue or Inbox) onto the timeline. It snaps to 15 minutes and gets a 30-minute block unless it already has a duration.
+- **Move:** drag a block up or down.
+- **Resize:** drag a block's bottom edge.
+- **Unschedule:** drag a block back onto the task list. It stays due today, just without a time.
+- **Complete:** tick the circle on a block.
+
+Every change saves the time and duration to Todoist, so your phone reminds you when a block starts.
+Repeating tasks keep repeating: moving today's "every day at 7pm" only moves today's occurrence.
+They can't be unscheduled, since the repeat rule needs a time.
+
+## What's in it
 
 - Overdue and Today tasks, sorted by time and then priority
 - Inbox tab
 - Project filter chips
 - Complete a task with Undo
 - Quick add (on the Today tab, tasks without a date get due today)
-- Read-only timeline of today's timed tasks with a "now" line
+- Timeline with drag-to-schedule, move, resize and unschedule, side-by-side overlaps, and a "now" line
 - Auto-refresh every 2 minutes and whenever you switch back to the window
 
 ## Files
@@ -43,7 +55,7 @@ The token is saved in a `.env` file in this folder. Never share or upload that f
 
 ## Roadmap
 
-- Day 2: drag tasks onto the timeline to time-block them (saves time and duration to Todoist)
+- ~~Day 2: drag tasks onto the timeline to time-block them~~ ✓
 - Day 3: life areas and milestones (an Areas page with progress, time spent per area, and nudges for neglected areas)
 - Day 4: Google Calendar events on the timeline
 - Day 5: brain-dump inbox powered by Claude
