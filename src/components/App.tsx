@@ -22,6 +22,7 @@ import { TopBar } from "./TopBar";
 import { TriageDialog } from "./TriageDialog";
 import { BrainDumpDialog, ClaudeDialog } from "./BrainDump";
 import { ShutdownDialog } from "./ShutdownDialog";
+import { HelpDialog } from "./HelpDialog";
 import { useMedia } from "./useNow";
 import { WeekView, useWeeklyAuto } from "./WeekView";
 
@@ -50,6 +51,7 @@ function Shell() {
       <BrainDumpDialog />
       <ClaudeDialog />
       <ShutdownDialog />
+      <HelpDialog />
       <Toast />
       <DragGhost />
     </div>
@@ -136,6 +138,7 @@ function useShortcuts() {
       else if (e.key === "p") proposePlan();
       else if (e.key === "b") { e.preventDefault(); ui.openDialog("dump"); }
       else if (e.key === "s") ui.openDialog("shutdown");
+      else if (e.key === "?") ui.openDialog("help");
       else if (e.key === "Enter" && ui.plan.active && ui.plan.items.length) acceptPlan();
     };
     document.addEventListener("keydown", onKey);

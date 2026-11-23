@@ -20,6 +20,7 @@ From then on:
 - **Updates install themselves.** Praxis checks GitHub Releases every 30 minutes (and when you bring
   the window up), downloads new versions in the background and asks to restart. If it's sitting in
   the tray, it just updates.
+- **Right-click Praxis on the taskbar** for Quick add, Brain dump, Shut down the day and Check for updates.
 - **Fullscreen and zoom:** `F11` toggles fullscreen; `Ctrl +` / `Ctrl −` / `Ctrl 0` zoom. Praxis remembers
   both, plus the window's size and position.
 - **Wide screens:** on an ultrawide (2200 px wide or more, e.g. a 5K2K monitor) the Day view shows your
@@ -42,6 +43,7 @@ Your data stays on your computer in `%APPDATA%\Praxis` (`.env` holds the Todoist
 | `D` / `W` / `A` | Day / Week / Areas view |
 | `B` | Brain dump |
 | `S` | Shut down the day |
+| `?` | All keyboard shortcuts (and the version you're on) |
 | `Ctrl+Shift+Space` | Quick add from anywhere (desktop app) |
 | `F11`, `Ctrl +/−/0` | Fullscreen, zoom (desktop app) |
 | `1` / `2` | Today / Inbox |
@@ -215,4 +217,4 @@ Pushes that don't change the version are only checked, not released.
 - ~~Ultrawide layout, fullscreen and zoom; releases publish themselves~~ ✓
 - ~~Day 5: brain-dump inbox with Claude~~ ✓
 - ~~Day 6: end-of-day shutdown~~ ✓
-- Day 7: polish, more shortcuts, open it like a real app
+- ~~Day 7: taskbar jump list, shortcut help, crash screen, repeating tasks count as done~~ ✓

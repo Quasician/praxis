@@ -37,7 +37,8 @@ if (!app.requestSingleInstanceLock()) {
   app.quit();
 } else {
   app.setAppUserModelId("com.quasician.praxis");
-  app.on("second-instance", () => showWindow());
+  // Launching Praxis again (taskbar jump list, Start menu) reuses this window.
+  app.on("second-instance", (_e, argv) => { if (!runArgs(argv)) showWindow(); });
   app.whenReady().then(start).catch((e) => { log("startup failed", e?.stack || e); dialog.showErrorBox("Praxis couldn't start", String(e)); app.quit(); });
   app.on("before-quit", () => { quitting = true; });
   app.on("will-quit", () => globalShortcut.unregisterAll());
@@ -45,12 +46,16 @@ if (!app.requestSingleInstanceLock()) {
 }
 
 async function start() {
-  const { listen } = createPraxisServer({ dataDir: app.getPath("userData"), staticDir: rendererDir });
+  const { listen, store } = createPraxisServer({ dataDir: app.getPath("userData"), staticDir: rendererDir });
+  watchShutdown(store.readConfig);
   const port = await listen(Number(process.env.PRAXIS_PORT) || 4321);
   baseUrl = `http://localhost:${port}`;
   log("server on", baseUrl);
   createWindow();
   createTray();
+  setupJumpList();
+  // Started from a jump-list entry: do it once the page is ready to listen.
+  if (JUMP.some((j) => process.argv.includes(j.arg))) win?.webContents.once("did-finish-load", () => setTimeout(() => runArgs(process.argv), 1500));
   registerQuickAdd();
   setupOpenAtLogin();
   setupUpdates();
@@ -177,6 +182,43 @@ function trigger(name: string) {
   win?.webContents.executeJavaScript(`window.dispatchEvent(new Event("praxis:${name}"))`).catch(() => undefined);
 }
 const quickAdd = () => trigger("quick-add");
+
+// ---------- evening reminder ----------
+/** When Praxis is tucked away in the tray at shut-down time, a Windows notification nudges you (once a day). */
+function watchShutdown(readConfig: () => Record<string, unknown>) {
+  let nudged = "";
+  setInterval(() => {
+    const planner = (readConfig().planner || {}) as { shutdownAt?: string; lastShutdown?: string | null };
+    const now = new Date();
+    const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+    const [h, m] = (planner.shutdownAt || "21:00").split(":").map(Number);
+    if (nudged === today || planner.lastShutdown === today || now.getHours() * 60 + now.getMinutes() < h * 60 + m) return;
+    nudged = today;
+    if (win?.isVisible() && win.isFocused()) return; // the in-app pill covers it
+    const n = new Notification({ title: "Shut down the day", body: "Two minutes: what got done, a home for the leftovers, a look at tomorrow." });
+    n.on("click", () => trigger("shutdown"));
+    n.show();
+  }, 60_000);
+}
+
+// ---------- taskbar jump list (right-click the taskbar button) ----------
+const JUMP = [
+  { arg: "--quick-add", title: "Quick add", description: "Add a task", run: () => quickAdd() },
+  { arg: "--brain-dump", title: "Brain dump", description: "Turn a messy list into tasks with Claude", run: () => trigger("brain-dump") },
+  { arg: "--shutdown", title: "Shut down the day", description: "Close out today", run: () => trigger("shutdown") },
+  { arg: "--check-updates", title: "Check for updates", description: "Look for a new version of Praxis", run: () => { showWindow(); checkForUpdates(true); } },
+];
+function runArgs(argv: string[]) {
+  const hit = JUMP.find((j) => argv.includes(j.arg));
+  hit?.run();
+  return !!hit;
+}
+function setupJumpList() {
+  if (process.platform !== "win32") return;
+  try {
+    app.setUserTasks(JUMP.map((j) => ({ program: process.execPath, arguments: j.arg, title: j.title, description: j.description, iconPath: process.execPath, iconIndex: 0 })));
+  } catch (e) { log("jump list failed", e); }
+}
 function registerQuickAdd() {
   if (!globalShortcut.register(QUICK_ADD, quickAdd)) log("couldn't register", QUICK_ADD, "(another app may be using it)");
 }

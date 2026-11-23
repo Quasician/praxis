@@ -1,9 +1,11 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
+import pkg from "./package.json" with { type: "json" };
 
 // The renderer (React UI). In development, API calls go to the local Praxis server.
 export default defineConfig({
   plugins: [react()],
+  define: { __APP_VERSION__: JSON.stringify(pkg.version) },
   base: "./",
   publicDir: "public_static",
   build: { outDir: "dist/renderer", emptyOutDir: true, sourcemap: true },
