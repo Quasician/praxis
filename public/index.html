@@ -151,6 +151,21 @@
     </form>
   </dialog>
 
+  <!-- Needs a decision -->
+  <dialog id="triage-dialog" class="dialog triage-dialog">
+    <form method="dialog" class="triage-form">
+      <div class="triage-head">
+        <div>
+          <h2>Needs a decision</h2>
+          <p class="dialog-sub">Tasks that are 2+ days overdue or keep getting pushed back. Give each one a decision so nothing gets lost.</p>
+        </div>
+        <span id="triage-count" class="triage-count"></span>
+      </div>
+      <div id="triage-body" class="triage-body"></div>
+      <div class="dialog-actions"><button value="close" class="ghost-btn">Close</button></div>
+    </form>
+  </dialog>
+
   <!-- Calendars -->
   <dialog id="calendars-dialog" class="dialog">
     <form method="dialog" id="calendars-form" class="planner-form">
@@ -188,5 +203,6 @@
   <script src="areas.js"></script>
   <script src="planner.js"></script>
   <script src="calendars.js"></script>
+  <script src="triage.js"></script>
 </body>
 </html>

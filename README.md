@@ -58,6 +58,29 @@ Praxis can fill your free time for you, **hardest work first**:
 With **auto** on (the default), Praxis proposes the plan the first time you open it each day.
 Change any of this in **⋯ → Planner settings**.
 
+## Nothing gets lost: "Needs a decision"
+
+Overdue tasks don't pile up silently. A task moves into the **Needs a decision** tray (pinned at the
+top of the Today list, with a counter in the header) when it is:
+
+- **2+ days overdue**, or
+- has **slipped 3+ times** (pushed to a later date while already due, including from your phone).
+
+Tray tasks leave the normal list and the auto-planner until you decide. Choices are grouped by how stale
+they are:
+
+| Choice | What it does |
+| --- | --- |
+| **Today** | Due today, so the planner can place it |
+| **Pick a day** | Tomorrow, this weekend, next week, or any date |
+| **Someday** | Removes the date and tags `@someday`, parked on purpose (the Friday review resurfaces them) |
+| **Break down** | Turns it into a `@milestone` with one small first step due today |
+| **Done** / **Drop** | Drop completes it tagged `@dropped`, so it's recoverable in Todoist's completed list |
+| **Skip to next** | For repeating tasks: closes the stale occurrence and moves to the next one |
+
+Groups with 3+ tasks get a one-click **Move all to Someday** for backlog cleanup. Tasks that slipped
+before rank higher in "Plan my day", so they stop sinking.
+
 ## Calendar
 
 Link your Google Calendar under **⋯ → Calendars…** and your events appear on the timeline;
@@ -107,7 +130,7 @@ Switch to **Areas** (top of the window, or press `A`) for the bigger picture.
 - ~~Day 3: life areas and milestones~~ ✓
 - ~~Auto-planner: fills free time, hardest tasks first~~ ✓
 - ~~Day 4: Google Calendar events on the timeline (and the planner works around them)~~ ✓
-- Next: "Needs a decision" tray so overdue tasks never get lost
+- ~~"Needs a decision" tray so overdue tasks never get lost~~ ✓
 - Day 5: brain-dump inbox powered by Claude
 - Day 6: end-of-day shutdown, plus the Friday weekly plan and review (zero overdue every week)
 - Day 7: polish, more shortcuts, open it like a real app

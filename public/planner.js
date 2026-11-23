@@ -68,9 +68,11 @@ function freeIntervals(cfg) {
 async function plannerCandidates(cfg) {
   const now = new Date(), t0 = startOfToday();
   const list = [];
+  const tray = typeof trayIds === "function" ? trayIds() : new Set();
   for (const t of state.today) {
     const d = parseDue(t.due);
     if (!d) continue;
+    if (tray.has(t.id)) continue; // needs a decision first (see the tray)
     if (d.hasTime && sameDay(d.d, now)) continue; // already has a slot today
     list.push({ task: t, source: "today", overdueDays: d.d < t0 ? Math.round((t0 - d.d) / 864e5) : 0 });
   }
@@ -101,7 +103,11 @@ async function buildPlan({ reshuffle = false } = {}) {
   if (reshuffle) plannerState.seed = (plannerState.seed || 7) * 31 + 17;
   const rand = rng(plannerState.seed);
   const jitter = new Map(cands.map((c) => [c.task.id, reshuffle ? rand() : 0]));
+  // Tasks that slipped before rank higher, so they stop sinking: each slip is worth half a
+  // willpower level (capped), and being overdue at all adds a little more.
+  const rank = (c) => willpower(c.task, cfg) + Math.min(1.5, 0.5 * (typeof slipCount === "function" ? slipCount(c.task.id) : 0)) + (c.overdueDays > 0 ? 0.25 : 0);
   cands.sort((a, b) =>
+    rank(b) - rank(a) ||
     willpower(b.task, cfg) - willpower(a.task, cfg) ||
     (reshuffle ? jitter.get(a.task.id) - jitter.get(b.task.id) : 0) ||
     (b.task.priority || 1) - (a.task.priority || 1) ||

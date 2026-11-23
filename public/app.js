@@ -236,8 +236,10 @@ function render() {
   $("#weekday").textContent = now.toLocaleDateString([], { weekday: "long" });
   $("#fulldate").textContent = now.toLocaleDateString([], { month: "long", day: "numeric", year: "numeric" });
 
-  const { overdue, today } = splitToday(state.today);
-  $("#count-today").textContent = state.loading ? "" : state.today.length || "";
+  // Tasks that need a decision live in the tray, not in the normal list.
+  const tray = typeof trayIds === "function" && !state.loading ? trayIds() : new Set();
+  const { overdue, today } = splitToday(state.today.filter((t) => !tray.has(t.id)));
+  $("#count-today").textContent = state.loading ? "" : (overdue.length + today.length) || "";
   $("#count-inbox").textContent = state.loading ? "" : state.inbox.length || "";
 
   const timedLeft = today.filter((t) => { const d = parseDue(t.due); return d && d.hasTime && d.d > now; }).length;
@@ -245,6 +247,7 @@ function render() {
     `<span><b>${today.length}</b> today</span>`,
     overdue.length ? `<span class="overdue"><b>${overdue.length}</b> overdue</span>` : "",
     timedLeft ? `<span><b>${timedLeft}</b> still scheduled</span>` : "",
+    tray.size ? `<button id="summary-triage" class="sum-tray" title="Review tasks that need a decision">⚑ <b>${tray.size}</b> need a decision</button>` : "",
   ].join("");
 
   $("#quick-input").placeholder = state.tab === "today"
@@ -265,8 +268,9 @@ function render() {
 
   if (state.tab === "today") {
     const o = overdue.filter(keep), t = today.filter(keep);
-    list.innerHTML = (groupHTML("Overdue", o, "overdue") + groupHTML("Today", t, "today")) ||
-      `<div class="empty"><div class="big">All clear.</div>Nothing due today. Enjoy it, or pull something from your Inbox.</div>`;
+    const banner = typeof triageBannerHTML === "function" ? triageBannerHTML(tray.size) : "";
+    list.innerHTML = banner + ((groupHTML("Overdue", o, "overdue") + groupHTML("Today", t, "today")) ||
+      `<div class="empty"><div class="big">All clear.</div>Nothing due today. Enjoy it, or pull something from your Inbox.</div>`);
   } else {
     const items = sortTasks(state.inbox.filter(keep), "inbox");
     list.innerHTML = items.length
