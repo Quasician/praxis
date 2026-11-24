@@ -6,7 +6,7 @@ import type { WeekCard, WeekDay } from "../domain/week";
 import type { Proposal } from "../domain/dump";
 
 export type View = "day" | "week" | "areas" | "progress";
-export type DialogName = "triage" | "planner" | "calendars" | "areas" | "dump" | "claude" | "shutdown" | "help" | "morning" | "backlog" | "fresh" | "reminders" | "constellation";
+export type DialogName = "triage" | "planner" | "calendars" | "areas" | "dump" | "claude" | "shutdown" | "help" | "morning" | "backlog" | "fresh" | "reminders" | "constellation" | "wallpaper";
 
 export interface Toast { id: number; msg: string; action?: { label: string; run: () => void } }
 
@@ -61,7 +61,7 @@ export const useUi = create<UiState>((set) => ({
     toastTimer = setTimeout(() => set({ toast: null }), 5000);
   },
   hideToast: () => set({ toast: null }),
-  dialogs: { triage: false, planner: false, calendars: false, areas: false, dump: false, claude: false, shutdown: false, help: false, morning: false, backlog: false, fresh: false, reminders: false, constellation: false },
+  dialogs: { triage: false, planner: false, calendars: false, areas: false, dump: false, claude: false, shutdown: false, help: false, morning: false, backlog: false, fresh: false, reminders: false, constellation: false, wallpaper: false },
   openDialog: (d) => set((s) => ({ dialogs: { ...s.dialogs, [d]: true } })),
   closeDialog: (d) => set((s) => ({ dialogs: { ...s.dialogs, [d]: false } })),
   plan: EMPTY_PLAN,

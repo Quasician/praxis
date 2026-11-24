@@ -1397,3 +1397,15 @@ body { background-image: linear-gradient(180deg, color-mix(in srgb, var(--sky-no
 .es-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--c); align-self: center; grid-row: span 2; }
 .es-label { font-size: 11.5px; color: var(--ink-2); }
 .es-text { grid-column: 2; font: 600 14px var(--sans); color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* ---------- 3.4: the valley's own page ---------- */
+.valley-doc, .valley-doc body { background: #000 !important; background-image: none !important; margin: 0; overflow: hidden; }
+.valley-page { position: fixed; inset: 0; }
+.valley-holder canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.valley-status { position: absolute; left: 8px; bottom: 4px; margin: 0; font: 12px var(--sans); color: #888; }
+
+.wallpaper-form .wp-folder { align-items: center; gap: 10px; }
+.wp-path { flex: 1; min-width: 0; font-size: 13px; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; direction: rtl; text-align: left; }
+.wp-status { margin: 4px 0 0; font-size: 13px; color: var(--ink-2); min-height: 1.4em; }
+.wp-error { color: var(--late, #c0392b); }
+.wp-notes { margin: 6px 0 0; padding-left: 18px; font-size: 12.5px; color: var(--ink-2); display: grid; gap: 3px; }

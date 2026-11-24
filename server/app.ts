@@ -6,15 +6,18 @@ import fs from "fs";
 import path from "path";
 import { createStore } from "./store";
 import { eventsForRange, testCalendar } from "./calendar";
-import { ClaudeError, firstSteps, looksLikeKey, reviewBacklog, sortDump, tinyVersions, drawConstellation, nextMove, verifyKey, type Auth, type BacklogTask, type SortContext, type StuckTask } from "./claude";
+import { ClaudeError, firstSteps, looksLikeKey, reviewBacklog, sortDump, tinyVersions, drawConstellation, nextMove, tagMottos, verifyKey, type Auth, type BacklogTask, type SortContext, type StuckTask } from "./claude";
 import { cachedCliStatus, cliStatus } from "./claudecode";
 
 export interface ServerOptions {
   dataDir: string;
   staticDir: string;
   todoistBase?: string;
+  /** Where your mottos live (the desktop app passes your Pictures/Mottos folder). */
+  mottosDir?: string;
   /** Only in the desktop app: reminders that float above other windows. */
-  desktop?: { nudge(action: string, key: string): void; test(): void; miniFit?(height: number): void; trayDial?(img16: string, img32: string, tip: string): void; taskbarDark?(): boolean };
+  desktop?: { nudge(action: string, key: string): void; test(): void; miniFit?(height: number): void; trayDial?(img16: string, img32: string, tip: string): void; taskbarDark?(): boolean;
+    wallpaper?(action: string, arg?: string): Promise<unknown> };
 }
 
 const MIME: Record<string, string> = {
@@ -40,6 +43,28 @@ function readBody(req: http.IncomingMessage): Promise<string> {
     req.on("end", () => resolve(Buffer.concat(chunks).toString("utf8")));
     req.on("error", reject);
   });
+}
+
+function readBinary(req: http.IncomingMessage, limit: number): Promise<Buffer> {
+  return new Promise((resolve, reject) => {
+    let size = 0;
+    const chunks: Buffer[] = [];
+    req.on("data", (c: Buffer) => {
+      size += c.length;
+      if (size > limit) { reject(new Error("Body too large")); req.destroy(); return; }
+      chunks.push(c);
+    });
+    req.on("end", () => resolve(Buffer.concat(chunks)));
+    req.on("error", reject);
+  });
+}
+
+const IMAGE_TYPES: Record<string, string> = { ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".webp": "image/webp" };
+/** A motto file's name, only if it's a plain image file name (no folders, no tricks). */
+export function safeMottoName(name: string) {
+  const n = String(name || "");
+  if (!n || n.length > 200 || n !== path.basename(n) || n.startsWith(".") || /[\\/:*?"<>|\0]/.test(n)) return null;
+  return IMAGE_TYPES[path.extname(n).toLowerCase()] ? n : null;
 }
 
 // Blocks other websites from poking at the local server through your browser.
@@ -106,6 +131,49 @@ export function createPraxisServer(opts: ServerOptions) {
       return sendJSON(res, 200, { ok: true });
     }
 
+    // ---------- the valley wallpaper (3.4) ----------
+    const mottoDir = () => {
+      const w = (store.readConfig() as { wallpaper?: { folder?: string } }).wallpaper;
+      return path.resolve(w?.folder || opts.mottosDir || path.join(opts.dataDir, "Mottos"));
+    };
+    if (route === "GET /api/valley/mottos") {
+      const dir = mottoDir();
+      try {
+        const names = fs.readdirSync(dir).filter((n) => safeMottoName(n)).sort();
+        return sendJSON(res, 200, { folder: dir, names });
+      } catch { return sendJSON(res, 200, { folder: dir, names: [], missing: true }); }
+    }
+    if (route === "GET /api/valley/motto") {
+      const name = safeMottoName(url.searchParams.get("name") || "");
+      if (!name) return sendJSON(res, 400, { error: "Not a motto file name." });
+      const dir = mottoDir(), file = path.join(dir, name);
+      if (path.dirname(file) !== dir || !fs.existsSync(file)) return sendJSON(res, 404, { error: "No such motto." });
+      res.writeHead(200, { "Content-Type": IMAGE_TYPES[path.extname(name).toLowerCase()], "Cache-Control": "no-store" });
+      return void fs.createReadStream(file).pipe(res);
+    }
+    if (route === "POST /api/valley/frame") {
+      let buf: Buffer;
+      try { buf = await readBinary(req, 80e6); } catch { return sendJSON(res, 413, { error: "Picture too large." }); }
+      if (buf.length < 8 || buf.readUInt32BE(0) !== 0x89504e47) return sendJSON(res, 400, { error: "Expected a PNG picture." });
+      const dir = path.join(opts.dataDir, "wallpaper");
+      fs.mkdirSync(dir, { recursive: true });
+      // Windows only notices a new wallpaper if the file name changes, so alternate between two names (and keep no others).
+      const prev = fs.readdirSync(dir).filter((n) => /^valley-[ab]\.png$/.test(n)).map((n) => ({ n, t: fs.statSync(path.join(dir, n)).mtimeMs })).sort((a, b) => b.t - a.t);
+      const name = prev[0]?.n === "valley-a.png" ? "valley-b.png" : "valley-a.png";
+      const file = path.join(dir, name);
+      fs.writeFileSync(file, buf);
+      return sendJSON(res, 200, { file });
+    }
+
+    if (route === "GET /api/desktop/wallpaper" || route === "POST /api/desktop/wallpaper") {
+      if (!opts.desktop?.wallpaper) return sendJSON(res, 404, { error: "The wallpaper works in the Praxis desktop app." });
+      let body: { action?: unknown; folder?: unknown } = {};
+      if (req.method === "POST") { try { body = JSON.parse((await readBody(req)) || "{}"); } catch { return sendJSON(res, 400, { error: "Invalid JSON" }); } }
+      const action = req.method === "GET" ? "state" : String(body.action || "");
+      if (!["state", "enable", "disable", "refresh", "folder", "pick-folder", "live-on", "live-off"].includes(action)) return sendJSON(res, 400, { error: "Unknown action." });
+      try { return sendJSON(res, 200, await opts.desktop.wallpaper(action, typeof body.folder === "string" ? body.folder.slice(0, 500) : undefined)); }
+      catch (e) { return sendJSON(res, 500, { error: (e as Error).message }); }
+    }
     if (route === "GET /api/desktop/taskbar") {
       if (!opts.desktop?.taskbarDark) return sendJSON(res, 404, { error: "Only in the desktop app." });
       return sendJSON(res, 200, { dark: !!opts.desktop.taskbarDark() });
@@ -161,6 +229,16 @@ export function createPraxisServer(opts: ServerOptions) {
         if (route.endsWith("tiny")) return sendJSON(res, 200, await tinyVersions(a, body.tasks as StuckTask[], today));
         return sendJSON(res, 200, route.endsWith("steps") ? await firstSteps(a, body.tasks as StuckTask[], today) : await reviewBacklog(a, body.tasks as BacklogTask[], today));
       } catch (e) { return sendJSON(res, e instanceof ClaudeError ? e.status : 500, { error: (e as Error).message }); }
+    }
+    if (route === "POST /api/claude/motto-tags") {
+      const a = await auth();
+      if (!a) return sendJSON(res, 401, { error: NO_AUTH });
+      let body: { names?: unknown };
+      try { body = JSON.parse(await readBody(req)); } catch { return sendJSON(res, 400, { error: "Invalid JSON" }); }
+      const names = (Array.isArray(body.names) ? body.names : []).map(String).filter((n) => safeMottoName(n)).slice(0, 400);
+      if (!names.length) return sendJSON(res, 200, { tags: {} });
+      try { return sendJSON(res, 200, { tags: await tagMottos(a, names) }); }
+      catch (e) { const err = e as ClaudeError; return sendJSON(res, err.status || 502, { error: err.message }); }
     }
     if (route === "POST /api/claude/constellation" || route === "POST /api/claude/unstick") {
       const a = await auth();

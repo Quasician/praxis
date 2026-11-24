@@ -35,6 +35,7 @@ import { BacklogDialog } from "./BacklogDialog";
 import { useMedia } from "./useNow";
 import { WeekView, useWeeklyAuto } from "./WeekView";
 import { useTrayDial } from "./Glance";
+import { WallpaperDialog } from "./WallpaperDialog";
 
 export function App() {
   const { status, connected, todayQ } = useData();
@@ -78,6 +79,7 @@ function Shell() {
       <FreshStartDialog />
       <RemindersDialog />
       <ConstellationDialog />
+      <WallpaperDialog />
       <Celebration />
       <Toast />
       <DragGhost />
@@ -185,6 +187,8 @@ function useShortcuts() {
     const onQuickAdd = () => useUi.getState().focusQuickAdd();
     const onDump = () => useUi.getState().openDialog("dump");
     const onShutdown = () => useUi.getState().openDialog("shutdown");
+    const onWallpaper = () => useUi.getState().openDialog("wallpaper");
+    window.addEventListener("praxis:wallpaper", onWallpaper);
     window.addEventListener("praxis:quick-add", onQuickAdd);
     window.addEventListener("praxis:brain-dump", onDump);
     window.addEventListener("praxis:shutdown", onShutdown);
@@ -196,6 +200,7 @@ function useShortcuts() {
       window.removeEventListener("praxis:quick-add", onQuickAdd);
       window.removeEventListener("praxis:brain-dump", onDump);
       window.removeEventListener("praxis:shutdown", onShutdown);
+      window.removeEventListener("praxis:wallpaper", onWallpaper);
       window.removeEventListener("focus", onFocus);
     };
   }, []);

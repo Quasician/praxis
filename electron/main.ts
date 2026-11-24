@@ -10,6 +10,7 @@ import fs from "fs";
 import path from "path";
 import { createPraxisServer } from "../server/app";
 import { dueNudges, reminderCfg, testNudge, type Nudge, type Slot } from "../src/domain/nudges";
+import { createWallpaper } from "./wallpaper";
 
 const QUICK_ADD = "CommandOrControl+Shift+Space";
 const UPDATE_EVERY = 30 * 60 * 1000; // plus a check whenever the window is brought up
@@ -49,9 +50,12 @@ if (!app.requestSingleInstanceLock()) {
 async function start() {
   const { listen, store } = createPraxisServer({
     dataDir: app.getPath("userData"), staticDir: rendererDir,
-    desktop: { nudge: (action, key) => onNudgeAction(action, key), test: () => showNudge(testNudge(), true), miniFit, trayDial, taskbarDark: () => nativeTheme.shouldUseDarkColorsForSystemIntegratedUI ?? nativeTheme.shouldUseDarkColors },
+    mottosDir: path.join(app.getPath("pictures"), "Mottos"),
+    desktop: { nudge: (action, key) => onNudgeAction(action, key), test: () => showNudge(testNudge(), true), miniFit, trayDial, taskbarDark: () => nativeTheme.shouldUseDarkColorsForSystemIntegratedUI ?? nativeTheme.shouldUseDarkColors,
+      wallpaper: (action, arg) => wallpaperAction(action, arg) },
   });
   readConfig = store.readConfig;
+  wallpaper = createWallpaper({ readConfig: store.readConfig, writeConfig: store.writeConfig, baseUrl: () => baseUrl, log });
   startNudger();
   const port = await listen(Number(process.env.PRAXIS_PORT) || 4321);
   baseUrl = `http://localhost:${port}`;
@@ -59,6 +63,7 @@ async function start() {
   createWindow();
   createTray();
   if (readPrefs().edgeStrip !== false) startStrip();
+  wallpaper.start();
   setupJumpList();
   // Started from a jump-list entry: do it once the page is ready to listen.
   if (JUMP.some((j) => process.argv.includes(j.arg))) win?.webContents.once("did-finish-load", () => setTimeout(() => runArgs(process.argv), 1500));
@@ -215,6 +220,7 @@ function refreshTrayMenu() {
     { label: "Now (always on top)", click: () => openMini() },
     { label: "Mark Now done", accelerator: NOW_DONE, click: nowDone },
     { label: "Show a test reminder", click: () => showNudge(testNudge(), true) },
+    { label: "Wallpaper…", click: () => trigger("wallpaper") },
     { label: "Edge horizon (top of the screen)", type: "checkbox", checked: readPrefs().edgeStrip !== false, click: (item) => { writePrefs({ edgeStrip: item.checked }); if (item.checked) startStrip(); else stopStrip(); } },
     { label: "Full screen", accelerator: "F11", type: "checkbox", checked: !!win?.isFullScreen(), click: () => { showWindow(); toggleFullScreen(); } },
     { type: "separator" },
@@ -224,6 +230,23 @@ function refreshTrayMenu() {
     { type: "separator" },
     { label: "Quit Praxis", click: () => { quitting = true; app.quit(); } },
   ]));
+}
+
+// ---------- the valley wallpaper (3.4) ----------
+let wallpaper: ReturnType<typeof createWallpaper>;
+async function wallpaperAction(action: string, arg?: string) {
+  switch (action) {
+    case "enable": return wallpaper.enable(arg);
+    case "disable": return wallpaper.disable();
+    case "refresh": return wallpaper.refresh();
+    case "folder": return arg ? wallpaper.setFolder(arg) : wallpaper.state();
+    case "pick-folder": {
+      const st = wallpaper.state();
+      const r = await dialog.showOpenDialog(win!, { title: "Your mottos folder", defaultPath: st.folder || st.defaultFolder, properties: ["openDirectory"] });
+      return r.canceled || !r.filePaths[0] ? st : wallpaper.setFolder(r.filePaths[0]);
+    }
+    default: return wallpaper.state();
+  }
 }
 
 // ---------- the tray sundial ----------

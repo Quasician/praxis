@@ -115,6 +115,19 @@ Praxis is built to be easy on the eyes on a big monitor all day:
 - **Readable type**: Atkinson Hyperlegible for text (designed for legibility) and Bricolage Grotesque for headings, bundled so they work offline.
 - **Calm motion**: finishing a task fills the circle and folds the row away; the focus timer is a ring that fills. If Windows has "Show animations" turned off, Praxis stops animating too.
 
+## Your mottos on the valley (3.4)
+
+Turn it on under ⋯ → **Wallpaper…** (or the tray menu). Your Windows wallpaper becomes a landscape drawn live behind your mottos:
+
+- **The season follows the calendar**, a little each day: buds and blossom in spring, deep green in summer, colour moving through the forest in October (each tree turns on its own day), bare branches by mid-November, snow on the peaks first and then the whole valley from about mid-December, a frozen lake in deep winter.
+- **The light follows the real sun and moon** where you are (Milpitas by default): dawn, day, golden hour, dusk and night blend into each other; the sun climbs higher in summer than in winter; at night the moon shows its real phase.
+- **The motto changes on the hour**, shuffled so none repeats until all have shown. With Claude connected, each motto is matched once to the time of day it suits (from its file name). New mottos you drop in the folder are picked up within the hour.
+- **Your projects shine as constellations**, lit star by star as you finish steps. Nothing is ever drawn across the words, and task names never appear on the wallpaper.
+- Redrawn every 10 minutes and whenever you come back to the PC. Pictures go to Praxis's own folder; your Mottos folder is only read.
+- Turning it off puts your Windows slideshow (or previous wallpaper) back the way it was.
+
+How it works: the valley's land, tree shapes and tree positions are baked once (`public_static/valley`); light, season, weather and your sky are drawn on the graphics card (`src/valley`), and the desktop app sets the result as the wallpaper through Windows' own wallpaper interface.
+
 ## Stay in view (3.3)
 
 **The edge horizon.** A strip a few pixels tall runs along the top of your main screen, above full-screen apps too: the day's sky from 6 AM to midnight, the past dimmed, your blocks as colored marks and the sun as a bright tick at "now". Clicks always go straight through it. Rest the mouse on the very top edge for half a second and a small card opens under it with the next block and how long until it (and the block under the mouse, if there is one); move away and it closes. Turn it off from the tray menu: "Edge horizon".
@@ -338,7 +351,7 @@ Pushes that don't change the version are only checked, not released.
 - ~~3.2: the Horizon (the day left to right), the week as seven skies, colors by time of day~~ ✓
 - ~~3.2.1: every block fits its words, the pop-out grows to fit~~ ✓
 - ~~3.3: stay in view: the edge horizon strip and the tray sundial~~ ✓
-- 3.4: the valley: your mottos on a living landscape as the wallpaper (seasons by date, light by the hour)
+- ~~3.4: the valley: your mottos on a living landscape as the wallpaper (seasons by date, light by the hour)~~ ✓
 - 3.5: real Milpitas weather on the wallpaper, and an optional live (moving) wallpaper
 - 3.6: never rot: offline queue, self-healing days, capture hotkey
 - 3.7: rewards: sky events, constellation legends, the Sunday letter, optional sound

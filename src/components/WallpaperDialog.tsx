@@ -1,0 +1,69 @@
+// 3.4: your mottos on the valley, as the Windows wallpaper. Opt-in; turning it off puts your slideshow back.
+import { useEffect, useState } from "react";
+import { api } from "../lib/api";
+import { toast, useUi } from "../state/ui";
+import { Dialog } from "./common";
+
+const isDesktop = () => /Electron/i.test(navigator.userAgent);
+interface WState {
+  enabled?: boolean; folder?: string; defaultFolder: string; live?: boolean; mottos: number; windows: boolean;
+  current?: { name: string } | null; last?: { at: string; motto: string; ms: number } | null; error?: string | null;
+  saved?: { status: number; folder: string } | null;
+}
+
+export function WallpaperDialog() {
+  return <Dialog name="wallpaper" id="wallpaper-dialog"><Body /></Dialog>;
+}
+
+const pretty = (name?: string) => (name || "").replace(/\.(png|jpe?g|webp)$/i, "").replace(/^[0-9a-z]{1,4}-/i, "").replace(/-/g, " ");
+
+function Body() {
+  const close = useUi((s) => s.closeDialog);
+  const [st, setSt] = useState<WState | null>(null);
+  const [busy, setBusy] = useState<string | null>(null);
+  const desktop = isDesktop();
+  const load = () => api<WState>("/api/desktop/wallpaper").then(setSt).catch(() => setSt(null));
+  useEffect(() => { if (desktop) load(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  const act = async (action: string, label: string) => {
+    setBusy(label);
+    try { const s = await api<WState>("/api/desktop/wallpaper", { method: "POST", body: { action } }); setSt(s); if (s.error) toast(s.error); }
+    catch (e) { toast(`Couldn't do that: ${(e as Error).message}`); }
+    finally { setBusy(null); }
+  };
+  const folder = st?.folder || st?.saved?.folder || st?.defaultFolder || "";
+
+  return (
+    <div className="planner-form wallpaper-form" id="wallpaper-form">
+      <h2>Your mottos on the valley</h2>
+      <p className="dialog-sub">Your desktop becomes a living landscape behind your mottos: the season follows the calendar, the light follows the real sun and moon here, your projects shine as constellations, and the motto changes on the hour.</p>
+      {!desktop && <p className="dialog-note">This works in the Praxis desktop app.</p>}
+      {desktop && st && (
+        <>
+          <label className="switch-row"><input type="checkbox" id="wp-enabled" checked={!!st.enabled} disabled={!!busy}
+            onChange={(e) => act(e.target.checked ? "enable" : "disable", e.target.checked ? "Drawing your first one…" : "Putting your wallpaper back…")} />
+            <span>Use the valley as my desktop wallpaper</span></label>
+          <div className="form-row wp-folder"><span className="form-label">Mottos from</span>
+            <span className="wp-path" id="wp-folder" title={folder}>{folder}</span>
+            <button type="button" className="ghost-btn" id="wp-pick" disabled={!!busy} onClick={() => act("pick-folder", "Choosing…")}>Change…</button>
+          </div>
+          <p className="wp-status" id="wp-status">
+            {busy ? busy
+              : st.error ? <span className="wp-error">{st.error}</span>
+              : st.enabled && st.last ? <>Showing “{pretty(st.last.motto)}” · drawn {new Date(st.last.at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })} in {(st.last.ms / 1000).toFixed(1)}s · {st.mottos} motto{st.mottos === 1 ? "" : "s"}</>
+              : st.mottos ? `${st.mottos} motto${st.mottos === 1 ? "" : "s"} found.` : "No pictures found in that folder yet."}
+          </p>
+          <ul className="wp-notes">
+            <li>Your mottos folder is only read, never changed. New mottos you add show up within the hour.</li>
+            <li>Task names never appear on your wallpaper; your projects show only as stars.</li>
+            <li>{st.saved && (st.saved.status & 2) ? "Turning this off puts your Windows slideshow back as it was." : "Turning this off puts your previous wallpaper back."}</li>
+          </ul>
+        </>
+      )}
+      <div className="dialog-actions">
+        {desktop && st?.enabled && <button type="button" className="ghost-btn" id="wp-refresh" disabled={!!busy} onClick={() => act("refresh", "Drawing…")}>Redraw now</button>}
+        <span className="spacer" />
+        <button type="button" className="primary" onClick={() => close("wallpaper")}>Done</button>
+      </div>
+    </div>
+  );
+}
