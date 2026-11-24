@@ -115,6 +115,12 @@ Praxis is built to be easy on the eyes on a big monitor all day:
 - **Readable type**: Atkinson Hyperlegible for text (designed for legibility) and Bricolage Grotesque for headings, bundled so they work offline.
 - **Calm motion**: finishing a task fills the circle and folds the row away; the focus timer is a ring that fills. If Windows has "Show animations" turned off, Praxis stops animating too.
 
+## Stay in view (3.3)
+
+**The edge horizon.** A strip a few pixels tall runs along the top of your main screen, above full-screen apps too: the day's sky from 6 AM to midnight, the past dimmed, your blocks as colored marks and the sun as a bright tick at "now". Clicks always go straight through it. Rest the mouse on the very top edge for half a second and a small card opens under it with the next block and how long until it (and the block under the mouse, if there is one); move away and it closes. Turn it off from the tray menu: "Edge horizon".
+
+**The tray sundial.** The tray icon is a tiny sundial: the sun moves along its arc through the day (the moon at night), and a badge shows how many of today's commitments are still open. Hover it for the details: commitments left, the next block and sunset.
+
 ## The Horizon (3.2)
 
 The Day view runs **left to right as one sky**. The sun crosses it at today's real sunrise and sunset (dotted ahead of you, solid behind), the past dims, and your blocks hang below it at their times. Drag tasks onto the day, drag a block sideways to move it or by its right edge to change its length; the mouse wheel scrolls through the day. Prefer the old top-to-bottom timeline? ⋯ → untick "Day as a horizon".
@@ -331,7 +337,7 @@ Pushes that don't change the version are only checked, not released.
 - ~~3.1: draw a constellation with Claude, "I'm stuck", guess the time~~ ✓
 - ~~3.2: the Horizon (the day left to right), the week as seven skies, colors by time of day~~ ✓
 - ~~3.2.1: every block fits its words, the pop-out grows to fit~~ ✓
-- 3.3: stay in view: the edge horizon strip and the tray sundial
+- ~~3.3: stay in view: the edge horizon strip and the tray sundial~~ ✓
 - 3.4: the valley: your mottos on a living landscape as the wallpaper (seasons by date, light by the hour)
 - 3.5: real Milpitas weather on the wallpaper, and an optional live (moving) wallpaper
 - 3.6: never rot: offline queue, self-healing days, capture hotkey

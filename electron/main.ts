@@ -25,7 +25,7 @@ let restoreState: (() => void) | null = null;
 // ---------- small persisted desktop settings ----------
 const prefsFile = () => path.join(app.getPath("userData"), "desktop.json");
 type Bounds = { x: number; y: number; width: number; height: number };
-type Prefs = { openAtLogin?: boolean; toldAboutTray?: boolean; bounds?: Bounds; maximized?: boolean; fullscreen?: boolean; zoom?: number; miniBounds?: Bounds };
+type Prefs = { openAtLogin?: boolean; toldAboutTray?: boolean; bounds?: Bounds; maximized?: boolean; fullscreen?: boolean; zoom?: number; miniBounds?: Bounds; edgeStrip?: boolean };
 const readPrefs = (): Prefs => { try { return JSON.parse(fs.readFileSync(prefsFile(), "utf8")); } catch { return {}; } };
 const writePrefs = (p: Prefs) => { try { fs.writeFileSync(prefsFile(), JSON.stringify({ ...readPrefs(), ...p }, null, 2)); } catch { /* ignore */ } };
 const log = (...a: unknown[]) => { try { fs.appendFileSync(path.join(app.getPath("userData"), "praxis.log"), `${new Date().toISOString()} ${a.map(String).join(" ")}\n`); } catch { /* ignore */ } };
@@ -49,7 +49,7 @@ if (!app.requestSingleInstanceLock()) {
 async function start() {
   const { listen, store } = createPraxisServer({
     dataDir: app.getPath("userData"), staticDir: rendererDir,
-    desktop: { nudge: (action, key) => onNudgeAction(action, key), test: () => showNudge(testNudge(), true), miniFit },
+    desktop: { nudge: (action, key) => onNudgeAction(action, key), test: () => showNudge(testNudge(), true), miniFit, trayDial, taskbarDark: () => nativeTheme.shouldUseDarkColorsForSystemIntegratedUI ?? nativeTheme.shouldUseDarkColors },
   });
   readConfig = store.readConfig;
   startNudger();
@@ -58,6 +58,7 @@ async function start() {
   log("server on", baseUrl);
   createWindow();
   createTray();
+  if (readPrefs().edgeStrip !== false) startStrip();
   setupJumpList();
   // Started from a jump-list entry: do it once the page is ready to listen.
   if (JUMP.some((j) => process.argv.includes(j.arg))) win?.webContents.once("did-finish-load", () => setTimeout(() => runArgs(process.argv), 1500));
@@ -214,6 +215,7 @@ function refreshTrayMenu() {
     { label: "Now (always on top)", click: () => openMini() },
     { label: "Mark Now done", accelerator: NOW_DONE, click: nowDone },
     { label: "Show a test reminder", click: () => showNudge(testNudge(), true) },
+    { label: "Edge horizon (top of the screen)", type: "checkbox", checked: readPrefs().edgeStrip !== false, click: (item) => { writePrefs({ edgeStrip: item.checked }); if (item.checked) startStrip(); else stopStrip(); } },
     { label: "Full screen", accelerator: "F11", type: "checkbox", checked: !!win?.isFullScreen(), click: () => { showWindow(); toggleFullScreen(); } },
     { type: "separator" },
     { label: "Open at login", type: "checkbox", checked: app.getLoginItemSettings().openAtLogin, click: (item) => { setOpenAtLogin(item.checked); } },
@@ -222,6 +224,79 @@ function refreshTrayMenu() {
     { type: "separator" },
     { label: "Quit Praxis", click: () => { quitting = true; app.quit(); } },
   ]));
+}
+
+// ---------- the tray sundial ----------
+// The main window draws the icon (the sun on its arc, the commitments still open) and sends it here.
+let lastDial = "";
+function trayDial(img16: string, img32: string, tip: string) {
+  if (!tray || !img16.startsWith("data:image/png") || !img32.startsWith("data:image/png")) return;
+  if (img16 + tip === lastDial) return;
+  if (!lastDial) log("tray dial", tip);
+  lastDial = img16 + tip;
+  const img = nativeImage.createEmpty();
+  img.addRepresentation({ scaleFactor: 1, dataURL: img16 });
+  img.addRepresentation({ scaleFactor: 2, dataURL: img32 });
+  if (!img.isEmpty()) tray.setImage(img);
+  tray.setToolTip(tip.slice(0, 127)); // Windows cuts tray tooltips at 127 characters
+}
+
+// ---------- the edge horizon ----------
+// A strip a few pixels tall along the top of the main screen: the day's sky, your blocks and the sun.
+// Clicks always go through it. Rest the mouse on the very top edge and it opens a small card with the next block;
+// move away and it closes.
+const STRIP_H = 5, STRIP_OPEN_H = 120, DWELL_MS = 450;
+let stripWin: BrowserWindow | null = null;
+let stripPoll: NodeJS.Timeout | null = null;
+function stripArea() { return screen.getPrimaryDisplay().bounds; } // bounds, not workArea: it sits above full-screen apps too
+function startStrip() {
+  if (stripWin && !stripWin.isDestroyed()) return;
+  const a = stripArea();
+  stripWin = new BrowserWindow({
+    x: a.x, y: a.y, width: a.width, height: STRIP_H, frame: false, transparent: true, resizable: false, movable: false,
+    minimizable: false, maximizable: false, fullscreenable: false, skipTaskbar: true, focusable: false, show: false,
+    hasShadow: false, alwaysOnTop: true, title: "Edge horizon", backgroundColor: "#00000000",
+    webPreferences: { contextIsolation: true, sandbox: true, backgroundThrottling: false },
+  });
+  stripWin.setAlwaysOnTop(true, "screen-saver");
+  stripWin.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+  stripWin.setIgnoreMouseEvents(true);
+  stripWin.on("page-title-updated", (e) => e.preventDefault()); // keep its own name, so it's never mistaken for the main window
+  stripWin.removeMenu();
+  stripWin.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
+  stripWin.webContents.on("will-navigate", (e) => e.preventDefault());
+  stripWin.loadURL(`${baseUrl}/?strip=1`);
+  stripWin.once("ready-to-show", () => stripWin?.showInactive());
+  stripWin.on("closed", () => { stripWin = null; });
+  let dwell = 0, open = false, lastX = -1;
+  const send = (detail: { open: boolean; x: number }) =>
+    stripWin?.webContents.executeJavaScript(`window.dispatchEvent(new CustomEvent("praxis:strip", { detail: ${JSON.stringify(detail)} }))`).catch(() => undefined);
+  const fit = (h: number) => { const b = stripArea(); stripWin?.setBounds({ x: b.x, y: b.y, width: b.width, height: h }); };
+  stripPoll = setInterval(() => {
+    if (!stripWin || stripWin.isDestroyed()) return;
+    const p = screen.getCursorScreenPoint(), b = stripArea();
+    const onEdge = p.x >= b.x && p.x < b.x + b.width && p.y >= b.y && p.y <= b.y + STRIP_H + 1;
+    if (onEdge) {
+      if (!dwell) dwell = Date.now();
+      if (!open && Date.now() - dwell >= DWELL_MS) { open = true; fit(STRIP_OPEN_H); stripWin.moveTop(); }
+      if (open && Math.abs(p.x - lastX) > 2) { lastX = p.x; send({ open: true, x: p.x - b.x }); }
+    } else {
+      dwell = 0;
+      if (open) { open = false; lastX = -1; send({ open: false, x: 0 }); setTimeout(() => { if (!open) fit(STRIP_H); }, 120); }
+    }
+  }, 100);
+  // Screens change (a monitor plugged in, resolution changed): follow the main screen.
+  const refit = () => fit(open ? STRIP_OPEN_H : STRIP_H);
+  screen.on("display-metrics-changed", refit);
+  screen.on("display-added", refit);
+  screen.on("display-removed", refit);
+  stripWin.on("closed", () => { screen.off("display-metrics-changed", refit); screen.off("display-added", refit); screen.off("display-removed", refit); });
+}
+function stopStrip() {
+  if (stripPoll) clearInterval(stripPoll);
+  stripPoll = null;
+  if (stripWin && !stripWin.isDestroyed()) stripWin.destroy();
+  stripWin = null;
 }
 
 // ---------- quick add from anywhere ----------

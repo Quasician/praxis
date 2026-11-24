@@ -13,7 +13,7 @@ import { useAppearance } from "./useAppearance";
 import { useNow } from "./useNow";
 import { askNextMove } from "../data/constellation";
 import { addStep } from "../data/actions";
-import { ApiError } from "../lib/api";
+import { ApiError, api } from "../lib/api";
 
 export const FOCUS_MIN = 25;
 export const GUESSES = [10, 15, 25, 45, 60, 90];
@@ -195,7 +195,7 @@ export function NowMini() {
       const h = Math.ceil(Math.max(...kids.map((k) => k.getBoundingClientRect().bottom), 60) + 12);
       if (Math.abs(h - last) < 4) return;
       last = h; clearTimeout(t);
-      t = setTimeout(() => fetch("/api/desktop/mini-fit", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ height: h }) }).catch(() => {}), 60);
+      t = setTimeout(() => api("/api/desktop/mini-fit", { method: "POST", body: { height: h } }).catch(() => {}), 60);
     };
     const ro = new ResizeObserver(fit);
     const mo = new MutationObserver(() => { const c = document.querySelector(".now-card.mini"); if (c) { ro.disconnect(); ro.observe(c); for (const k of Array.from(c.children)) ro.observe(k); fit(); } });

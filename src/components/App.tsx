@@ -34,6 +34,7 @@ import { daysAway } from "../data/habits";
 import { BacklogDialog } from "./BacklogDialog";
 import { useMedia } from "./useNow";
 import { WeekView, useWeeklyAuto } from "./WeekView";
+import { useTrayDial } from "./Glance";
 
 export function App() {
   const { status, connected, todayQ } = useData();
@@ -55,6 +56,7 @@ function Shell() {
   useAppearance();
   useBlockNotifications();
   useDesktopBridge();
+  useTrayDial();
   useDoneHotkey();
   useShortcuts();
   return (

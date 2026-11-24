@@ -14,7 +14,7 @@ export interface ServerOptions {
   staticDir: string;
   todoistBase?: string;
   /** Only in the desktop app: reminders that float above other windows. */
-  desktop?: { nudge(action: string, key: string): void; test(): void; miniFit?(height: number): void };
+  desktop?: { nudge(action: string, key: string): void; test(): void; miniFit?(height: number): void; trayDial?(img16: string, img32: string, tip: string): void; taskbarDark?(): boolean };
 }
 
 const MIME: Record<string, string> = {
@@ -103,6 +103,20 @@ export function createPraxisServer(opts: ServerOptions) {
       let body: { action?: string; key?: string };
       try { body = JSON.parse((await readBody(req)) || "{}"); } catch { return sendJSON(res, 400, { error: "Invalid JSON" }); }
       opts.desktop.nudge(String(body.action || "").slice(0, 20), String(body.key || "").slice(0, 200));
+      return sendJSON(res, 200, { ok: true });
+    }
+
+    if (route === "GET /api/desktop/taskbar") {
+      if (!opts.desktop?.taskbarDark) return sendJSON(res, 404, { error: "Only in the desktop app." });
+      return sendJSON(res, 200, { dark: !!opts.desktop.taskbarDark() });
+    }
+    if (route === "POST /api/desktop/tray") {
+      if (!opts.desktop?.trayDial) return sendJSON(res, 404, { error: "Only in the desktop app." });
+      let body: { img16?: unknown; img32?: unknown; tip?: unknown };
+      try { body = JSON.parse((await readBody(req)) || "{}"); } catch { return sendJSON(res, 400, { error: "Invalid JSON" }); }
+      const ok = (v: unknown) => typeof v === "string" && v.startsWith("data:image/png;base64,") && v.length < 60_000;
+      if (!ok(body.img16) || !ok(body.img32)) return sendJSON(res, 400, { error: "Expected two small PNG images." });
+      opts.desktop.trayDial(body.img16 as string, body.img32 as string, String(body.tip || "Praxis").slice(0, 200));
       return sendJSON(res, 200, { ok: true });
     }
 
