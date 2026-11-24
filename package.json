@@ -1,7 +1,7 @@
 {
   "name": "praxis",
   "productName": "Praxis",
-  "version": "3.8.1",
+  "version": "3.8.2",
   "description": "Turn ideas into action: a desktop planner on top of Todoist.",
   "author": "Quasician",
   "private": true,
@@ -41,7 +41,7 @@
           ]
         }
       ],
-      "icon": "build/icon.png"
+      "icon": "build/icon.ico"
     },
     "nsis": {
       "oneClick": true,
