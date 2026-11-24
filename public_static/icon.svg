@@ -20,21 +20,21 @@
     <path d="M34 204 A94 94 0 0 1 222 204" fill="none" stroke="#fff" stroke-opacity=".32" stroke-width="6" stroke-dasharray="0.1 15" stroke-linecap="round"/>
     <!-- faint stars -->
     <g fill="#fff" fill-opacity=".6">
-      <circle cx="38" cy="54" r="3"/><circle cx="118" cy="36" r="2.4"/><circle cx="226" cy="116" r="2.8"/><circle cx="214" cy="28" r="2.2"/><circle cx="30" cy="146" r="2.2"/>
+      <circle cx="38" cy="54" r="3"/><circle cx="104" cy="34" r="2.4"/><circle cx="226" cy="118" r="2.8"/><circle cx="216" cy="26" r="2.2"/><circle cx="30" cy="118" r="2.8"/>
     </g>
     <!-- constellation: progress toward a milestone -->
-    <path d="M58 120 L90 80 L130 96 L172 50 L204 70" fill="none" stroke="#fff" stroke-opacity=".7" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+    <g transform="translate(-6 0)"><path d="M58 120 L90 80 L130 96 L172 50 L204 70" fill="none" stroke="#fff" stroke-opacity=".7" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
     <g fill="#fff">
       <circle cx="58" cy="120" r="8"/><circle cx="90" cy="80" r="9"/><circle cx="130" cy="96" r="8"/><circle cx="204" cy="70" r="6.5" fill-opacity=".8"/>
     </g>
     <!-- the goal star -->
-    <path d="M172 28 L179 43 L194 50 L179 57 L172 72 L165 57 L150 50 L165 43 Z" fill="#fff0c8"/>
+    <path d="M172 28 L179 43 L194 50 L179 57 L172 72 L165 57 L150 50 L165 43 Z" fill="#fff0c8"/></g>
     <!-- the rising sun -->
     <circle cx="128" cy="204" r="40" fill="#ffc55e"/>
     <!-- low city: taller at the sides, open in the middle -->
-    <path d="M0 256 V164 H18 V152 H32 V172 H46 V140 H64 V178 H80 V190 H96 V204 H160 V190 H176 V178 H192 V142 H210 V170 H224 V150 H240 V162 H256 V256 Z" fill="#1b1733"/>
+    <path d="M0 256 V164 H18 V152 H32 V172 H46 V140 H64 V178 H80 V190 H96 V204 H160 V190 H176 V178 H192 V140 H210 V172 H224 V152 H238 V164 H256 V256 Z" fill="#1b1733"/>
     <g fill="#ffcf86" fill-opacity=".85">
-      <rect x="51" y="150" width="5" height="6"/><rect x="51" y="164" width="5" height="6"/><rect x="197" y="154" width="5" height="6"/><rect x="22" y="164" width="5" height="6"/><rect x="229" y="160" width="5" height="6"/><rect x="197" y="168" width="5" height="6"/>
+      <rect x="51" y="150" width="5" height="6"/><rect x="200" y="150" width="5" height="6"/><rect x="51" y="164" width="5" height="6"/><rect x="200" y="164" width="5" height="6"/><rect x="22" y="164" width="5" height="6"/><rect x="229" y="164" width="5" height="6"/>
     </g>
   </g>
   <rect x="2" y="2" width="252" height="252" rx="54" fill="none" stroke="#fff" stroke-opacity=".14" stroke-width="4"/>
