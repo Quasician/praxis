@@ -103,6 +103,11 @@ export async function quickAdd(text: string, forToday: boolean) {
   try {
     task = await api<Task>("/api/todoist/tasks/quick", { method: "POST", body: { text } }); // Todoist's natural-language parser
   } catch (e) {
+    // Todoist is down: keep it and add it when Todoist is back.
+    if (todoistDown(e)) {
+      const { queueQuickAdd } = await import("./pending");
+      if (queueQuickAdd(forToday && !/\b(today|tomorrow|tonight|every|next)\b/i.test(text) ? `${text} today` : text)) { toast("Todoist is down right now, so it's saved here and will be added when it's back."); return; }
+    }
     const status = (e as { status?: number }).status;
     if (status !== 404 && status !== 405) throw e;
     task = await api<Task>("/api/todoist/tasks", { method: "POST", body: { content: text, ...(forToday ? { due_string: "today" } : {}) } });

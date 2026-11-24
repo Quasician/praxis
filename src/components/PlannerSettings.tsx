@@ -39,6 +39,7 @@ function Body() {
       <label className="switch-row"><input type="checkbox" name="morningCommit" checked={s.morningCommit} onChange={(e) => set("morningCommit", e.target.checked)} /> <span>Start each day with a one-minute commit (pick today's {s.commitCount})</span></label>
       <label className="switch-row"><input type="checkbox" name="adaptive" checked={s.adaptive} onChange={(e) => set("adaptive", e.target.checked)} /> <span>Make plans lighter or fuller based on how much I finished last week</span></label>
       <label className="switch-row"><input type="checkbox" name="learn" checked={s.learn} onChange={(e) => set("learn", e.target.checked)} /> <span>Learn from my history: Deep work in my best hours, durations from how long things really take</span></label>
+      <label className="switch-row"><input type="checkbox" name="selfHeal" id="ps-selfheal" checked={!!s.selfHeal} onChange={(e) => set("selfHeal", e.target.checked)} /> <span>When I skip a shutdown, re-home the leftovers for me (with a morning note and an undo)</span></label>
       <label className="switch-row"><input type="checkbox" name="weeklyAuto" checked={s.weeklyAuto} onChange={(e) => set("weeklyAuto", e.target.checked)} /> <span>Draft next week's plan automatically on Friday after work</span></label>
 
       <div className="form-grid">

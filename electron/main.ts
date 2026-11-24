@@ -4,7 +4,7 @@
 //   • Ctrl+Shift+Space from anywhere → quick add
 //   • Opens at login (toggle in the tray menu)
 //   • Updates itself from GitHub Releases in the background
-import { app, BrowserWindow, dialog, globalShortcut, Menu, nativeImage, nativeTheme, Notification, powerMonitor, screen, shell, Tray } from "electron";
+import { app, BrowserWindow, clipboard, dialog, globalShortcut, Menu, nativeImage, nativeTheme, Notification, powerMonitor, screen, shell, Tray } from "electron";
 import { autoUpdater } from "electron-updater";
 import fs from "fs";
 import path from "path";
@@ -219,6 +219,7 @@ function refreshTrayMenu() {
     { label: "Shut down the day…", click: () => trigger("shutdown") },
     { label: "Now (always on top)", click: () => openMini() },
     { label: "Mark Now done", accelerator: NOW_DONE, click: nowDone },
+    { label: "Capture clipboard to Inbox", accelerator: CAPTURE, click: () => { capture().catch(() => undefined); } },
     { label: "Show a test reminder", click: () => showNudge(testNudge(), true) },
     { label: "Wallpaper…", click: () => trigger("wallpaper") },
     { label: "Edge horizon (top of the screen)", type: "checkbox", checked: readPrefs().edgeStrip !== false, click: (item) => { writePrefs({ edgeStrip: item.checked }); if (item.checked) startStrip(); else stopStrip(); } },
@@ -336,6 +337,19 @@ const quickAdd = () => trigger("quick-add");
 /** Ctrl+Alt+D anywhere: mark the Now task done without bringing Praxis forward. */
 const NOW_DONE = "CommandOrControl+Alt+D";
 const nowDone = () => win?.webContents.executeJavaScript('window.dispatchEvent(new Event("praxis:now-done"))').catch(() => undefined);
+/** Ctrl+Alt+Q anywhere (3.6): whatever text is on the clipboard becomes a task in your Todoist Inbox, without switching windows. */
+const CAPTURE = "CommandOrControl+Alt+Q";
+async function capture() {
+  const text = String(await clipboard.readText() || "").trim();
+  const say = (title: string, body: string) => { if (Notification.isSupported()) new Notification({ title, body, silent: true }).show(); };
+  if (!text) return say("Nothing to capture", "Copy some text first, then press Ctrl+Alt+Q.");
+  try {
+    const r = await win?.webContents.executeJavaScript(`window.__praxisCapture ? window.__praxisCapture(${JSON.stringify(text.slice(0, 20000))}) : { ok: false, error: "Praxis is still starting." }`) as { ok: boolean; queued?: boolean; title?: string; error?: string } | undefined;
+    if (!r?.ok) return say("Couldn't capture that", r?.error || "Open Praxis and try again.");
+    say(r.queued ? "Saved for your Inbox" : "Added to your Inbox", r.queued ? `“${r.title}” (Todoist is down; it goes in as soon as it's back)` : `“${r.title}”`);
+    log("captured", r.queued ? "(queued)" : "", (r.title || "").length);
+  } catch (e) { say("Couldn't capture that", (e as Error).message); }
+}
 
 // ---------- reminders that reach you in full-screen apps ----------
 // Windows turns on Do Not Disturb automatically while an app is full screen, which hides ordinary
@@ -494,6 +508,7 @@ function setupJumpList() {
 function registerQuickAdd() {
   if (!globalShortcut.register(QUICK_ADD, quickAdd)) log("couldn't register", QUICK_ADD, "(another app may be using it)");
   if (!globalShortcut.register(NOW_DONE, nowDone)) log("couldn't register", NOW_DONE, "(another app may be using it)");
+  if (!globalShortcut.register(CAPTURE, () => { capture().catch(() => undefined); })) log("couldn't register", CAPTURE, "(another app may be using it)");
 }
 
 // ---------- open at login (on by default) ----------

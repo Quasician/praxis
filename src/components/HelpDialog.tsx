@@ -22,6 +22,7 @@ const KEYS: [string, string][] = [
 const DESKTOP: [string, string][] = [
   ["Ctrl+Shift+Space", "Quick add from anywhere"],
   ["Ctrl+Alt+D", "Mark the Now task done, from anywhere"],
+  ["Ctrl+Alt+Q", "Send the clipboard to your Todoist Inbox, from anywhere"],
   ["F11", "Full screen"],
   ["Ctrl +  ·  Ctrl −  ·  Ctrl 0", "Zoom in, out, reset"],
 ];

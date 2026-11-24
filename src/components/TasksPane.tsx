@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type PointerEvent } from "react";
+import { usePending } from "../data/pending";
+import { HealNoteCard } from "./HealNote";
 import { fmtDayShort, fmtDuration, fmtTime, durationMinutes, parseDue, sameDay } from "../lib/dates";
 import { blockMinutes, sortTasks, splitToday } from "../lib/tasks";
 import { Inline, colorOf, plain } from "../lib/text";
@@ -35,6 +37,7 @@ export function TasksPane() {
   return (
     <section className="tasks-pane">
       <NowCard />
+      <HealNoteCard />
       <nav className="tabs" role="tablist">
         <button role="tab" data-tab="today" className={`tab ${tab === "today" ? "active" : ""}`} onClick={() => setTab("today")}>
           Today <span className="count" id="count-today">{loading ? "" : overdue.length + todayList.length || ""}</span>
@@ -120,6 +123,7 @@ function TaskRow({ t, ctx }: { t: Task; ctx: Ctx }) {
   const committed = useCommitted();
   const { projects } = useData();
   const lifting = useUi((s) => !!s.drag && s.drag.proposalIdx === undefined && s.drag.task.id === t.id);
+  const pending = usePending().ids.has(t.id);
   const [done, setDone] = useState(false);
   const due = parseDue(t.due);
   const proj = projects.get(t.project_id);
@@ -134,7 +138,8 @@ function TaskRow({ t, ctx }: { t: Task; ctx: Ctx }) {
   const complete = () => { setDone(true); setTimeout(() => completeTask(t), 520); }; // let the check pop and the row fold first
 
   return (
-    <li className={`task p${t.priority || 1} ${t.parent_id ? "sub" : ""} ${done ? "done" : ""} ${lifting ? "lifting" : ""}`} data-id={t.id} onPointerDown={onPointerDown}>
+    <li className={`task p${t.priority || 1} ${t.parent_id ? "sub" : ""} ${done ? "done" : ""} ${lifting ? "lifting" : ""} ${pending ? "pending" : ""}`} data-id={t.id} onPointerDown={onPointerDown}
+        title={pending ? "Waiting to reach Todoist" : undefined}>
       <button className="check" title="Complete" aria-label="Complete task" onClick={complete}>
         <svg viewBox="0 0 24 24" width="12" height="12"><path fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" d="M5 12.5l4.5 4.5L19 7.5" /></svg>
       </button>

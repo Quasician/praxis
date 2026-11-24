@@ -48,6 +48,7 @@ Your data stays on your computer in `%APPDATA%\Praxis` (`.env` holds the Todoist
 | `?` | All keyboard shortcuts (and the version you're on) |
 | `Ctrl+Shift+Space` | Quick add from anywhere (desktop app) |
 | `Ctrl+Alt+D` | Mark the Now task done from anywhere (desktop app) |
+| `Ctrl+Alt+Q` | Send the clipboard to your Todoist Inbox from anywhere (desktop app) |
 | `F11`, `Ctrl +/−/0` | Fullscreen, zoom (desktop app) |
 | `1` / `2` | Today / Inbox |
 | `Esc` | Leave the input, or cancel a drag |
@@ -114,6 +115,14 @@ Praxis is built to be easy on the eyes on a big monitor all day:
 - **Focus mode (F)**: hides everything except Now and the next three tasks. Press F again to see everything.
 - **Readable type**: Atkinson Hyperlegible for text (designed for legibility) and Bricolage Grotesque for headings, bundled so they work offline.
 - **Calm motion**: finishing a task fills the circle and folds the row away; the focus timer is a ring that fills. If Windows has "Show animations" turned off, Praxis stops animating too.
+
+## Never rot (3.6)
+
+**When Todoist is down, nothing is lost.** Changes you make (completing, moving, rescheduling, quick-adding) are kept on this computer, marked with a dashed outline and a "changes waiting for Todoist" chip, and sent as soon as Todoist is back (click the chip to try right away). They survive a restart. If a task also changed in Todoist meanwhile (on your phone, say), Todoist's version wins and Praxis tells you which.
+
+**Self-healing days.** Skipped yesterday's shutdown? Praxis can re-home the leftovers for you: one-off tasks spread over the next days within your capacity, missed repeats back on today. A note at the top of your list in the morning says what moved, with an Undo. Because it changes dates while you're not looking, it asks once before it ever does this (change it any time in Planner settings).
+
+**Capture from anywhere: Ctrl+Alt+Q.** Copy any text, press Ctrl+Alt+Q, and it lands in your Todoist Inbox without switching windows: the first line is the title, the rest goes in the notes. (Also in the tray menu.)
 
 ## Weather and motion (3.5)
 
@@ -359,7 +368,7 @@ Pushes that don't change the version are only checked, not released.
 - ~~3.3: stay in view: the edge horizon strip and the tray sundial~~ ✓
 - ~~3.4: the valley: your mottos on a living landscape as the wallpaper (seasons by date, light by the hour)~~ ✓
 - ~~3.5: real Milpitas weather on the wallpaper, and an optional live (moving) wallpaper~~ ✓
-- 3.6: never rot: offline queue, self-healing days, capture hotkey
+- ~~3.6: never rot: offline queue, self-healing days, capture hotkey~~ ✓
 - 3.7: rewards: sky events, constellation legends, the Sunday letter, optional sound
 - 3.8: finish the theme: sunrise and sunset rituals, ideas as clouds, Areas in the sky, the Horizon clouds over as the day fills
 - ~~1.1: morning commit, committed vs. bonus, adaptive plans, Now card, first steps, backlog cleanup, Progress, learning~~ ✓

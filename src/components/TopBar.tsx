@@ -10,6 +10,7 @@ import { ShutdownPill } from "./ShutdownDialog";
 import { StreakChip } from "./Habits";
 import { RELEASE_URL, VERSION } from "../lib/version";
 import { updateConfig } from "../data/actions";
+import { flush, usePending } from "../data/pending";
 
 const VIEWS: { id: View; label: string; title: string }[] = [
   { id: "day", label: "Day", title: "Plan your day (D)" },
@@ -34,6 +35,7 @@ export function TopBar() {
   const { overdue, today: todayList } = splitToday(today.filter((t) => !trayIds.has(t.id)));
   const timedLeft = todayList.filter((t) => { const d = parseDue(t.due); return d && d.hasTime && d.d > now; }).length;
   const synced = todayQ.dataUpdatedAt ? `Synced ${fmtTime(new Date(todayQ.dataUpdatedAt))}` : "";
+  const pending = usePending();
   const status = todayQ.isError ? "Couldn't sync — retrying soon" : todayQ.isFetching && !todayQ.data ? "Syncing…" : synced;
 
   return (
@@ -58,6 +60,8 @@ export function TopBar() {
       <div className="actions">
         <StreakChip />
         <UpdatedChip />
+        {pending.count > 0 && <button id="pending-chip" className="pending-chip" title="Todoist couldn't be reached, so these changes are kept here and sent as soon as it's back. Click to try now." onClick={() => flush()}>
+          {pending.count} change{pending.count === 1 ? "" : "s"} waiting for Todoist</button>}
         <span id="sync-status" className="sync-status">{status}</span>
         <ShutdownPill />
         <button id="dump-btn" className="ghost-btn dump-btn" title="Brain dump: Claude turns a messy list into tasks (B)" onClick={() => openDialog("dump")}>✦ Brain dump</button>

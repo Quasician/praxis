@@ -36,6 +36,9 @@ import { useMedia } from "./useNow";
 import { WeekView, useWeeklyAuto } from "./WeekView";
 import { useTrayDial } from "./Glance";
 import { WallpaperDialog } from "./WallpaperDialog";
+import { startPending } from "../data/pending";
+import { HealAskDialog } from "./HealNote";
+import { morningHeal } from "../data/heal";
 
 export function App() {
   const { status, connected, todayQ } = useData();
@@ -45,7 +48,9 @@ export function App() {
   return <Shell />;
 }
 
+let pendingStarted = false;
 function Shell() {
+  if (!pendingStarted) { pendingStarted = true; startPending(); }
   const view = useUi((s) => s.view);
   const wide = useMedia("(min-width: 2200px)"); // ultrawide: show areas beside the day
   const { config } = useData();
@@ -80,6 +85,7 @@ function Shell() {
       <RemindersDialog />
       <ConstellationDialog />
       <WallpaperDialog />
+      <HealAskDialog />
       <Celebration />
       <Toast />
       <DragGhost />
@@ -110,6 +116,9 @@ function useBackgroundJobs() {
       useUi.setState({ awayDays: daysAway(config) });
       if (config.lastOpen !== today) await updateConfig((c) => ({ ...c, lastOpen: today }));
       if (fresh && !weeklyStarted) { useUi.getState().openDialog("fresh"); await updateConfig((c) => ({ ...c, planner: { ...(c.planner || {}), lastAuto: today } })); return; }
+      // Skipped yesterday's shutdown? Re-home the leftovers (asks once, the first time).
+      const healed = await morningHeal(config, todayQ.data || []).catch(() => "none" as const);
+      if (healed === "ask") { useUi.getState().openDialog("heal"); return; }
       if (!cfg.auto || cfg.lastAuto === today || weeklyStarted) return;
       if (minOfDay(new Date()) > toMin(cfg.dayEnd) - 30) return;
       const plan = await computePlan();

@@ -1412,3 +1412,17 @@ body { background-image: linear-gradient(180deg, color-mix(in srgb, var(--sky-no
 .valley-live .valley-holder canvas { object-fit: cover; }
 .valley-live .valley-status { display: none; }
 .wp-wx { font-style: normal; color: var(--ink-3); font-size: 12.5px; }
+
+/* ---------- 3.6: changes waiting for Todoist ---------- */
+.pending-chip { border: 1px dashed color-mix(in srgb, var(--accent) 55%, transparent); background: color-mix(in srgb, var(--accent) 8%, transparent); color: var(--ink-2);
+  border-radius: 999px; padding: 3px 11px; font: 600 12px var(--sans); cursor: pointer; white-space: nowrap; }
+.pending-chip:hover { color: var(--ink); }
+.task.pending, .tl-block.pending { outline: 1.5px dashed color-mix(in srgb, var(--accent) 60%, transparent); outline-offset: 2px; }
+.heal-note { margin: 0 0 10px; padding: 10px 12px; border-radius: 14px; background: color-mix(in srgb, var(--accent) 7%, var(--panel)); border: 1px solid color-mix(in srgb, var(--accent) 22%, var(--line)); font-size: 13px; }
+.heal-head { display: flex; align-items: center; gap: 8px; }
+.heal-head strong { font-weight: 650; color: var(--ink); }
+.heal-head .ghost-btn { padding: 3px 10px; font-size: 12.5px; }
+.heal-list { list-style: none; margin: 6px 0 0; padding: 0; display: grid; gap: 2px; }
+.heal-list li { display: flex; gap: 8px; color: var(--ink-2); min-width: 0; }
+.heal-title { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.heal-to { flex: none; color: var(--ink-3); }

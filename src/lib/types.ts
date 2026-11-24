@@ -78,6 +78,9 @@ export interface PlannerSettings {
   fill: number;                // % of free time the daily plan fills (starting point; adapts)
   adaptive: boolean;           // nudge `fill` up or down with your recent completion rate
   commitCount: number;         // tasks you commit to each day (at most one Deep); the rest are bonus
+  selfHeal?: boolean;          // 3.6: re-home leftovers by itself when a shutdown was skipped (asked once)
+  healedOn?: string;
+  healNote?: { day: string; moves: { id: string; title: string; from: Due | null; to: string }[]; undone?: boolean; seen?: boolean } | null;
   morningCommit: boolean;      // open the one-minute morning commit instead of a bare plan
   learn: boolean;              // schedule Deep work in your best hours, scale durations to reality
 }

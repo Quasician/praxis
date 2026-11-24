@@ -56,8 +56,14 @@ async function postSync<T>(body: unknown): Promise<T> {
     return api<T>("/api/todoist/sync", { method: "POST", body });
   }
 }
+/** 3.6: while Todoist is down, changes are kept and sent later (see data/pending.ts). */
+type OfflineHandler = (kind: "sync" | "close" | "reopen" | "quick", payload: { commands?: SyncCommand[]; taskId?: string; text?: string }) => boolean;
+let offline: OfflineHandler | null = null;
+export const setOfflineHandler = (h: OfflineHandler | null) => { offline = h; };
 export async function sync(commands: SyncCommand[]): Promise<SyncCommand[]> {
-  const res = await postSync<{ sync_status?: Record<string, unknown> }>({ commands });
+  let res: { sync_status?: Record<string, unknown> };
+  try { res = await postSync<{ sync_status?: Record<string, unknown> }>({ commands }); }
+  catch (e) { if (todoistDown(e) && offline?.("sync", { commands })) return []; throw e; }
   const st = res?.sync_status || {};
   return commands.filter((c) => st[c.uuid] !== "ok");
 }
@@ -72,5 +78,9 @@ export async function syncOrThrow(commands: SyncCommand[]) {
   if (bad.length) throw new Error(`Todoist rejected ${bad.length} change${bad.length > 1 ? "s" : ""}`);
 }
 
-export const closeTask = (id: string) => api(`/api/todoist/tasks/${encodeURIComponent(id)}/close`, { method: "POST" });
-export const reopenTask = (id: string) => api(`/api/todoist/tasks/${encodeURIComponent(id)}/reopen`, { method: "POST" });
+const taskAction = async (id: string, kind: "close" | "reopen") => {
+  try { return await api(`/api/todoist/tasks/${encodeURIComponent(id)}/${kind}`, { method: "POST" }); }
+  catch (e) { if (todoistDown(e) && offline?.(kind, { taskId: id })) return null; throw e; }
+};
+export const closeTask = (id: string) => taskAction(id, "close");
+export const reopenTask = (id: string) => taskAction(id, "reopen");

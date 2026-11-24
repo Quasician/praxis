@@ -2,13 +2,15 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { habitStreak } from "../domain/progress";
 import { parseDue, sameDay, minOfDay, ymd } from "../lib/dates";
 import { plain } from "../lib/text";
-import type { Task } from "../lib/types";
+import type { Project, Task } from "../lib/types";
 import type { Slot } from "../domain/nudges";
 import { blockMinutes } from "../lib/tasks";
-import { completeTask, updateConfigFresh } from "../data/actions";
+import { completeTask, reconcileSoon, updateConfigFresh } from "../data/actions";
+import { sync, uuid } from "../lib/api";
+import { pendingCount } from "../data/pending";
 import { AWAY_DAYS, PILE, daysAway, freshStart, overdueNow } from "../data/habits";
 import { proposePlan } from "../data/planActions";
-import { useCompleted } from "../data/queries";
+import { inboxOf, qk, queryClient, useCompleted } from "../data/queries";
 import { useData } from "../data/useData";
 import { useUi } from "../state/ui";
 import { Dialog } from "./common";
@@ -159,7 +161,7 @@ export function Celebration() {
   </>;
 }
 
-declare global { interface Window { __praxisToday?: () => Task[]; __praxisSchedule?: () => Slot[] } }
+declare global { interface Window { __praxisToday?: () => Task[]; __praxisSchedule?: () => Slot[]; __praxisCapture?: (text: string) => Promise<{ ok: boolean; queued?: boolean; title?: string; error?: string }> } }
 
 // ---------- the desktop app's reminders ----------
 /** Lets the desktop app read today's timed blocks and act on its reminder buttons (Done, Start, +5 min). */
@@ -175,6 +177,22 @@ export function useDesktopBridge() {
         const start = d.d.getTime();
         return [{ id: t.id, title: plain(t.content), start, end: start + blockMinutes(t) * 60_000 }];
       });
+    };
+    // 3.6: the capture hotkey sends the clipboard here; it becomes a task in your Inbox (kept for later if Todoist is down).
+    window.__praxisCapture = async (text: string) => {
+      const lines = String(text || "").replace(/\r/g, "").split("\n").map((l) => l.trim()).filter(Boolean);
+      if (!lines.length) return { ok: false, error: "Nothing to capture: copy some text first." };
+      let title = lines[0], desc = lines.slice(1).join("\n");
+      if (title.length > 300) { desc = `…${title.slice(290)}${desc ? `\n${desc}` : ""}`; title = `${title.slice(0, 290)}…`; }
+      const inbox = inboxOf(queryClient.getQueryData<Project[]>(qk.projects));
+      if (!inbox) return { ok: false, error: "Couldn't find your Inbox in Todoist." };
+      const before = pendingCount();
+      try {
+        const failed = await sync([{ type: "item_add", uuid: uuid(), args: { content: title, description: desc.slice(0, 15000), project_id: inbox.id } }]);
+        if (failed.length) return { ok: false, error: "Todoist didn't accept it." };
+        reconcileSoon(1500);
+        return { ok: true, queued: pendingCount() > before, title };
+      } catch (e) { return { ok: false, error: (e as Error).message }; }
     };
     const find = (e: Event) => todayTasks().find((t) => t.id === (e as CustomEvent<string>).detail);
     const onDone = (e: Event) => { const t = find(e); if (t) completeTask(t); };

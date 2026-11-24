@@ -15,6 +15,7 @@ import { useCommitted, useData } from "../data/useData";
 import { useUi } from "../state/ui";
 import { pointerMin, startDrag } from "./drag";
 import { useNow } from "./useNow";
+import { usePending } from "../data/pending";
 import { CheckIcon, PlanBanner } from "./Timeline";
 
 const ROW_H = 70;           // one row of blocks
@@ -279,9 +280,10 @@ function SunArc({ width, rise, set, nowMin, X, skyH: SKY_H }: { width: number; r
 function HzTask({ b, color, past, lifting, short, style, onPointerDown }: { b: Block; color: string; past: boolean; lifting: boolean; short: boolean; style: CSSProperties; onPointerDown: (e: PointerEvent) => void }) {
   const committed = useCommitted();
   const t = b.task!;
+  const pending = usePending().ids.has(t.id);
   const rec = t.due && t.due.is_recurring;
   return (
-    <div className={`tl-block ${past ? "past" : ""} ${lifting ? "lifting" : ""} ${short ? "short" : ""}`} data-id={t.id} style={{ ...style, ["--c" as string]: color }}
+    <div className={`tl-block ${past ? "past" : ""} ${lifting ? "lifting" : ""} ${short ? "short" : ""} ${pending ? "pending" : ""}`} data-id={t.id} style={{ ...style, ["--c" as string]: color }}
          title={`${plain(t.content)} · ${fmtMin(b.start)}–${fmtMin(b.end)}`} onPointerDown={onPointerDown}>
       <span className="blk-len" aria-hidden="true" />
       <button className="blk-check" title="Complete" aria-label="Complete task" onClick={() => completeTask(t)}><CheckIcon /></button>
