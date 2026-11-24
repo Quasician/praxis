@@ -13,6 +13,7 @@ import { proposePlan } from "../data/planActions";
 import { inboxOf, qk, queryClient, useCompleted } from "../data/queries";
 import { useData } from "../data/useData";
 import { useUi } from "../state/ui";
+import type { CheerKind } from "../state/ui";
 import { Dialog } from "./common";
 import { FOCUS_MIN, finishNow } from "./NowCard";
 
@@ -128,36 +129,88 @@ export function Celebration() {
   const cheer = useUi((s) => s.cheer);
   const canvas = useRef<HTMLCanvasElement>(null);
   const [msg, setMsg] = useState("");
+  const [kind, setKind] = useState<CheerKind>("confetti");
   useEffect(() => {
     if (!cheer.n) return;
-    setMsg(cheer.msg);
-    const hide = setTimeout(() => setMsg(""), 4200);
+    const k = cheer.kind || "confetti";
+    setMsg(cheer.msg); setKind(k);
+    const hide = setTimeout(() => setMsg(""), k === "aurora" ? 6500 : 4200);
     const c = canvas.current;
     const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     if (!c || reduced) return () => clearTimeout(hide);
     const ctx = c.getContext("2d")!;
     c.width = innerWidth; c.height = innerHeight;
-    const colors = ["#c8553d", "#d4a017", "#2f8f5b", "#3b78d8", "#a855f7"];
-    const bits = Array.from({ length: 140 }, () => ({
-      x: innerWidth / 2 + (Math.random() - 0.5) * 200, y: innerHeight * 0.35, vx: (Math.random() - 0.5) * 14, vy: -Math.random() * 13 - 4,
-      r: Math.random() * Math.PI, vr: (Math.random() - 0.5) * 0.3, w: 6 + Math.random() * 6, h: 3 + Math.random() * 4, c: colors[Math.floor(Math.random() * colors.length)],
-    }));
     let raf = 0; const t0 = performance.now();
-    const frame = (t: number) => {
-      ctx.clearRect(0, 0, c.width, c.height);
-      const life = (t - t0) / 1800;
-      for (const b of bits) {
-        b.vy += 0.35; b.x += b.vx; b.y += b.vy; b.r += b.vr; b.vx *= 0.99;
-        ctx.save(); ctx.globalAlpha = Math.max(0, 1 - life); ctx.translate(b.x, b.y); ctx.rotate(b.r); ctx.fillStyle = b.c; ctx.fillRect(-b.w / 2, -b.h / 2, b.w, b.h); ctx.restore();
-      }
-      if (life < 1) raf = requestAnimationFrame(frame); else ctx.clearRect(0, 0, c.width, c.height);
-    };
+    let frame: (t: number) => void;
+    if (k === "meteor") {
+      // One bright streak from the upper right, down and to the left, with a soft tail and a few sparks.
+      const W = c.width, H = c.height, x0 = W * 0.86, y0 = H * 0.06, x1 = W * 0.2, y1 = H * 0.42, dur = 1300;
+      // White on a night page; warm gold on a light one, so it shows either way.
+      const dark = document.documentElement.dataset.theme === "dark";
+      const [cr, cg, cb] = dark ? [255, 246, 226] : [222, 150, 40];
+      const sparks: { x: number; y: number; vx: number; vy: number; t: number }[] = [];
+      frame = (t) => {
+        const u = (t - t0) / dur;
+        ctx.clearRect(0, 0, W, H);
+        const head = Math.min(1, u), fade = u > 1 ? Math.max(0, 1 - (u - 1) / 0.5) : 1;
+        const hx = x0 + (x1 - x0) * head, hy = y0 + (y1 - y0) * head;
+        const tail = 0.32, tx = x0 + (x1 - x0) * Math.max(0, head - tail), ty = y0 + (y1 - y0) * Math.max(0, head - tail);
+        const g = ctx.createLinearGradient(tx, ty, hx, hy);
+        g.addColorStop(0, `rgba(${cr},${cg},${cb},0)`); g.addColorStop(1, `rgba(${cr},${cg},${cb},${0.95 * fade})`);
+        ctx.strokeStyle = g; ctx.lineWidth = dark ? 3 : 4; ctx.lineCap = "round";
+        ctx.beginPath(); ctx.moveTo(tx, ty); ctx.lineTo(hx, hy); ctx.stroke();
+        const glow = ctx.createRadialGradient(hx, hy, 0, hx, hy, 26);
+        glow.addColorStop(0, `rgba(${cr},${cg},${cb},${0.9 * fade})`); glow.addColorStop(1, `rgba(${cr},${cg},${cb},0)`);
+        ctx.fillStyle = glow; ctx.beginPath(); ctx.arc(hx, hy, 26, 0, Math.PI * 2); ctx.fill();
+        if (u < 1 && Math.random() < 0.6) sparks.push({ x: hx, y: hy, vx: (Math.random() - 0.3) * 1.5, vy: Math.random() * 1.2, t });
+        for (const p of sparks) {
+          const a = 1 - (t - p.t) / 700; if (a <= 0) continue;
+          p.x += p.vx; p.y += p.vy; ctx.fillStyle = `rgba(${cr},${cg},${cb},${a * 0.8 * fade})`; ctx.fillRect(p.x, p.y, 2, 2);
+        }
+        if (u < 1.5) raf = requestAnimationFrame(frame); else ctx.clearRect(0, 0, W, H);
+      };
+    } else if (k === "aurora") {
+      // Curtains of green and violet light along the top of the window, breathing for a few seconds.
+      const W = c.width, H = c.height, dur = 6000;
+      const bands = Array.from({ length: 5 }, (_, i) => ({ y: H * (0.08 + i * 0.035), amp: 18 + i * 6, f: 0.004 + i * 0.0013, ph: Math.random() * 6, hue: i % 2 ? [150, 110, 240] : [90, 235, 165] }));
+      frame = (t) => {
+        const u = (t - t0) / dur, env = Math.sin(Math.PI * Math.min(1, u)) ** 0.8;
+        ctx.clearRect(0, 0, W, H);
+        ctx.globalCompositeOperation = "lighter";
+        for (const b of bands) {
+          for (let x = 0; x < W; x += 6) {
+            const y = b.y + Math.sin(x * b.f + b.ph + u * 3) * b.amp + Math.sin(x * b.f * 2.7 - u * 2) * b.amp * 0.4;
+            const flick = 0.55 + 0.45 * Math.sin(x * 0.05 + u * 9 + b.ph);
+            const g = ctx.createLinearGradient(x, y - 90, x, y + 14);
+            g.addColorStop(0, "rgba(0,0,0,0)"); g.addColorStop(1, `rgba(${b.hue[0]},${b.hue[1]},${b.hue[2]},${0.11 * env * flick})`);
+            ctx.fillStyle = g; ctx.fillRect(x, y - 90, 6, 104);
+          }
+        }
+        ctx.globalCompositeOperation = "source-over";
+        if (u < 1) raf = requestAnimationFrame(frame); else ctx.clearRect(0, 0, W, H);
+      };
+    } else {
+      const colors = ["#c8553d", "#d4a017", "#2f8f5b", "#3b78d8", "#a855f7"];
+      const bits = Array.from({ length: 140 }, () => ({
+        x: innerWidth / 2 + (Math.random() - 0.5) * 200, y: innerHeight * 0.35, vx: (Math.random() - 0.5) * 14, vy: -Math.random() * 13 - 4,
+        r: Math.random() * Math.PI, vr: (Math.random() - 0.5) * 0.3, w: 6 + Math.random() * 6, h: 3 + Math.random() * 4, c: colors[Math.floor(Math.random() * colors.length)],
+      }));
+      frame = (t) => {
+        ctx.clearRect(0, 0, c.width, c.height);
+        const life = (t - t0) / 1800;
+        for (const b of bits) {
+          b.vy += 0.35; b.x += b.vx; b.y += b.vy; b.r += b.vr; b.vx *= 0.99;
+          ctx.save(); ctx.globalAlpha = Math.max(0, 1 - life); ctx.translate(b.x, b.y); ctx.rotate(b.r); ctx.fillStyle = b.c; ctx.fillRect(-b.w / 2, -b.h / 2, b.w, b.h); ctx.restore();
+        }
+        if (life < 1) raf = requestAnimationFrame(frame); else ctx.clearRect(0, 0, c.width, c.height);
+      };
+    }
     raf = requestAnimationFrame(frame);
     return () => { cancelAnimationFrame(raf); clearTimeout(hide); };
   }, [cheer.n]); // eslint-disable-line
   return <>
-    <canvas ref={canvas} className="confetti" aria-hidden="true" />
-    {msg && <div className="cheer" id="cheer" role="status">{msg}</div>}
+    <canvas ref={canvas} className="confetti" aria-hidden="true" data-kind={kind} />
+    {msg && <div className={`cheer cheer-${kind}`} id="cheer" role="status" data-kind={kind}>{msg}</div>}
   </>;
 }
 

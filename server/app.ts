@@ -6,7 +6,7 @@ import fs from "fs";
 import path from "path";
 import { createStore } from "./store";
 import { eventsForRange, testCalendar } from "./calendar";
-import { ClaudeError, firstSteps, looksLikeKey, reviewBacklog, sortDump, tinyVersions, drawConstellation, nextMove, tagMottos, verifyKey, type Auth, type BacklogTask, type SortContext, type StuckTask } from "./claude";
+import { ClaudeError, firstSteps, looksLikeKey, reviewBacklog, sortDump, tinyVersions, drawConstellation, nextMove, tagMottos, writeLegend, writeLetter, verifyKey, type Auth, type BacklogTask, type SortContext, type StuckTask } from "./claude";
 import { cachedCliStatus, cliStatus } from "./claudecode";
 
 export interface ServerOptions {
@@ -239,6 +239,23 @@ export function createPraxisServer(opts: ServerOptions) {
       if (!names.length) return sendJSON(res, 200, { tags: {} });
       try { return sendJSON(res, 200, { tags: await tagMottos(a, names) }); }
       catch (e) { const err = e as ClaudeError; return sendJSON(res, err.status || 502, { error: err.message }); }
+    }
+    if (route === "POST /api/claude/legend" || route === "POST /api/claude/letter") {
+      const a = await auth();
+      if (!a) return sendJSON(res, 401, { error: NO_AUTH });
+      let body: Record<string, unknown>;
+      try { body = JSON.parse(await readBody(req)); } catch { return sendJSON(res, 400, { error: "Invalid JSON" }); }
+      const str = (v: unknown, n: number) => (typeof v === "string" ? v.slice(0, n) : "");
+      const strs = (v: unknown, k: number, n: number) => (Array.isArray(v) ? v : []).map((x) => str(x, n)).filter(Boolean).slice(0, k);
+      const num = (v: unknown) => (typeof v === "number" && isFinite(v) ? Math.max(0, Math.min(10000, Math.round(v))) : 0);
+      try {
+        if (route === "POST /api/claude/legend") {
+          const name = str(body.name, 200); if (!name) return sendJSON(res, 400, { error: "Missing name" });
+          return sendJSON(res, 200, { legend: await writeLegend(a, { name, steps: strs(body.steps, 40, 160), days: num(body.days) }) });
+        }
+        const projects = (Array.isArray(body.projects) ? body.projects : []).slice(0, 12).map((p: any) => ({ name: str(p?.name, 120), lit: num(p?.lit), finished: !!p?.finished })).filter((p) => p.name);
+        return sendJSON(res, 200, await writeLetter(a, { week: str(body.week, 10), done: strs(body.done, 60, 140), kept: num(body.kept), committedDays: num(body.committedDays), projects, busiest: str(body.busiest, 12) || undefined, total: num(body.total) }));
+      } catch (e) { const err = e as ClaudeError; return sendJSON(res, err.status || 502, { error: err.message }); }
     }
     if (route === "POST /api/claude/constellation" || route === "POST /api/claude/unstick") {
       const a = await auth();

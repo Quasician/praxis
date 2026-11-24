@@ -66,8 +66,11 @@ export function celebrateIfEarned(doneId: string) {
   const tiny = new Set([...(rec.tinyDone || []), doneId]);
   const left = committed.filter((p) => p.id !== doneId && open.has(p.id) && !tiny.has(p.id));
   const ui = useUi.getState();
-  if (!left.length) ui.celebrate(committed.length > 1 ? `All ${committed.length} commitments done. Everything else today is a bonus.` : "Done. Today's a win.");
-  else if (rec.planned.find((p) => p.id === doneId)?.star) ui.celebrate("That's the one that mattered. Today's already a win.");
+  const isOne = !!rec.planned.find((p) => p.id === doneId)?.star;
+  // 3.7: finishing "the one" sends a shooting star across the sky (here, and on the wallpaper for a while).
+  if (isOne) updateConfig((c) => ({ ...c, rewards: { ...(c.rewards || {}), meteorAt: new Date().toISOString() } })).catch(() => undefined);
+  if (!left.length) ui.celebrate(committed.length > 1 ? `All ${committed.length} commitments done. Everything else today is a bonus.` : "Done. Today's a win.", isOne ? "meteor" : "confetti");
+  else if (isOne) ui.celebrate("That's the one that mattered. Today's already a win.", "meteor");
 }
 
 // ---------- "the one" on your phone ----------

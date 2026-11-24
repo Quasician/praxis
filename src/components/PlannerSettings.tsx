@@ -5,6 +5,8 @@ import { updateConfig } from "../data/actions";
 import { useData } from "../data/useData";
 import { toast, useUi } from "../state/ui";
 import { Dialog } from "./common";
+import { SCALES, type ScaleName } from "../domain/rewards";
+import { previewScale } from "../lib/chime";
 
 const DOW = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
@@ -40,6 +42,15 @@ function Body() {
       <label className="switch-row"><input type="checkbox" name="adaptive" checked={s.adaptive} onChange={(e) => set("adaptive", e.target.checked)} /> <span>Make plans lighter or fuller based on how much I finished last week</span></label>
       <label className="switch-row"><input type="checkbox" name="learn" checked={s.learn} onChange={(e) => set("learn", e.target.checked)} /> <span>Learn from my history: Deep work in my best hours, durations from how long things really take</span></label>
       <label className="switch-row"><input type="checkbox" name="selfHeal" id="ps-selfheal" checked={!!s.selfHeal} onChange={(e) => set("selfHeal", e.target.checked)} /> <span>When I skip a shutdown, re-home the leftovers for me (with a morning note and an undo)</span></label>
+      <label className="switch-row"><input type="checkbox" name="sundayLetter" id="ps-letter" checked={s.sundayLetter !== false} onChange={(e) => set("sundayLetter", e.target.checked)} /> <span>On Sundays, a short letter from Claude about my week, with one suggestion</span></label>
+      <div className="switch-row chime-row">
+        <label htmlFor="ps-chime">A soft note when I finish something</label>
+        <select id="ps-chime" name="chime" value={s.chime || "off"} onChange={(e) => { const v = e.target.value as ScaleName; set("chime", v); previewScale(v); }}>
+          <option value="off">Off</option>
+          {Object.entries(SCALES).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
+        </select>
+        <span className="muted small">Each one climbs the scale, so a good day plays a little tune.</span>
+      </div>
       <label className="switch-row"><input type="checkbox" name="weeklyAuto" checked={s.weeklyAuto} onChange={(e) => set("weeklyAuto", e.target.checked)} /> <span>Draft next week's plan automatically on Friday after work</span></label>
 
       <div className="form-grid">

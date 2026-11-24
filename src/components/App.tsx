@@ -38,6 +38,7 @@ import { useTrayDial } from "./Glance";
 import { WallpaperDialog } from "./WallpaperDialog";
 import { startPending } from "../data/pending";
 import { HealAskDialog } from "./HealNote";
+import { LetterDialog, useRewards } from "./Rewards";
 import { morningHeal } from "../data/heal";
 
 export function App() {
@@ -65,6 +66,7 @@ function Shell() {
   useTrayDial();
   useDoneHotkey();
   useShortcuts();
+  useRewards();
   return (
     <div id="app" className="app" data-anim={dir.current}>
       <TopBar />
@@ -86,6 +88,7 @@ function Shell() {
       <ConstellationDialog />
       <WallpaperDialog />
       <HealAskDialog />
+      <LetterDialog />
       <Celebration />
       <Toast />
       <DragGhost />

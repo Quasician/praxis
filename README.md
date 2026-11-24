@@ -116,6 +116,20 @@ Praxis is built to be easy on the eyes on a big monitor all day:
 - **Readable type**: Atkinson Hyperlegible for text (designed for legibility) and Bricolage Grotesque for headings, bundled so they work offline.
 - **Calm motion**: finishing a task fills the circle and folds the row away; the focus timer is a ring that fills. If Windows has "Show animations" turned off, Praxis stops animating too.
 
+## Rewards (3.7)
+
+Small, rare, and earned.
+
+**A shooting star** crosses the screen when you finish *the one* (your ★ for the day). If the wallpaper is on, it passes over the valley too, and stays there as a streak for a few hours.
+
+**The aurora** comes out the evening you've kept every commitment for a week (and again at two weeks, three…). Days you didn't commit to anything don't count and don't break it. It glows in your sky in Progress and over the valley on the wallpaper until the next morning.
+
+**Constellation legends.** When a project finishes and joins the Milky Way, Claude writes it a one-line legend from its steps. Click a finished constellation to read it.
+
+**The Sunday letter.** On Sunday (or Monday, if you didn't open Praxis on Sunday) Claude writes you a short letter about your week: real things you finished, what it noticed, and one small suggestion you can drop in your Inbox. It waits at the top of your list; old ones are in ⋯ → Sunday letter. Without Claude connected you get a plain tally instead. Switch it off in Planner settings.
+
+**A note when you finish something** (off by default). Pick a scale in Planner settings — pentatonic, major, minor, dorian, lydian — and each completion plays the next note up, so a good day plays a little tune. It's quiet, and it starts again from the bottom each morning.
+
 ## Never rot (3.6)
 
 **When Todoist is down, nothing is lost.** Changes you make (completing, moving, rescheduling, quick-adding) are kept on this computer, marked with a dashed outline and a "changes waiting for Todoist" chip, and sent as soon as Todoist is back (click the chip to try right away). They survive a restart. If a task also changed in Todoist meanwhile (on your phone, say), Todoist's version wins and Praxis tells you which.
@@ -369,6 +383,6 @@ Pushes that don't change the version are only checked, not released.
 - ~~3.4: the valley: your mottos on a living landscape as the wallpaper (seasons by date, light by the hour)~~ ✓
 - ~~3.5: real Milpitas weather on the wallpaper, and an optional live (moving) wallpaper~~ ✓
 - ~~3.6: never rot: offline queue, self-healing days, capture hotkey~~ ✓
-- 3.7: rewards: sky events, constellation legends, the Sunday letter, optional sound
+- ~~3.7: rewards: sky events, constellation legends, the Sunday letter, optional sound~~ ✓
 - 3.8: finish the theme: sunrise and sunset rituals, ideas as clouds, Areas in the sky, the Horizon clouds over as the day fills
 - ~~1.1: morning commit, committed vs. bonus, adaptive plans, Now card, first steps, backlog cleanup, Progress, learning~~ ✓

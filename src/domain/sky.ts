@@ -9,7 +9,7 @@ import { isMilestone } from "../lib/tasks";
 import type { Area, Task } from "../lib/types";
 
 export interface SkyStep { id: string; title: string; min: number; done?: string }
-export interface SkyConstellation { name: string; area?: string; steps: SkyStep[]; since: string; finished?: string; target?: string | null; seed?: string }
+export interface SkyConstellation { name: string; area?: string; steps: SkyStep[]; since: string; finished?: string; target?: string | null; seed?: string; legend?: string }
 export interface SkyRecord { cons: Record<string, SkyConstellation>; dust: Record<string, number> }
 
 export const EMPTY_SKY: SkyRecord = { cons: {}, dust: {} };
@@ -67,6 +67,7 @@ export function mergeSky(prev: SkyRecord | undefined, active: Task[], completed:
       ...(finishedAt ? { finished: finishedAt } : {}),
       target: src ? targetOf(src) : was?.target ?? null,
       ...(was?.seed ? { seed: was.seed } : {}),
+      ...(was?.legend ? { legend: was.legend } : {}),
     };
   };
 
@@ -147,7 +148,7 @@ export interface ConstellationView {
   id: string; name: string; color: string; areaName: string;
   x: number; y: number; w: number; h: number;          // bounds, for the label and clicking
   stars: StarView[]; links: { a: number; b: number; lit: boolean }[];
-  lit: number; total: number; daysLeft: number | null; late: boolean; finished?: string; target: string | null;
+  lit: number; total: number; daysLeft: number | null; late: boolean; finished?: string; target: string | null; legend?: string;
   nextStep: StarView | null;
 }
 export interface DustView { x: number; y: number; r: number; o: number; fresh: boolean }
@@ -207,7 +208,7 @@ export function layoutSky(sky: SkyRecord, o: LayoutOpts): SkyLayout {
       id, name: c.name, color, areaName: o.areas.find((a) => a.id === c.area)?.name || "",
       x: 0, y: 0, w, h, stars, links: links.map(([a, b]) => ({ a, b, lit: stars[a].lit && stars[b].lit })),
       lit: stars.filter((s) => s.lit).length, total: stars.length, daysLeft: d, late: d !== null && d < 0,
-      finished: c.finished, target: c.target ?? null, nextStep: stars.find((s) => s.next) || stars.find((s) => !s.lit) || null,
+      finished: c.finished, legend: c.legend, target: c.target ?? null, nextStep: stars.find((s) => s.next) || stars.find((s) => !s.lit) || null,
     };
   };
 

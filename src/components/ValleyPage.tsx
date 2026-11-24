@@ -4,12 +4,15 @@ import { useEffect, useRef, useState } from "react";
 import { loadAssets, ValleyRenderer, type RenderOpts, type SkyProject, type ValleyAssets } from "../valley/render";
 import type { Weather } from "../valley/model";
 
-export interface WallpaperJob { when: string; weather?: Weather; motto?: string | null; projects?: SkyProject[]; width?: number; height?: number; save?: boolean }
+/** 3.7: the rewards in the sky. meteorAt: when you finished "the one"; aurora: 1 while it's out. */
+export interface JobEvents { meteorAt?: string | null; aurora?: number }
+export interface WallpaperJob { when: string; weather?: Weather; motto?: string | null; projects?: SkyProject[]; width?: number; height?: number; save?: boolean; events?: JobEvents }
+const eventsAt = (e: JobEvents | undefined, at: number) => (e ? { aurora: e.aurora || 0, meteorAge: e.meteorAt ? (at - Date.parse(e.meteorAt)) / 1000 : null } : undefined);
 declare global {
   interface Window {
     __valley?: {
       ready: boolean;
-      render(o: Omit<RenderOpts, "when" | "motto"> & { when: string; motto?: string | null; width?: number; height?: number }): Promise<{ ms: number; box: number[] | null; constellations: number; phase: string; doy: number }>;
+      render(o: Omit<RenderOpts, "when" | "motto" | "events"> & { when: string; motto?: string | null; width?: number; height?: number; events?: JobEvents }): Promise<{ ms: number; box: number[] | null; constellations: number; phase: string; doy: number }>;
       dataURL(type?: string, quality?: number, scale?: number): string;
       maskCount(box: [number, number, number, number]): number;
       wallpaper(job: WallpaperJob): Promise<{ file: string; ms: number }>;
@@ -62,7 +65,7 @@ export function ValleyPage() {
         const w = o.width || 5120, h = o.height || Math.round(w * 2160 / 5120);
         const r = await ensure(w, h);
         const motto = await mottoBitmap(o.motto, w, h);
-        const info = r.render({ ...o, when: new Date(o.when), motto });
+        const info = r.render({ ...o, when: new Date(o.when), motto, events: eventsAt(o.events, Date.parse(o.when)) });
         r.present();
         const phase = info.scene.light > .8 ? "day" : info.scene.up ? "low sun" : "night";
         return { ms: Math.round(info.ms), box: info.box, constellations: info.constellations, phase, doy: info.scene.season.doy };
@@ -96,7 +99,7 @@ export function ValleyPage() {
       /** Draws one wallpaper and hands it to the desktop app, which saves it and sets it. */
       async wallpaper(job) {
         const t0 = performance.now();
-        await window.__valley!.render({ when: job.when, weather: job.weather, motto: job.motto, projects: job.projects, width: job.width, height: job.height });
+        await window.__valley!.render({ when: job.when, weather: job.weather, motto: job.motto, projects: job.projects, width: job.width, height: job.height, events: job.events });
         const px = renderer!.pixels();
         const c = new OffscreenCanvas(renderer!.W, renderer!.H);
         c.getContext("2d")!.putImageData(new ImageData(px, renderer!.W, renderer!.H), 0, 0);
@@ -116,7 +119,7 @@ export function ValleyPage() {
       const t0 = performance.now();
       try {
         const motto = await mottoBitmap(liveJob.motto, renderer.W, renderer.H);
-        renderer.render({ when: new Date(), weather: liveJob.weather, motto, projects: liveJob.projects, time: t0 / 1000, wind: liveJob.wind ?? 0.2 });
+        renderer.render({ when: new Date(), weather: liveJob.weather, motto, projects: liveJob.projects, time: t0 / 1000, wind: liveJob.wind ?? 0.2, events: eventsAt(liveJob.events, Date.now()) });
         renderer.present();
         frames++;
       } catch (e) { window.__valley!.error = String((e as Error)?.message || e); return; }

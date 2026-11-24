@@ -26,7 +26,10 @@ export interface RenderOpts {
   mask?: boolean;           // draw only the scenery (white) on black: for checking nothing reaches the words
   time?: number;            // seconds, for the moving (live) version
   wind?: number;            // 0..1
+  events?: SkyEvents;       // 3.7: rewards that show in the sky
 }
+/** 3.7: a shooting star after you finish "the one" (its age in seconds), and the aurora after a week of kept commitments. */
+export interface SkyEvents { meteorAge?: number | null; aurora?: number }
 export interface RenderInfo { scene: Scene; box: [number, number, number, number] | null; constellations: number; ms: number }
 
 const FULL_VS = `#version 300 es
@@ -60,6 +63,7 @@ uniform vec3 uGlowC0, uGlowC1, uGlow0, uGlow1;   // colour; amount, width, heigh
 uniform float uGlowX, uGrey, uDim, uMoonPhase, uUp;
 uniform vec4 uSun;                                // x, y, radius
 uniform vec3 uSunC;
+uniform float uAurora, uTime, uStarsVis;
 void main() {
   if (uMask > 0.5) { outColor = vec4(0.0, 0.0, 0.0, 1.0); return; }
   vec2 p = dpos();
@@ -92,6 +96,17 @@ void main() {
     add += mc * 0.6 * k * exp(-d * d / (2.0 * (26.0 * 26.0 + r * r * 0.25)));
   }
   c = c + add * (1.0 - c / 255.0);
+  // 3.7: the aurora, after a week of kept commitments. Curtains of light low in the night sky, quieter near the words.
+  if (uAurora > 0.0 && uStarsVis > 0.12) {
+    float lower = 800.0 + 420.0 * (vnoise(vec2(p.x / 1100.0 + uTime * 0.008, 1.7)) - 0.5) + 160.0 * (vnoise(vec2(p.x / 280.0 - uTime * 0.02, 5.3)) - 0.5);
+    float rise = max(0.0, lower - p.y);
+    float v = smoothstep(lower + 60.0, lower - 40.0, p.y) * exp(-rise / 300.0);
+    float curtain = smoothstep(0.32, 0.85, vnoise(vec2(p.x / 300.0 + uTime * 0.02, 4.1)) * 0.65 + vnoise(vec2(p.x / 90.0 - uTime * 0.05, 9.3)) * 0.35);
+    float rays = 0.55 + 0.45 * vnoise(vec2(p.x / 14.0 + uTime * 0.25, 2.3));
+    float a = uAurora * curtain * rays * v * min(1.0, uStarsVis * 1.5) * (0.3 + 0.7 * sm(distOut(p) / 500.0)) * 0.6;
+    vec3 col = mix(vec3(96.0, 240.0, 168.0), vec3(156.0, 104.0, 246.0), smoothstep(lower - 90.0, lower - 480.0, p.y));
+    c = c + col * a * (1.0 - c / 255.0);
+  }
   outColor = vec4(c / 255.0, 1.0);
 }`;
 
@@ -521,6 +536,24 @@ export class ValleyRenderer {
     return { box, grid: { w: w4, h: h4, d: grid } };
   }
 
+  /** A path for the shooting star: high in the sky, clear of the words and the sun. */
+  private meteorPath(sc: Scene, grid: { w: number; h: number; d: Uint8Array } | null): [number, number, number, number] | null {
+    const ok = (x: number, y: number) => {
+      if (Math.hypot(x - sc.sunX, y - sc.sunY) < 220) return false;
+      if (!grid) return true;
+      const i = Math.floor(x / DESIGN_W * grid.w), j = Math.floor(y / DESIGN_H * grid.h);
+      for (let dj = -10; dj <= 10; dj += 2) for (let di = -10; di <= 10; di += 2) { const ii = i + di, jj = j + dj; if (ii >= 0 && jj >= 0 && ii < grid.w && jj < grid.h && grid.d[jj * grid.w + ii]) return false; }
+      return true;
+    };
+    for (const [x0, y0] of [[3900, 120], [1700, 110], [4500, 260], [900, 240], [2800, 90], [600, 520], [4700, 560]] as [number, number][]) {
+      const x1 = x0 - 560, y1 = y0 + 210;
+      let clear = true;
+      for (let u = 0; u <= 1; u += .1) if (!ok(x0 + (x1 - x0) * u, y0 + (y1 - y0) * u)) { clear = false; break; }
+      if (clear) return [x0, y0, x1, y1];
+    }
+    return null;
+  }
+
   /** Your projects as constellations, placed where the sky is clear of the words and the sun. */
   placeConstellations(projects: SkyProject[], sc: Scene, grid: { w: number; h: number; d: Uint8Array } | null) {
     const out: { pts: [number, number][]; links: [number, number][]; lit: boolean[]; r: number[]; color: RGB }[] = [];
@@ -587,6 +620,7 @@ export class ValleyRenderer {
       gl.uniform1f(p.u("uGlowX"), sc.glowX); gl.uniform1f(p.u("uGrey"), sc.grey); gl.uniform1f(p.u("uDim"), sc.wet ? 0.5 : sc.weather === "cloudy" ? 0.75 : 1);
       gl.uniform1f(p.u("uMoonPhase"), sc.moon); gl.uniform1f(p.u("uUp"), sc.up ? 1 : 0);
       gl.uniform4f(p.u("uSun"), sc.sunX, sc.sunY, sc.up ? 30 : 26, 0); gl.uniform3fv(p.u("uSunC"), sc.sun);
+      gl.uniform1f(p.u("uAurora"), mask ? 0 : o.events?.aurora || 0); gl.uniform1f(p.u("uTime"), time); gl.uniform1f(p.u("uStarsVis"), sc.stars);
     });
 
     // 2. Stars and your constellations, added as light.
@@ -617,6 +651,24 @@ export class ValleyRenderer {
         if (c.lit[i]) dots.push(x, y, c.r[i], c.r[i], c.color[0] * .5 + 140, c.color[1] * .5 + 140, c.color[2] * .5 + 140, vis, 0, 0, 0.12, 0);
         else dots.push(x, y, 5, 5, c.color[0] * .6, c.color[1] * .6, c.color[2] * .6, vis, 0, 2, 0, 0);
       });
+    }
+    const age = o.events?.meteorAge;
+    if (age !== null && age !== undefined && age >= 0 && age < 3 * 3600) {
+      const path = this.meteorPath(sc, ink.grid);
+      if (path) {
+        // Still picture: the streak as it passes. Moving wallpaper: it crosses again every 90 seconds for the first hour.
+        const live = !!o.time, cyc = 90, t = live ? ((time % cyc) / 1.1) : 0.75;
+        if (!live || (age < 3600 && t <= 1.4)) {
+          const head = Math.min(1, t), [x0, y0, x1, y1] = path;
+          const hx = x0 + (x1 - x0) * head, hy = y0 + (y1 - y0) * head, fade = live ? Math.max(0, 1 - Math.max(0, t - 1) / .4) : 1;
+          for (let k = 0; k < 14; k++) {
+            const u0 = Math.max(0, head - .5 * (k + 1) / 14), u1 = Math.max(0, head - .5 * k / 14);
+            const a = (1 - k / 14) * .9 * fade * Math.max(.4, Math.min(1, sc.stars * 1.5 + .4));
+            segs.push(x0 + (x1 - x0) * u0, y0 + (y1 - y0) * u0, x0 + (x1 - x0) * u1, y0 + (y1 - y0) * u1, 255, 246, 220, a, 3.2 - 2 * k / 14, k < 3 ? .12 : 0, 0, 0, 0, 0, 0, 0);
+          }
+          dots.push(hx, hy, 3.6, 3.6, 255, 250, 232, .95 * fade, 0, 0, .12, 0);
+        }
+      }
     }
     gl.bindFramebuffer(gl.FRAMEBUFFER, this.A.fb); gl.viewport(0, 0, this.W, this.H);
     gl.enable(gl.BLEND); gl.blendFunc(gl.ONE_MINUS_DST_COLOR, gl.ONE);

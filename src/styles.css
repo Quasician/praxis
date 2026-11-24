@@ -1426,3 +1426,23 @@ body { background-image: linear-gradient(180deg, color-mix(in srgb, var(--sky-no
 .heal-list li { display: flex; gap: 8px; color: var(--ink-2); min-width: 0; }
 .heal-title { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .heal-to { flex: none; color: var(--ink-3); }
+
+/* 3.7 rewards */
+.chime-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+.chime-row select { font: inherit; padding: 4px 8px; border-radius: 8px; border: 1px solid var(--line); background: var(--card); color: var(--ink); }
+.chime-row .muted { flex-basis: 100%; }
+.cheer-meteor { background: #141b33; color: #fff6e2; box-shadow: 0 0 0 1px rgba(255,240,210,.25), var(--shadow); }
+.cheer-aurora { background: linear-gradient(100deg, #10263a, #1d1b3f); color: #dffbea; box-shadow: 0 0 0 1px rgba(120,240,180,.3), var(--shadow); }
+.letter-card { display: flex; align-items: center; gap: 10px; margin: 0 0 12px; padding: 10px 14px; border-radius: 12px; background: var(--card); border: 1px solid var(--line); }
+.letter-seal { font-size: 18px; color: var(--accent); }
+.letter-dialog { max-width: 560px; }
+.letter { font: 16px/1.6 var(--serif, Georgia, serif); padding: 4px 6px; }
+.letter p { margin: 0 0 14px; }
+.letter-date { color: var(--muted); font: 600 13px var(--sans); }
+.letter-suggestion { border-left: 3px solid var(--accent); padding: 4px 0 4px 12px; margin: 18px 0; }
+.letter-suggestion p { margin-bottom: 8px; }
+.letter-sign { text-align: right; font-style: italic; color: var(--muted); }
+.sky-card-legend { font-style: italic; color: var(--muted); margin: 6px 0 10px; line-height: 1.45; }
+.sky-aurora { animation: aur-breathe 7s ease-in-out infinite alternate; }
+@keyframes aur-breathe { from { opacity: .7; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .sky-aurora { animation: none; } }

@@ -81,6 +81,8 @@ export interface PlannerSettings {
   selfHeal?: boolean;          // 3.6: re-home leftovers by itself when a shutdown was skipped (asked once)
   healedOn?: string;
   healNote?: { day: string; moves: { id: string; title: string; from: Due | null; to: string }[]; undone?: boolean; seen?: boolean } | null;
+  chime?: import("../domain/rewards").ScaleName; // 3.7: a note on each completion, in this scale ("off" by default)
+  sundayLetter?: boolean;      // 3.7: a short weekly letter from Claude on Sundays (on unless switched off)
   morningCommit: boolean;      // open the one-minute morning commit instead of a bare plan
   learn: boolean;              // schedule Deep work in your best hours, scale durations to reality
 }
@@ -119,6 +121,8 @@ export interface Config {
   reminders?: Partial<import("../domain/nudges").Reminders>;
   sky?: import("../domain/sky").SkyRecord;
   lastSeenVersion?: string;
+  rewards?: import("../domain/rewards").Rewards;
+  letters?: Record<string, import("../domain/rewards").Letter>;
   [key: string]: unknown;
 }
 

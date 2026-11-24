@@ -8,6 +8,7 @@ import { doToday, updateConfig } from "../data/actions";
 import { useActive, useCompleted } from "../data/queries";
 import { useData } from "../data/useData";
 import { useUi } from "../state/ui";
+import { auroraOn } from "../domain/rewards";
 
 const SEEN_KEY = "praxis.sky.seen";
 const readSeen = () => { try { return Number(localStorage.getItem(SEEN_KEY)) || 0; } catch { return 0; } };
@@ -53,6 +54,7 @@ export function SkyView() {
   const lay = useMemo(() => layoutSky(sky, { width: W, areas: config?.areas || [], colorOf, nextIds, todayIds, seenAt }),
     [sky, W, config?.areas, nextIds, todayIds, seenAt]);
   const sel = [...lay.constellations, ...lay.milky].find((c) => c.id === picked) || null;
+  const aurora = auroraOn(config?.rewards);
 
   const month = Date.now() - 30 * 864e5;
   const litMonth = Object.values(sky.cons).reduce((n, c) => n + c.steps.filter((s) => s.done && Date.parse(s.done) > month).length, 0);
@@ -86,11 +88,12 @@ export function SkyView() {
           </defs>
           <rect width={W} height={SKY_H} fill="url(#sky-bg)" />
           <ellipse cx={W / 2} cy={44} rx={W * 0.55} ry={46} fill="url(#sky-band)" />
+          {aurora && <SkyAurora W={W} />}
           <g className="sky-dust">{lay.dust.map((d, i) => <circle key={i} cx={d.x} cy={d.y} r={d.r * k * 1.2} opacity={d.o} className={d.fresh ? "fresh" : ""} />)}</g>
 
           {lay.milky.map((c) => (
             <g key={c.id} className="sky-milky" transform={`translate(${c.x} ${c.y})`} onClick={(e) => { e.stopPropagation(); setPicked(c.id); }}
-               onMouseMove={(e) => { const r = box.current!.getBoundingClientRect(); setHover({ x: e.clientX - r.left, y: e.clientY - r.top, text: c.name, sub: `Finished ${fmtDate(c.finished)} · ${c.total} stars` }); }}>
+               onMouseMove={(e) => { const r = box.current!.getBoundingClientRect(); setHover({ x: e.clientX - r.left, y: e.clientY - r.top, text: c.name, sub: c.legend || `Finished ${fmtDate(c.finished)} · ${c.total} stars` }); }}>
               <rect x={-6} y={-6} width={c.w + 12} height={c.h + 12} fill="transparent" />
               {c.links.map((l, i) => <line key={i} x1={c.stars[l.a].x} y1={c.stars[l.a].y} x2={c.stars[l.b].x} y2={c.stars[l.b].y} />)}
               {c.stars.map((s) => <circle key={s.id} cx={s.x} cy={s.y} r={1.3 * k * 1.4} />)}
@@ -173,6 +176,7 @@ function Picked({ c, active, right, onClose }: { c: ConstellationView; active: T
         {c.lit} of {c.total} stars lit
         {c.finished ? ` · finished ${fmtDate(c.finished)}` : c.target ? ` · ${c.late ? `${dayWord(-(c.daysLeft || 0))} past its deadline` : c.daysLeft === 0 ? "due today" : `due ${fmtDate(c.target)}, in ${dayWord(c.daysLeft || 0)}`}` : ""}
       </p>
+      {c.legend && <p className="sky-card-legend" id="sky-legend-line">{c.legend}</p>}
       <ol className="sky-steps">
         {c.stars.map((s) => (
           <li key={s.id} className={s.lit ? "lit" : s.next ? "next" : ""}>
@@ -183,5 +187,33 @@ function Picked({ c, active, right, onClose }: { c: ConstellationView; active: T
       </ol>
       {next && !c.nextStep!.today && <button className="primary" id="sky-do-today" onClick={() => doToday(next)}>Do the next step today</button>}
     </div>
+  );
+}
+
+/** 3.7: the aurora, after a week of kept commitments: rays of green and violet light along the top of your sky until morning. */
+function SkyAurora({ W }: { W: number }) {
+  const rays = useMemo(() => {
+    const out: { x: number; y: number; h: number; o: number; v: boolean }[] = [];
+    const n = Math.round(W / 9);
+    for (let i = 0; i < n; i++) {
+      const x = (i + 0.5) * W / n, u = x / W;
+      const base = 96 + Math.sin(u * 13 + 1.3) * 22 + Math.sin(u * 31 - .6) * 8;          // the curtain's lower edge, wandering
+      const curtain = Math.max(0, Math.sin(u * 9.5 + .4) * .6 + Math.sin(u * 23 + 2) * .4);   // where it's bright, where it thins out
+      const flick = .55 + .45 * Math.sin(i * 12.9898) * Math.sin(i * 4.1414);
+      if (curtain * flick < .05) continue;
+      out.push({ x, y: base, h: 60 + curtain * 70, o: Math.min(.9, curtain * (.6 + .4 * flick)), v: Math.sin(u * 5 + 3) > .55 });
+    }
+    return out;
+  }, [W]);
+  const w = W / Math.round(W / 9) * 1.4;
+  return (
+    <g className="sky-aurora" id="sky-aurora" aria-hidden="true" filter="url(#aur-blur)">
+      <defs>
+        <filter id="aur-blur" x="-5%" y="-30%" width="110%" height="160%"><feGaussianBlur stdDeviation="3 5" /></filter>
+        <linearGradient id="aur-g" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stopColor="#7dffbf" stopOpacity=".7" /><stop offset=".35" stopColor="#4fe3a0" stopOpacity=".3" /><stop offset="1" stopColor="#4fe3a0" stopOpacity="0" /></linearGradient>
+        <linearGradient id="aur-v" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stopColor="#8affd0" stopOpacity=".6" /><stop offset=".4" stopColor="#b48cff" stopOpacity=".28" /><stop offset="1" stopColor="#b48cff" stopOpacity="0" /></linearGradient>
+      </defs>
+      {rays.map((r, i) => <rect key={i} x={r.x - w / 2} y={r.y - r.h} width={w} height={r.h + 6} fill={r.v ? "url(#aur-v)" : "url(#aur-g)"} opacity={r.o} />)}
+    </g>
   );
 }

@@ -77,6 +77,7 @@ export function TopBar() {
             <button id="new-project-btn" onClick={() => { setMenu(false); openDialog("constellation"); }}>New project…</button>
             <button id="reminders-btn" onClick={() => { setMenu(false); openDialog("reminders"); }}>Reminders…</button>
             <button id="wallpaper-btn" onClick={() => { setMenu(false); openDialog("wallpaper"); }}>Wallpaper…</button>
+            <button id="letter-btn" onClick={() => { setMenu(false); openDialog("letter"); }}>Sunday letter…</button>
             <button id="calendars-btn" onClick={() => { setMenu(false); openDialog("calendars"); }}>Calendars…</button>
             <button id="claude-btn" onClick={() => { setMenu(false); openDialog("claude"); }}>Claude…</button>
             <button id="backlog-btn" onClick={() => { setMenu(false); openDialog("backlog"); }}>Clean up backlog with Claude…</button>

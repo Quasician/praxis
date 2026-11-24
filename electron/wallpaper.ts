@@ -178,6 +178,13 @@ function powershell(args: string[], log: WallpaperDeps["log"]): Promise<string> 
 
 const COLORS = ["#8fb4ff", "#8fe0b0", "#f0b75a", "#c9a8ff", "#ff9fb0", "#9fd8ff", "#b8c4e8"];
 /** Your active projects from the sky record, as the renderer wants them. */
+/** 3.7: the shooting star (for 3 hours after you finish "the one") and the aurora (after a week of kept commitments). */
+function eventsOf(cfg: Cfg, now = Date.now()) {
+  const r = cfg.rewards as { meteorAt?: string; aurora?: { until?: string } | null } | undefined;
+  const meteorAt = r?.meteorAt && now - Date.parse(r.meteorAt) < 3 * 3600e3 && now >= Date.parse(r.meteorAt) ? r.meteorAt : null;
+  const aurora = r?.aurora?.until && Date.parse(r.aurora.until) > now ? 1 : 0;
+  return { meteorAt, aurora };
+}
 function projectsOf(cfg: Cfg) {
   const sky = cfg.sky as { cons?: Record<string, { name: string; steps: { done?: string; min: number }[]; finished?: string; since: string; seed?: string }> } | undefined;
   const live = Object.entries(sky?.cons || {}).filter(([, c]) => !c.finished && c.steps?.length).sort((a, b) => (b[1].since || "").localeCompare(a[1].since || "")).slice(0, 7);
@@ -312,7 +319,7 @@ export function createWallpaper(deps: WallpaperDeps) {
   async function feedLive() {
     if (!live || live.isDestroyed()) return;
     const now = new Date(), wx = weatherNow();
-    const job = { when: now.toISOString(), weather: wx?.kind || "clear", wind: wx?.wind ?? 0.2, motto: cfgOf().current?.name || pickMotto(cfgOf(), now), projects: projectsOf(deps.readConfig()) };
+    const job = { when: now.toISOString(), weather: wx?.kind || "clear", wind: wx?.wind ?? 0.2, motto: cfgOf().current?.name || pickMotto(cfgOf(), now), projects: projectsOf(deps.readConfig()), events: eventsOf(deps.readConfig()) };
     await live.webContents.executeJavaScript(`window.__valley.live(${JSON.stringify(job)})`).catch((e) => deps.log("live feed failed", e?.message || e));
     syncPause();
   }
@@ -325,15 +332,15 @@ export function createWallpaper(deps: WallpaperDeps) {
     if (!w.enabled || busy || (locked && !force)) return;
     const now = new Date();
     const motto = pickMotto(cfgOf(), now);
-    const projects = projectsOf(deps.readConfig());
+    const projects = projectsOf(deps.readConfig()), events = eventsOf(deps.readConfig());
     await refreshWeather();
     const wx = weatherNow();
-    const key = `${motto}|${Math.floor((now.getHours() * 60 + now.getMinutes()) / 10)}|${now.toDateString()}|${JSON.stringify(projects.map((p) => p.steps.filter((s) => s.lit).length))}|${wx?.kind}|${Math.round((wx?.wind ?? 0) * 4)}`;
+    const key = `${motto}|${Math.floor((now.getHours() * 60 + now.getMinutes()) / 10)}|${now.toDateString()}|${JSON.stringify(projects.map((p) => p.steps.filter((s) => s.lit).length))}|${wx?.kind}|${Math.round((wx?.wind ?? 0) * 4)}|${events.meteorAt || ""}|${events.aurora}`;
     if (!force && key === lastKey) return;
     busy = true;
     try {
       const v = await ensureWindow();
-      const job = { when: now.toISOString(), weather: wx?.kind || "clear", motto, projects, ...size() };
+      const job = { when: now.toISOString(), weather: wx?.kind || "clear", motto, projects, events, ...size() };
       const out = await v.webContents.executeJavaScript(`window.__valley.wallpaper(${JSON.stringify(job)})`) as { file: string; ms: number };
       await powershell(["-Action", "set", "-Path", out.file, "-Position", "4"], deps.log);
       lastKey = key;

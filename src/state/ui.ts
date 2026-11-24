@@ -5,8 +5,11 @@ import type { Task } from "../lib/types";
 import type { WeekCard, WeekDay } from "../domain/week";
 import type { Proposal } from "../domain/dump";
 
+/** 3.7: confetti for a day's commitments, a shooting star for "the one", the aurora for a week. */
+export type CheerKind = "confetti" | "meteor" | "aurora";
+
 export type View = "day" | "week" | "areas" | "progress";
-export type DialogName = "triage" | "planner" | "calendars" | "areas" | "dump" | "claude" | "shutdown" | "help" | "morning" | "backlog" | "fresh" | "reminders" | "constellation" | "wallpaper" | "heal";
+export type DialogName = "triage" | "planner" | "calendars" | "areas" | "dump" | "claude" | "shutdown" | "help" | "morning" | "backlog" | "fresh" | "reminders" | "constellation" | "wallpaper" | "heal" | "letter";
 
 export interface Toast { id: number; msg: string; action?: { label: string; run: () => void } }
 
@@ -37,7 +40,7 @@ interface UiState {
   quickAddFocus: number; focusQuickAdd: () => void;
   week: { key: string; days: WeekDay[]; cards: WeekCard[] } | null; setWeek: (w: UiState["week"]) => void;
   dump: DumpState; setDump: (d: Partial<DumpState>) => void;
-  cheer: { n: number; msg: string }; celebrate: (msg: string) => void;
+  cheer: { n: number; msg: string; kind?: CheerKind }; celebrate: (msg: string, kind?: CheerKind) => void;
   nowTaskId: string | null; setNowTask: (id: string | null) => void;
   awayDays: number;
 }
@@ -61,7 +64,7 @@ export const useUi = create<UiState>((set) => ({
     toastTimer = setTimeout(() => set({ toast: null }), 5000);
   },
   hideToast: () => set({ toast: null }),
-  dialogs: { triage: false, planner: false, calendars: false, areas: false, dump: false, claude: false, shutdown: false, help: false, morning: false, backlog: false, fresh: false, reminders: false, constellation: false, wallpaper: false, heal: false },
+  dialogs: { triage: false, planner: false, calendars: false, areas: false, dump: false, claude: false, shutdown: false, help: false, morning: false, backlog: false, fresh: false, reminders: false, constellation: false, wallpaper: false, heal: false, letter: false },
   openDialog: (d) => set((s) => ({ dialogs: { ...s.dialogs, [d]: true } })),
   closeDialog: (d) => set((s) => ({ dialogs: { ...s.dialogs, [d]: false } })),
   plan: EMPTY_PLAN,
@@ -71,7 +74,7 @@ export const useUi = create<UiState>((set) => ({
   quickAddFocus: 0, focusQuickAdd: () => set((s) => ({ quickAddFocus: s.quickAddFocus + 1, view: "day" })),
   week: null, setWeek: (week) => set({ week }),
   dump: EMPTY_DUMP, setDump: (d) => set((s) => ({ dump: { ...s.dump, ...d } })),
-  cheer: { n: 0, msg: "" }, celebrate: (msg) => set((s) => ({ cheer: { n: s.cheer.n + 1, msg } })),
+  cheer: { n: 0, msg: "" }, celebrate: (msg, kind) => set((s) => ({ cheer: { n: s.cheer.n + 1, msg, kind } })),
   nowTaskId: null, setNowTask: (nowTaskId) => set({ nowTaskId }),
   awayDays: 0,
 }));
