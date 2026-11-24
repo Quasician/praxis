@@ -108,10 +108,15 @@ namespace PraxisWall {
     [DllImport("user32.dll", CharSet = CharSet.Unicode)] static extern int GetClassName(IntPtr h, System.Text.StringBuilder sb, int n);
     [DllImport("user32.dll")] static extern int GetSystemMetrics(int i);
     [DllImport("user32.dll")] static extern bool SetProcessDPIAware();
+    [DllImport("user32.dll")] static extern IntPtr SetThreadDpiAwarenessContext(IntPtr ctx);
+    [StructLayout(LayoutKind.Sequential)] public struct POINT { public int X, Y; }
+    [DllImport("user32.dll")] static extern IntPtr MonitorFromPoint(POINT pt, uint flags);
+    [DllImport("user32.dll")] static extern bool ScreenToClient(IntPtr h, ref POINT p);
 
     /** Puts a window behind the desktop icons, over the wallpaper, covering the main screen. */
     public static string Attach(long hwnd, int w, int h) {
-      SetProcessDPIAware();
+      // Real pixels on every screen (per-monitor DPI aware), so positions aren't scaled behind our back.
+      try { if (SetThreadDpiAwarenessContext(new IntPtr(-4)) == IntPtr.Zero) SetProcessDPIAware(); } catch { SetProcessDPIAware(); }
       IntPtr me = new IntPtr(hwnd), r;
       IntPtr progman = FindWindow("Progman", null);
       if (progman == IntPtr.Zero) return "no-desktop";
@@ -128,10 +133,19 @@ namespace PraxisWall {
       if (target == IntPtr.Zero) { target = FindWindowEx(progman, IntPtr.Zero, "WorkerW", null); if (target != IntPtr.Zero) how = "progman-workerw"; }
       if (target == IntPtr.Zero) { target = progman; how = "progman"; }
       SetParent(me, target);
-      int x = -GetSystemMetrics(76), y = -GetSystemMetrics(77);   // where the main screen sits in the whole desktop
+      // Cover the main screen exactly: take its rectangle on the desktop and convert it into the parent's own coordinates
+      // (the parent isn't always at the desktop's corner, so offsetting by the virtual screen alone can land it off to one side).
+      var mi = new MONITORINFO(); mi.cbSize = Marshal.SizeOf(typeof(MONITORINFO));
+      POINT o = new POINT(); o.X = 0; o.Y = 0;
+      int x, y;
+      if (GetMonitorInfo(MonitorFromPoint(o, 1), ref mi)) {
+        POINT p = new POINT(); p.X = mi.rcMonitor.Left; p.Y = mi.rcMonitor.Top;
+        ScreenToClient(target, ref p);
+        x = p.X; y = p.Y; w = mi.rcMonitor.Right - mi.rcMonitor.Left; h = mi.rcMonitor.Bottom - mi.rcMonitor.Top;
+      } else { x = -GetSystemMetrics(76); y = -GetSystemMetrics(77); }
       SetWindowPos(me, IntPtr.Zero, x, y, w, h, 0x0004 | 0x0010 | 0x0040);
       if (how == "progman") { IntPtr dv = FindWindowEx(progman, IntPtr.Zero, "SHELLDLL_DefView", null); if (dv != IntPtr.Zero) SetWindowPos(me, dv, x, y, w, h, 0x0010 | 0x0040); }
-      return how;
+      return how + " " + x + "," + y + " " + w + "x" + h;
     }
     /** "full" when the window in front covers its whole screen (a game, a full-screen video), else "normal". */
     public static string Foreground() {

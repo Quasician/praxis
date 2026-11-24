@@ -152,7 +152,7 @@ export interface ConstellationView {
   nextStep: StarView | null;
 }
 export interface DustView { x: number; y: number; r: number; o: number; fresh: boolean }
-export interface SkyLayout { width: number; height: number; horizon: number; constellations: ConstellationView[]; milky: ConstellationView[]; dust: DustView[]; regions: { name: string; color: string; x: number; w: number }[] }
+export interface SkyLayout { width: number; height: number; horizon: number; constellations: ConstellationView[]; milky: ConstellationView[]; dust: DustView[]; regions: { id?: string; name: string; color: string; x: number; w: number }[] }
 
 export interface LayoutOpts {
   width: number;                  // viewBox units (height is fixed)
@@ -162,6 +162,7 @@ export interface LayoutOpts {
   nextIds: Map<string, string>;   // milestone id -> its next open step (Todoist order)
   todayIds: Set<string>;          // steps due today
   seenAt: number;                 // stars lit after this get the "just lit" animation
+  allAreas?: boolean;             // 3.8: every area gets its region, even with nothing in the sky yet
 }
 
 export const SKY_H = 420;
@@ -177,11 +178,11 @@ export function layoutSky(sky: SkyRecord, o: LayoutOpts): SkyLayout {
   const done = Object.entries(sky.cons).filter(([, c]) => c.finished).sort((a, b) => (a[1].finished || "").localeCompare(b[1].finished || ""));
 
   // Regions: the areas that have a project in the sky, in your area order; then everything else.
-  const used = o.areas.filter((a) => live.some(([, c]) => c.area === a.id));
+  const used = o.allAreas ? o.areas : o.areas.filter((a) => live.some(([, c]) => c.area === a.id));
   const hasOther = live.some(([, c]) => !c.area || !o.areas.some((a) => a.id === c.area));
   const regionList = [...used.map((a) => ({ id: a.id as string | undefined, name: a.name, color: o.colorOf(a.color) })), ...(hasOther ? [{ id: undefined, name: "Other", color: "#c9cfdc" }] : [])];
   const regionW = (W - 80) / Math.max(1, regionList.length);
-  const regions = regionList.map((r, i) => ({ name: r.name, color: r.color, x: 40 + i * regionW, w: regionW }));
+  const regions = regionList.map((r, i) => ({ id: r.id, name: r.name, color: r.color, x: 40 + i * regionW, w: regionW }));
 
   const day0 = new Date(now); day0.setHours(0, 0, 0, 0);
   const daysTo = (t?: string | null) => (t ? Math.round((new Date(t.length <= 10 ? `${t}T00:00:00` : t).getTime() - day0.getTime()) / 864e5) : null);

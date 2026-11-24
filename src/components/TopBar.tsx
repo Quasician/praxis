@@ -15,7 +15,7 @@ import { flush, usePending } from "../data/pending";
 const VIEWS: { id: View; label: string; title: string }[] = [
   { id: "day", label: "Day", title: "Plan your day (D)" },
   { id: "week", label: "Week", title: "Plan your week (W)" },
-  { id: "areas", label: "Areas", title: "Life areas and milestones (A)" },
+  { id: "areas", label: "Sky", title: "Your areas and projects, as a night sky (A)" },
   { id: "progress", label: "Progress", title: "Planned vs. done, and what Praxis has learned (G)" },
 ];
 

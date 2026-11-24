@@ -9,6 +9,9 @@ import { useActive, useCompleted } from "../data/queries";
 import { useData } from "../data/useData";
 import { toast, useUi } from "../state/ui";
 import { Dialog } from "./common";
+import { SkyView } from "./SkyView";
+
+const AREA_KEY = "praxis.area";
 
 const onToday = (t: Task) => { const d = parseDue(t.due); return !!(d && sameDay(d.d, new Date())); };
 
@@ -27,24 +30,33 @@ export function AreasView({ side = false }: { side?: boolean } = {}) {
   const quiet = computed.filter((c) => c.quiet).map((c) => c.area.name);
   const msCount = computed.reduce((s, c) => s + c.milestones.length, 0);
 
+  const [sel, setSel] = useState<string | null>(() => { try { return localStorage.getItem(AREA_KEY); } catch { return null; } });
+  const pick = (id: string) => { setSel(id); try { localStorage.setItem(AREA_KEY, id); } catch { /* ignore */ } };
+  const summary = ready && <>
+    This week: <b>{totalDone}</b> done{totalMin ? <> · <b>{fmtSpan(totalMin)}</b> timed</> : null}
+    {" · "}<b>{msCount}</b> active milestone{msCount === 1 ? "" : "s"}{" · "}
+    {quiet.length ? <span className="quiet-note">Gone quiet: {quiet.join(", ")}</span> : "Every area got attention recently"}
+  </>;
+
+  // The narrow column beside the day view on very wide screens: the cards, as before.
+  if (side) return (
+    <main id="areas-side" className="areas-view side">
+      <div className="areas-head"><div><h2>Areas</h2><p className="areas-sub">{summary}</p></div></div>
+      <div className="areas-grid">{computed.map((c) => <AreaCard key={c.area.id} x={c} />)}</div>
+    </main>
+  );
+
+  // 3.8: the Sky tab. Your areas are regions of the sky; click one to open it below.
+  const selected = computed.find((c) => c.area.id === sel) || (sel === "other" ? null : computed[0]) || null;
   return (
-    <main id={side ? "areas-side" : "areas-view"} className={`areas-view${side ? " side" : ""}`}>
-      <div className="areas-head">
-        <div>
-          <h2>{side ? "Areas" : "Areas of your life"}</h2>
-          <p id="areas-sub" className="areas-sub">
-            {ready && <>
-              This week: <b>{totalDone}</b> done{totalMin ? <> · <b>{fmtSpan(totalMin)}</b> timed</> : null}
-              {" · "}<b>{msCount}</b> active milestone{msCount === 1 ? "" : "s"}{" · "}
-              {quiet.length ? <span className="quiet-note">Gone quiet: {quiet.join(", ")}</span> : "Every area got attention recently"}
-            </>}
-          </p>
-        </div>
-        <button id="edit-areas-btn" className="ghost-btn" onClick={() => openDialog("areas")}>Edit areas</button>
-      </div>
-      <div id="areas-grid" className="areas-grid">
-        {!ready ? Array.from({ length: 4 }, (_, i) => <div key={i} className="area-card skeleton-card"><div className="skeleton" /><div className="skeleton" /><div className="skeleton" /></div>)
-          : computed.length ? computed.map((c) => <AreaCard key={c.area.id} x={c} />)
+    <main id="areas-view" className="areas-view sky-areas">
+      <SkyView allAreas selectedArea={selected ? selected.area.id : sel} onArea={pick}
+        actions={<button id="edit-areas-btn" className="ghost-btn" onClick={() => openDialog("areas")}>Edit areas</button>} />
+      <p id="areas-sub" className="areas-sub area-summary">{summary}</p>
+      <div id="area-panel" className="area-panel">
+        {!ready ? <div className="area-card skeleton-card"><div className="skeleton" /><div className="skeleton" /><div className="skeleton" /></div>
+          : selected ? <AreaCard key={selected.area.id} x={selected} />
+          : computed.length ? <div className="empty">These projects aren't in an area yet. Use “Edit areas” to give them one.</div>
           : <div className="empty"><div className="big">No areas yet.</div>Click “Edit areas” to group your projects into areas of your life.</div>}
       </div>
       <AreaEditor />

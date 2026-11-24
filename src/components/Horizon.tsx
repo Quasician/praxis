@@ -6,7 +6,7 @@ import { workBand } from "../domain/planner";
 import { seeded } from "../domain/sky";
 import { skyStops, sunTimes } from "../domain/sun";
 import { fmtMin, fmtSpan, minOfDay, toMin, ymd } from "../lib/dates";
-import { willpower } from "../lib/tasks";
+import { blockMinutes, isMilestone, willpower } from "../lib/tasks";
 import { colorOf, plain } from "../lib/text";
 import type { Task } from "../lib/types";
 import { completeTask } from "../data/actions";
@@ -17,6 +17,7 @@ import { pointerMin, startDrag } from "./drag";
 import { useNow } from "./useNow";
 import { usePending } from "../data/pending";
 import { CheckIcon, PlanBanner } from "./Timeline";
+import { DayWeatherLayer, IdeaClouds, dayWeather } from "./SkyClouds";
 
 const ROW_H = 70;           // one row of blocks
 const LABEL_MIN = 120;      // the least room a block's label gets
@@ -75,7 +76,7 @@ export function assignRows(items: Item[], hourW: number) {
 }
 
 export function HorizonPane() {
-  const { today, events, projects, cfg, trayIds, loading } = useData();
+  const { today, events, projects, cfg, trayIds, loading, config } = useData();
   const committedIds = useCommitted();
   const plan = useUi((s) => s.plan);
   const drag = useUi((s) => s.drag);
@@ -158,6 +159,17 @@ export function HorizonPane() {
   const hours = Array.from({ length: TL_END - TL_START + 1 }, (_, i) => TL_START + i);
   const stops = skyStops(rise, set, TL_START * 60, TL_END * 60).map(([v, p]) => `var(${v}) ${p.toFixed(1)}%`).join(", ");
   const target = drag?.target;
+  // 3.8: today's own weather: the sky clouds over as the day fills (planned time against free time).
+  const dayStart = toMin(cfg.dayStart);
+  const eventMin = blocks.filter((b) => b.event).reduce((s, b) => s + Math.max(0, Math.min(b.end, dayEnd) - Math.max(b.start, dayStart)), 0);
+  // Everything on today counts once: a block at its length, a proposed block at its length, anything else at its usual length.
+  const placed = new Set([...blocks.filter((b) => b.task).map((b) => b.task!.id), ...(plan.active ? plan.items.map((it) => it.task.id) : [])]);
+  const loose = todayList.filter((t) => !placed.has(t.id) && !isMilestone(t)).reduce((s, t) => s + blockMinutes(t), 0);
+  const taskMin = blocks.filter((b) => b.task).reduce((s, b) => s + b.dur, 0) + loose + (plan.active ? plan.items.reduce((s, it) => s + it.dur, 0) : 0);
+  const weather = dayWeather(taskMin, Math.max(0, dayEnd - dayStart - eventMin));
+  const ideas = (config?.ideas || []) as import("../data/ideas").Idea[];
+  const [skyTop, setSkyTop] = useState(0);
+  useLayoutEffect(() => { if (tlRef.current) setSkyTop(tlRef.current.offsetTop); });
 
   return (
     <section className="timeline-pane horizon-pane" id="horizon">
@@ -167,6 +179,7 @@ export function HorizonPane() {
           {loading ? "" : ahead.length ? `${ahead.length} block${ahead.length > 1 ? "s" : ""} ahead · ${fmtSpan(aheadMin)} planned` : "Nothing planned yet"}
         </span>
         <span className="tl-summary" id="hz-sun">Sunrise {fmtMin(rise)} · sunset {fmtMin(set)}</span>
+        {!loading && <span className={`tl-summary hz-weather-word${weather.storm ? " storm" : ""}`} id="hz-weather" title={weather.tip} data-fill={weather.fill.toFixed(2)}>{weather.word}</span>}
         <span id="tl-allday" className="tl-allday">
           {allDay.map((e, i) => <span key={i} className="allday-chip" style={{ ["--c" as string]: e.color || "var(--ink-3)" }} title={e.calendar || ""}>{e.title}</span>)}
         </span>
@@ -184,6 +197,7 @@ export function HorizonPane() {
         <div className="tl-grid hz-grid" style={{ width, height: SKY_H + 30 + lanesH }}>
           <div className="hz-sky" style={{ height: SKY_H, background: `linear-gradient(to right, ${stops})` }}>
             <SunArc width={width} rise={rise} set={set} nowMin={nowMin} X={X} skyH={SKY_H} />
+            <DayWeatherLayer cover={weather.cover} storm={weather.storm} x0={X(dayStart)} x1={X(dayEnd)} skyH={SKY_H} />
           </div>
           <div className="hz-ruler" style={{ top: SKY_H }}>
             {hours.map((h) => <span key={h} style={{ left: X(h * 60) }}>{new Date(2000, 0, 1, h % 24).toLocaleTimeString([], { hour: "numeric" })}</span>)}
@@ -241,6 +255,7 @@ export function HorizonPane() {
           {now.getHours() >= TL_START && <div className="hz-now tl-now" style={{ left: X(nowMin), height: SKY_H + 30 + lanesH }} />}
         </div>
       </div>
+      <IdeaClouds ideas={ideas} top={skyTop} height={Math.round(SKY_H * 0.62)} />
     </section>
   );
 }

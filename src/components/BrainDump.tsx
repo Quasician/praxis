@@ -6,7 +6,8 @@ import { api } from "../lib/api";
 import { acceptDump, sortWithClaude } from "../data/dump";
 import { queryClient, qk, useStatus } from "../data/queries";
 import { useData } from "../data/useData";
-import { EMPTY_DUMP, useUi } from "../state/ui";
+import { EMPTY_DUMP, toast, useUi } from "../state/ui";
+import { keepIdeas } from "../data/ideas";
 import { Dialog } from "./common";
 
 export function BrainDumpDialog() {
@@ -62,6 +63,8 @@ function DumpBody() {
           onKeyDown={(e) => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey) && dump.text.trim() && !busy) run("sort"); }} />
         <div className="dump-row">
           <span className="dump-hint">Ctrl+Enter to sort · nothing is added until you review it</span>
+          {!dump.ideaIds?.length && <button type="button" id="dump-ideas" className="ghost-btn" disabled={!dump.text.trim() || !!busy} title="Not tasks yet? Each line becomes a cloud that drifts across today's sky until you're ready."
+            onClick={async () => { const n = await keepIdeas(dump.text); setDump({ text: "" }); closeDialog("dump"); toast(`${n} idea${n === 1 ? "" : "s"} drifting in your sky. Click one when it's ready to be a task.`); }}>☁ Keep as ideas</button>}
           {inbox.length > 0 && <button type="button" id="dump-inbox" className="ghost-btn" disabled={!!busy} onClick={() => run("inbox")}>{busy === "inbox" ? "Sorting…" : `File my Inbox (${Math.min(inbox.length, 80)})`}</button>}
           <button type="button" id="dump-sort" className="primary" disabled={!dump.text.trim() || !!busy} onClick={() => run("sort")}>{busy === "sort" ? "Sorting…" : "Sort it"}</button>
         </div>

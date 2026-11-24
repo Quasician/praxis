@@ -1446,3 +1446,65 @@ body { background-image: linear-gradient(180deg, color-mix(in srgb, var(--sky-no
 .sky-aurora { animation: aur-breathe 7s ease-in-out infinite alternate; }
 @keyframes aur-breathe { from { opacity: .7; } to { opacity: 1; } }
 @media (prefers-reduced-motion: reduce) { .sky-aurora { animation: none; } }
+
+/* 3.8: areas in the sky */
+.sky-region-hit { fill: transparent; cursor: pointer; transition: fill .2s; }
+.sky-region-hit:hover { fill: color-mix(in srgb, var(--c) 5%, transparent); }
+.sky-region-hit.on { fill: color-mix(in srgb, var(--c) 5%, transparent); }
+.sky-region.pick { cursor: pointer; opacity: .75; }
+.sky-region.pick:hover, .sky-region.pick:focus-visible { opacity: 1; outline: none; text-decoration: underline; }
+.sky-region.on { opacity: 1; font-weight: 700; }
+.sky-areas .area-summary { margin: 14px 2px 10px; }
+.area-panel .area-card { max-width: 1100px; }
+
+/* 3.8: the day's weather and ideas as clouds */
+.horizon-pane { position: relative; }
+.hz-weather { position: absolute; inset: 0; pointer-events: none; overflow: hidden; border-radius: inherit; }
+.hz-overcast { position: absolute; inset: 0; background: linear-gradient(to bottom, rgba(120,130,150,calc(var(--cover) * .32)), rgba(120,130,150,calc(var(--cover) * .12))); }
+.hz-weather.storm .hz-overcast { background: linear-gradient(to bottom, rgba(84,92,112,.5), rgba(110,118,138,.22)); }
+.hz-wcloud { position: absolute; animation: wcloud-sway var(--d) ease-in-out infinite alternate; }
+.hz-wcloud svg { display: block; fill: rgba(236,240,247,.78); }
+.hz-weather.storm .hz-wcloud svg { fill: rgba(150,158,176,.85); }
+:root[data-theme="dark"] .hz-wcloud svg { fill: rgba(150,162,190,.32); }
+:root[data-theme="dark"] .hz-weather.storm .hz-wcloud svg { fill: rgba(120,128,150,.5); }
+@keyframes wcloud-sway { from { transform: translateX(-14px); } to { transform: translateX(14px); } }
+.hz-weather-word { font-weight: 600; }
+.hz-weather-word.storm { color: var(--warn, #b5532c); }
+
+.idea-sky { position: absolute; left: 0; right: 0; height: 0; pointer-events: none; z-index: 3; }
+.idea-lane { position: relative; overflow: hidden; pointer-events: none; }
+.idea-cloud { position: absolute; left: 0; width: var(--cw); padding: 0; border: 0; background: none; cursor: pointer; pointer-events: auto; color: #2c3550;
+  animation: idea-drift var(--dur) linear infinite; animation-delay: var(--delay); }
+.idea-cloud:hover, .idea-cloud.open, .idea-cloud:focus-visible { animation-play-state: paused; outline: none; }
+.idea-shape { display: block; fill: rgba(255,255,255,.95); filter: drop-shadow(0 2px 6px rgba(40,50,80,.16)); }
+.idea-cloud:hover .idea-shape, .idea-cloud.open .idea-shape { fill: #fff; filter: drop-shadow(0 3px 10px rgba(40,50,80,.26)); }
+.idea-label { position: absolute; left: 0; right: 0; bottom: 0; line-height: var(--lh, 24px); text-align: center; font: 600 11.5px var(--sans); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 0 12px; }
+:root[data-theme="dark"] .idea-shape { fill: rgba(214,222,240,.9); }
+@keyframes idea-drift { from { transform: translateX(calc(-1 * var(--cw) - 10px)); } to { transform: translateX(calc(var(--pw) + 10px)); } }
+@media (prefers-reduced-motion: reduce) { .idea-cloud { animation: none; } .hz-wcloud { animation: none; } }
+.idea-pop { position: absolute; left: 50%; top: 10px; transform: translateX(-50%); pointer-events: auto; z-index: 4; width: min(420px, 90%); background: var(--card); color: var(--ink);
+  border: 1px solid var(--line); border-radius: 14px; box-shadow: var(--shadow); padding: 14px 16px; }
+.idea-text { margin: 0 0 4px; font-weight: 600; }
+.idea-age { margin: 0 0 10px; color: var(--muted); font-size: 12.5px; }
+.idea-acts { display: flex; flex-wrap: wrap; gap: 8px; }
+
+/* 3.8: dawn and dusk */
+.ritual-sky { position: relative; height: 96px; margin: -4px 0 14px; border-radius: 14px; overflow: hidden; }
+.ritual-sky svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+.ritual-sky .ritual-bg rect, .ritual-sky .ritual-hills path { transition: fill 1.2s ease; }
+.ritual-sky .ritual-bg circle { transition: opacity 1.2s ease; }
+.ritual-sun { position: absolute; left: 50%; width: 28px; height: 28px; margin-left: -14px; border-radius: 50%; background: radial-gradient(circle at 45% 40%, #fff7e0, #ffd27a 60%, #f6a74c);
+  transition: bottom 1.2s cubic-bezier(.3,.7,.3,1), box-shadow 1.2s, opacity .6s; }
+.ritual-sky.sunset .ritual-sun { background: radial-gradient(circle at 45% 40%, #ffe9c8, #ffb066 60%, #e8734a); }
+@media (prefers-reduced-motion: reduce) { .ritual-sky *, .ritual-sun { transition: none !important; } }
+
+/* Every dialog gets the same frame: the padding and scrolling live on one wrapper, so no dialog's content can touch its edges. */
+.dialog { overflow: hidden; }
+.dialog .dialog-body { padding: 24px 28px 20px; max-height: 86vh; overflow-y: auto; box-sizing: border-box; }
+.dialog .dialog-body > * { padding: 0; max-height: none; overflow: visible; }
+.dialog .dialog-body > * + * { margin-top: 12px; }
+.dialog .dialog-actions { margin-top: 10px; }
+.dialog .dialog-actions .primary, .dialog .dialog-actions .ghost-btn { border-radius: 10px; }
+:where(.dialog-body > div, .dialog-body > form, .dialog-body > article) { display: flex; flex-direction: column; gap: 12px; }
+.dialog .switch-row { display: flex; align-items: flex-start; gap: 10px; line-height: 1.4; }
+.dialog .switch-row input[type=checkbox] { margin: 2px 0 0; flex: none; }

@@ -11,6 +11,7 @@ import { useActive, useCompleted, useEvents } from "../data/queries";
 import { useData } from "../data/useData";
 import { toast, useUi } from "../state/ui";
 import { Dialog } from "./common";
+import { RitualSky } from "./Rituals";
 import { unstarToday } from "../data/habits";
 import { useNow } from "./useNow";
 
@@ -54,6 +55,8 @@ function ShutdownBody() {
   const open = today.filter((t) => { const d = parseDue(t.due); return d && ymd(d.d) <= todayKey && !isMilestone(t); })
     .sort((a, b) => (parseDue(a.due)!.d < parseDue(b.due)!.d ? 1 : -1));
   const movable = open.filter((t) => !t.due?.is_recurring);
+  const peak = useRef(0); peak.current = Math.max(peak.current, open.length);   // the sun sinks as each of these gets a home
+  const startOpen = peak.current;
 
   // 3. Tomorrow
   const tom = useMemo(() => (activeQ.data || []).filter((t) => { const d = parseDue(t.due); return d && ymd(d.d) === tomKey; }), [activeQ.data, tomKey]);
@@ -74,11 +77,13 @@ function ShutdownBody() {
       history: { ...(c.history || {}), [todayKey]: { ...(c.history || {})[todayKey], planned: (c.history || {})[todayKey]?.planned || [], shutdown: true } },
     }));
     close("shutdown");
+    useUi.getState().celebrate("", "sunset");
     toast(open.length ? `Day closed. ${open.length} task${open.length === 1 ? " stays" : "s stay"} where ${open.length === 1 ? "it is" : "they are"}.` : "Day closed. Nothing left hanging. See you tomorrow.");
   };
 
   return (
     <div className="shutdown-form">
+      <RitualSky kind="sunset" progress={startOpen ? 0.25 + 0.75 * (1 - open.length / startOpen) : 1} />
       <div>
         <h2>Shut down the day</h2>
         <p className="dialog-sub">Two minutes: see what you got done, give every leftover a home, glance at tomorrow. Then stop thinking about it.</p>

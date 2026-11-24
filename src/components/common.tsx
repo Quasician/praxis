@@ -15,7 +15,7 @@ export function Dialog({ name, id, className = "", children }: { name: DialogNam
   }, [open]);
   return (
     <dialog id={id} className={`dialog ${className}`} ref={ref} onClose={() => close(name)}>
-      {open && children}
+      {open && <div className="dialog-body">{children}</div>}
     </dialog>
   );
 }

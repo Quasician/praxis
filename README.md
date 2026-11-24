@@ -40,7 +40,7 @@ Your data stays on your computer in `%APPDATA%\Praxis` (`.env` holds the Todoist
 | `R` | Refresh |
 | `P` | Plan my day (auto-fill free time) |
 | `Enter` | Accept the proposed plan |
-| `D` / `W` / `A` | Day / Week / Areas view |
+| `D` / `W` / `A` | Day / Week / Sky (your areas) view |
 | `B` | Brain dump |
 | `M` | Morning commit |
 | `S` | Shut down the day |
@@ -115,6 +115,20 @@ Praxis is built to be easy on the eyes on a big monitor all day:
 - **Focus mode (F)**: hides everything except Now and the next three tasks. Press F again to see everything.
 - **Readable type**: Atkinson Hyperlegible for text (designed for legibility) and Bricolage Grotesque for headings, bundled so they work offline.
 - **Calm motion**: finishing a task fills the circle and folds the row away; the focus timer is a ring that fills. If Windows has "Show animations" turned off, Praxis stops animating too.
+
+## The whole sky (3.8)
+
+**Dawn and dusk.** The morning commit opens on a sunrise: the sun climbs as you choose your commitments and pick the one, and committing ends in a warm glow over the whole window. The shutdown is a sunset: the sun sinks as each leftover gets a home, and closing the day brings out the stars.
+
+**Ideas as clouds.** Not everything in a brain dump is a task yet. Click **☁ Keep as ideas** and each line becomes a small flat cloud drifting across today's sky on the Horizon. Click one to **turn it into tasks with Claude** (it opens the brain dump with the idea in it; once the tasks are added, the cloud goes) or to **let it go**. They live in the app, never on the wallpaper.
+
+**Your areas are the sky.** The Areas tab is now **Sky** (A). Each area of your life is a region of the night sky with its projects as constellations; click a region, or its name along the horizon, to open that area below: milestones, up next, this week's time. Progress (G) is just the numbers now.
+
+**The day's own weather.** Today's sky on the Horizon clouds over as the day fills: clear when there's room, a few clouds, clouding over, overcast, and a storm when there's more planned than fits. Hover the word next to sunset for the numbers. (This is your workload, not the weather outside; that's the wallpaper's job.)
+
+**Dialogs, tidied.** Every dialog has the same frame and padding now.
+
+**Moving wallpaper fix.** The moving wallpaper could sit off to one side of the screen on Windows 11; it now lines up exactly with your main screen.
 
 ## Rewards (3.7)
 
@@ -313,7 +327,7 @@ Press `W` (or click **Week**). On **Friday after work** Praxis opens a draft of 
 
 ## Areas and milestones
 
-Switch to **Areas** (top of the window, or press `A`) for the bigger picture.
+Switch to **Sky** (top of the window, or press `A`) for the bigger picture: click an area's part of the sky to open it.
 
 - **Areas** group your Todoist projects into parts of your life (Career, Health, Hobbies, Home…).
   Praxis guesses them from your project names the first time; change them with **Edit areas**.
@@ -384,5 +398,5 @@ Pushes that don't change the version are only checked, not released.
 - ~~3.5: real Milpitas weather on the wallpaper, and an optional live (moving) wallpaper~~ ✓
 - ~~3.6: never rot: offline queue, self-healing days, capture hotkey~~ ✓
 - ~~3.7: rewards: sky events, constellation legends, the Sunday letter, optional sound~~ ✓
-- 3.8: finish the theme: sunrise and sunset rituals, ideas as clouds, Areas in the sky, the Horizon clouds over as the day fills
+- ~~3.8: finish the theme: sunrise and sunset rituals, ideas as clouds, Areas in the sky, the Horizon clouds over as the day fills~~ ✓
 - ~~1.1: morning commit, committed vs. bonus, adaptive plans, Now card, first steps, backlog cleanup, Progress, learning~~ ✓

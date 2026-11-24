@@ -12,6 +12,7 @@ import type { Energy } from "../lib/types";
 import { useData } from "../data/useData";
 import { toast, useUi } from "../state/ui";
 import { Dialog } from "./common";
+import { RitualSky } from "./Rituals";
 
 export function MorningDialog() {
   return <Dialog name="morning" id="morning-dialog" className="morning-dialog"><MorningBody /></Dialog>;
@@ -71,6 +72,7 @@ function MorningBody() {
       const days = Array.from({ length: 6 }, (_, i) => addDays(startOfToday(), i + 1));
       await bulkPlace(spreadTasks(cfg, rest, days, activeQ.data || [], []), "over the rest of the week");
     }
+    useUi.getState().celebrate("", "sunrise");
     if (star) toast(`Committed. The one that matters: “${plain(star.task.content).slice(0, 60)}”. It's p1 in Todoist today, so your phone shows it first.`);
   };
 
@@ -104,6 +106,7 @@ function MorningBody() {
 
   return (
     <div className="morning-form">
+      <RitualSky kind="sunrise" progress={Math.min(1, committed.length / Math.max(1, cfg.commitCount)) * 0.8 + (theOne ? 0.2 : 0)} />
       <div>
         <h2>{hour < 12 ? "Good morning." : "Commit to today."}</h2>
         <p className="dialog-sub">Here's today's plan. ★ are your commitments, a day you can actually win. Bonus tasks only if you have energy left. Pick the one that matters most.</p>

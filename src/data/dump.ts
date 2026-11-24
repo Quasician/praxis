@@ -62,6 +62,9 @@ export async function acceptDump(ps: Proposal[], inbox: Task[]) {
   const filed = chosen.some((p) => p.sourceId);
   toast(failed.size ? `Saved ${saved} of ${chosen.length}. Todoist rejected ${failed.size}; they're still here to fix.`
     : `${filed ? "Filed" : "Added"} ${saved} task${saved === 1 ? "" : "s"}.`);
+  // 3.8: the ideas this came from have become tasks, so their clouds go.
+  const ideaIds = useUi.getState().dump.ideaIds;
+  if (!failed.size && ideaIds?.length) import("./ideas").then((m) => m.dropIdeas(ideaIds)).catch(() => undefined);
   useUi.getState().setDump(failed.size ? { proposals: chosen.filter((p) => failed.has(p.key)) } : EMPTY_DUMP);
   reconcileSoon(0);
   return saved;

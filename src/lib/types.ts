@@ -123,6 +123,7 @@ export interface Config {
   lastSeenVersion?: string;
   rewards?: import("../domain/rewards").Rewards;
   letters?: Record<string, import("../domain/rewards").Letter>;
+  ideas?: import("../data/ideas").Idea[];
   [key: string]: unknown;
 }
 

@@ -169,6 +169,23 @@ export function Celebration() {
         }
         if (u < 1.5) raf = requestAnimationFrame(frame); else ctx.clearRect(0, 0, W, H);
       };
+    } else if (k === "sunrise" || k === "sunset") {
+      // 3.8: the morning commit ends in a sunrise, the shutdown in a sunset: a warm glow (or a dusk with stars) over the whole window.
+      const W = c.width, H = c.height, dur = 2400, up = k === "sunrise";
+      const stars = up ? [] : Array.from({ length: 60 }, () => ({ x: Math.random() * W, y: Math.random() * H * 0.6, r: .6 + Math.random() * 1.2, p: Math.random() * 6 }));
+      frame = (t) => {
+        const u = Math.min(1, (t - t0) / dur), env = Math.sin(Math.PI * u);
+        ctx.clearRect(0, 0, W, H);
+        const sunY = up ? H * (1.08 - 0.32 * u) : H * (0.78 + 0.32 * u), sunX = W * 0.5;
+        const g = ctx.createRadialGradient(sunX, sunY, 0, sunX, sunY, Math.max(W, H) * 0.75);
+        if (up) { g.addColorStop(0, `rgba(255,214,150,${0.55 * env})`); g.addColorStop(0.35, `rgba(255,170,120,${0.22 * env})`); g.addColorStop(1, "rgba(255,170,120,0)"); }
+        else { g.addColorStop(0, `rgba(255,150,90,${0.4 * env})`); g.addColorStop(0.3, `rgba(150,80,130,${0.22 * env})`); g.addColorStop(1, `rgba(30,30,80,${0.28 * env})`); }
+        ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+        ctx.fillStyle = `rgba(255,${up ? 228 : 190},${up ? 170 : 120},${0.85 * env})`;
+        ctx.beginPath(); ctx.arc(sunX, sunY, Math.min(W, H) * 0.06, 0, Math.PI * 2); ctx.fill();
+        for (const s of stars) { ctx.fillStyle = `rgba(255,255,255,${Math.max(0, env * (0.4 + 0.6 * Math.sin(s.p + u * 8)) * Math.min(1, u * 2))})`; ctx.fillRect(s.x, s.y, s.r, s.r); }
+        if (u < 1) raf = requestAnimationFrame(frame); else ctx.clearRect(0, 0, W, H);
+      };
     } else if (k === "aurora") {
       // Curtains of green and violet light along the top of the window, breathing for a few seconds.
       const W = c.width, H = c.height, dur = 6000;

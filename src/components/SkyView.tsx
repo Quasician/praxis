@@ -30,7 +30,8 @@ function useSkyRecord() {
   return { sky: merged, active: activeQ.data || [], ready };
 }
 
-export function SkyView() {
+/** The sky. On the Sky tab (3.8) it's also how you get around your areas: each area is a region; click one to open it. */
+export function SkyView({ allAreas = false, selectedArea = null, onArea, actions }: { allAreas?: boolean; selectedArea?: string | null; onArea?: (id: string) => void; actions?: React.ReactNode } = {}) {
   const { config } = useData();
   const { sky, active, ready } = useSkyRecord();
   const box = useRef<HTMLDivElement>(null);
@@ -51,8 +52,8 @@ export function SkyView() {
   const { nextIds, todayIds } = useMemo(() => nextAndToday(active), [active]);
   const W = SKY_H * (size.w / Math.max(1, size.h));
   const k = W / Math.max(1, size.w);                 // viewBox units per screen pixel: keeps text a steady size
-  const lay = useMemo(() => layoutSky(sky, { width: W, areas: config?.areas || [], colorOf, nextIds, todayIds, seenAt }),
-    [sky, W, config?.areas, nextIds, todayIds, seenAt]);
+  const lay = useMemo(() => layoutSky(sky, { width: W, areas: config?.areas || [], colorOf, nextIds, todayIds, seenAt, allAreas }),
+    [sky, W, config?.areas, nextIds, todayIds, seenAt, allAreas]);
   const sel = [...lay.constellations, ...lay.milky].find((c) => c.id === picked) || null;
   const aurora = auroraOn(config?.rewards);
 
@@ -75,6 +76,7 @@ export function SkyView() {
         </div>
         <div className="sky-head-right">
           <p className="sky-legend">Bright stars are done, faint ones are still to do, a gold ring is the next step. The lower a project sits, the sooner it's due.</p>
+          {actions}
           <button className="primary" id="sky-new" onClick={() => useUi.getState().openDialog("constellation")}>+ New project</button>
         </div>
       </div>
@@ -89,6 +91,10 @@ export function SkyView() {
           <rect width={W} height={SKY_H} fill="url(#sky-bg)" />
           <ellipse cx={W / 2} cy={44} rx={W * 0.55} ry={46} fill="url(#sky-band)" />
           {aurora && <SkyAurora W={W} />}
+          {onArea && lay.regions.map((r) => (
+            <rect key={`hit-${r.id || "other"}`} className={`sky-region-hit${(r.id || "other") === selectedArea ? " on" : ""}`} x={r.x} y={0} width={r.w} height={SKY_H}
+              style={{ "--c": r.color } as React.CSSProperties} onClick={(e) => { e.stopPropagation(); setPicked(null); onArea(r.id || "other"); }} />
+          ))}
           <g className="sky-dust">{lay.dust.map((d, i) => <circle key={i} cx={d.x} cy={d.y} r={d.r * k * 1.2} opacity={d.o} className={d.fresh ? "fresh" : ""} />)}</g>
 
           {lay.milky.map((c) => (
@@ -136,7 +142,10 @@ export function SkyView() {
 
           <path className="sky-ground" d={`M0 ${lay.horizon} Q ${W * 0.25} ${lay.horizon - 8} ${W * 0.5} ${lay.horizon - 2} T ${W} ${lay.horizon - 4} L ${W} ${SKY_H} L 0 ${SKY_H} Z`} />
           {lay.regions.map((r) => (
-            <text key={r.name} className="sky-region" x={r.x + r.w / 2} y={lay.horizon + 30 * k} fontSize={12.5 * k} textAnchor="middle" style={{ fill: `color-mix(in srgb, ${r.color} 55%, #fff)` }}>{r.name}</text>
+            <text key={r.name} className={`sky-region${onArea ? " pick" : ""}${(r.id || "other") === selectedArea ? " on" : ""}`} data-area={r.id || "other"} x={r.x + r.w / 2} y={lay.horizon + 30 * k} fontSize={12.5 * k} textAnchor="middle"
+              style={{ fill: `color-mix(in srgb, ${r.color} 55%, #fff)` }} {...(onArea ? { role: "button", tabIndex: 0, "aria-pressed": (r.id || "other") === selectedArea,
+                onClick: (e: React.MouseEvent) => { e.stopPropagation(); setPicked(null); onArea(r.id || "other"); },
+                onKeyDown: (e: React.KeyboardEvent) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onArea(r.id || "other"); } } } : {})}>{r.name}</text>
           ))}
         </svg>
 

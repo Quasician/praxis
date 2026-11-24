@@ -13,7 +13,7 @@ const KEYS: [string, string][] = [
   ["S", "Shut down the day"],
   ["G", "Progress"],
   ["F", "Focus mode: only what's next"],
-  ["D · W · A", "Day, Week, Areas"],
+  ["D · W · A", "Day, Week, Sky (your areas)"],
   ["1 · 2", "Today, Inbox"],
   ["R", "Refresh from Todoist"],
   ["Esc", "Cancel a drag, close a dialog"],

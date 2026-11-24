@@ -6,7 +6,7 @@ import type { WeekCard, WeekDay } from "../domain/week";
 import type { Proposal } from "../domain/dump";
 
 /** 3.7: confetti for a day's commitments, a shooting star for "the one", the aurora for a week. */
-export type CheerKind = "confetti" | "meteor" | "aurora";
+export type CheerKind = "confetti" | "meteor" | "aurora" | "sunrise" | "sunset";
 
 export type View = "day" | "week" | "areas" | "progress";
 export type DialogName = "triage" | "planner" | "calendars" | "areas" | "dump" | "claude" | "shutdown" | "help" | "morning" | "backlog" | "fresh" | "reminders" | "constellation" | "wallpaper" | "heal" | "letter";
@@ -46,7 +46,7 @@ interface UiState {
 }
 
 /** The brain dump survives closing the dialog, so nothing typed or sorted is lost. */
-export interface DumpState { text: string; proposals: Proposal[] | null; questions: string[]; filing: boolean }
+export interface DumpState { text: string; proposals: Proposal[] | null; questions: string[]; filing: boolean; ideaIds?: string[] }
 const EMPTY_DUMP: DumpState = { text: "", proposals: null, questions: [], filing: false };
 export { EMPTY_DUMP };
 
