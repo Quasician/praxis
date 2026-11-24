@@ -1294,8 +1294,8 @@ body.mini-body #root { height: 100%; }
 .hz-ruler span:first-child { transform: none; padding-left: 6px; }
 .hz-lanes { position: absolute; left: 0; right: 0; background-image: linear-gradient(to right, color-mix(in srgb, var(--line) 45%, transparent) 1px, transparent 1px); }
 .hz-band { position: absolute; pointer-events: none; }
-.hz-band span { position: absolute; top: 6px; left: 8px; font-size: 12px; color: var(--ink-3); }
-.hz-band.work { background: color-mix(in srgb, var(--accent) 4%, transparent); border-left: 1px dashed color-mix(in srgb, var(--accent) 25%, transparent); border-right: 1px dashed color-mix(in srgb, var(--accent) 25%, transparent); }
+.hz-band span { position: absolute; bottom: 8px; left: 8px; font-size: 11.5px; color: var(--ink-3); white-space: nowrap; z-index: 2; }
+.hz-band.work { background: color-mix(in srgb, var(--accent) 2.5%, transparent); box-shadow: inset 0 2px 0 color-mix(in srgb, var(--accent) 26%, transparent); }
 .hz-band.off { background: repeating-linear-gradient(135deg, transparent 0 9px, color-mix(in srgb, var(--ink) 3%, transparent) 9px 10px); }
 .hz-past { position: absolute; left: 0; pointer-events: none; z-index: 1; background: color-mix(in srgb, var(--panel) 50%, transparent); }
 .hz-now.tl-now { top: 0 !important; width: 2px; left: 0; background: linear-gradient(to bottom, var(--star), color-mix(in srgb, var(--star) 20%, transparent)); z-index: 3; pointer-events: none; transform: translateX(-1px); }
@@ -1358,3 +1358,21 @@ body.dragging.resizing { cursor: ew-resize; }
 [data-theme="dark"][data-sky="night"]  { --accent: #8f98f5; --accent-soft: #25284a; --now: #8f98f5; }
 body { background-image: linear-gradient(180deg, color-mix(in srgb, var(--sky-now) 20%, var(--bg)) 0, var(--bg) 340px); background-repeat: no-repeat; }
 .nudge-doc body { background-image: none; }
+
+/* ---------- 3.2.1: every block is at least as wide as its words ---------- */
+.timeline.hz .tl-block .blk-body { overflow: hidden; flex: 1; }
+.timeline.hz .tl-block .blk-title, .timeline.hz .tl-block .blk-time { overflow: hidden; text-overflow: ellipsis; }
+.timeline.hz .tl-block .blk-len { display: none; }
+/* A block shorter than its words: the box is only room for the label; a bar on top shows its real length. */
+.timeline.hz .tl-block.short { background: color-mix(in srgb, var(--c) 7%, var(--panel)); border-style: dashed; border-left-style: solid; border-left-color: color-mix(in srgb, var(--c) 45%, transparent); }
+.timeline.hz .tl-block.short .blk-len { display: block; position: absolute; top: -1px; left: var(--len-l); width: var(--len-w); height: 4px; border-radius: 0 0 3px 3px; background: var(--c); pointer-events: none; }
+.timeline.hz .tl-block.short .tl-resize { right: auto; left: calc(var(--len-l) + var(--len-w) - 5px); }
+.timeline.hz .tl-block.past.short { border-left-style: dashed; }
+
+/* The pop-out: the guess sits on its own compact row under everything; the window grows to fit it. */
+.now-card.mini { flex-wrap: wrap; height: auto; min-height: 100vh; align-content: flex-start; row-gap: 6px; }
+.now-card.mini .now-guess { flex-basis: 100%; flex-wrap: nowrap; margin-top: 0; gap: 5px; overflow-x: auto; scrollbar-width: none; }
+.now-card.mini .now-guess .now-chip { padding: 2px 8px; flex: none; }
+.now-card.mini .now-guess > span { flex: none; }
+.now-card.mini .now-main { flex-basis: 100%; }
+.now-card.mini .now-actions { flex-wrap: wrap; }

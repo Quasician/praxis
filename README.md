@@ -121,6 +121,8 @@ The Day view runs **left to right as one sky**. The sun crosses it at today's re
 
 **The week as seven skies.** Each day in the Week view has a little sky: clear when it's light, cloudier as it fills up, stormy when you've planned more than you have time for. Stars over a day are project steps planned for it. Click today's sky to zoom back into the day. Moving between Day and Week zooms out and in.
 
+**Every block fits its words (3.2.1).** A block shorter than its title is drawn as wide as its words, with a bar along the top showing its real length; a finished block grows to the left so it never crosses the now line. The work-hours band is a faint line with its label on the part still ahead. The Now pop-out puts the time guess on one row and grows to fit.
+
 **Colors follow the time of day.** Buttons, highlights and a faint wash at the top of the window shift through the day: rose at dawn, blue by day, amber at golden hour, violet at dusk, indigo at night. Reminder cards and the Now pop-out match. Every phase keeps text at comfortable reading contrast.
 
 ## New projects, getting unstuck, and your sense of time (3.1)
@@ -328,5 +330,11 @@ Pushes that don't change the version are only checked, not released.
 - ~~3.0: the night sky (projects as constellations) and the sun in focus mode~~ ✓
 - ~~3.1: draw a constellation with Claude, "I'm stuck", guess the time~~ ✓
 - ~~3.2: the Horizon (the day left to right), the week as seven skies, colors by time of day~~ ✓
-- 3.3: ideas as clouds; the shut-down sunset
+- ~~3.2.1: every block fits its words, the pop-out grows to fit~~ ✓
+- 3.3: stay in view: the edge horizon strip and the tray sundial
+- 3.4: the valley: your mottos on a living landscape as the wallpaper (seasons by date, light by the hour)
+- 3.5: real Milpitas weather on the wallpaper, and an optional live (moving) wallpaper
+- 3.6: never rot: offline queue, self-healing days, capture hotkey
+- 3.7: rewards: sky events, constellation legends, the Sunday letter, optional sound
+- 3.8: finish the theme: sunrise and sunset rituals, ideas as clouds, Areas in the sky, the Horizon clouds over as the day fills
 - ~~1.1: morning commit, committed vs. bonus, adaptive plans, Now card, first steps, backlog cleanup, Progress, learning~~ ✓

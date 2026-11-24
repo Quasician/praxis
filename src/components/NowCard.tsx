@@ -118,6 +118,12 @@ export function NowCard({ mini = false }: { mini?: boolean }) {
   const upcoming = today.map((t) => parseDue(t.due)).filter((x) => x?.hasTime && sameDay(x.d, new Date()) && minOfDay(x.d) > nowM).map((x) => minOfDay(x!.d) - nowM).sort((a, b) => a - b);
   const nextIn = upcoming.length && upcoming[0] <= 180 ? upcoming[0] : null;
 
+  const guessRow = running && !focus?.guess && elapsed < 180 && (
+    <div className="now-guess" id="now-guess"><span>{mini ? "Guess:" : "How long will it take?"}</span>
+      {GUESSES.map((m) => <button key={m} id={`now-guess-${m}`} className="now-chip" onClick={() => guess(m)}>{m < 60 ? `${m}m` : `${m / 60 === 1 ? "1h" : `${m / 60}h`}`}</button>)}
+    </div>
+  );
+
   return (
     <div className={`now-card ${mini ? "mini" : ""} ${running ? "running" : ""} ${running && left <= 0 ? "over" : ""}`} id={mini ? "now-mini" : "now-card"} data-id={task.id}>
       {!mini && <span className="now-sun" aria-hidden="true" />}
@@ -137,11 +143,7 @@ export function NowCard({ mini = false }: { mini?: boolean }) {
             </span>
           </div>
         )}
-        {running && !focus?.guess && elapsed < 180 && (
-          <div className="now-guess" id="now-guess"><span>How long will it take?</span>
-            {GUESSES.map((m) => <button key={m} id={`now-guess-${m}`} className="now-chip" onClick={() => guess(m)}>{m < 60 ? `${m}m` : `${m / 60 === 1 ? "1h" : `${m / 60}h`}`}</button>)}
-          </div>
-        )}
+        {!mini && guessRow}
         {!mini && <span className="now-meta">{running && focus?.guess ? `you guessed ${focus.guess}m · ` : ""}{d?.hasTime ? `${d.d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })} · ` : ""}{blockMinutes(task)}m{next ? <> · next: <span className="now-next">{plain(next.content).slice(0, 48)}</span></> : null}</span>}
       </div>
       <div className="now-actions">
@@ -165,6 +167,7 @@ export function NowCard({ mini = false }: { mini?: boolean }) {
         {!mini && isDesktop() && <button id="now-popout" className="now-btn" title="Keep this on top of other windows" onClick={() => window.open(`${location.origin}/?mini=1`, "praxis-now")}>⧉</button>}
         {mini && <button className="now-btn close" title="Close" onClick={() => window.close()}>×</button>}
       </div>
+      {mini && guessRow}
     </div>
   );
 }
@@ -182,6 +185,23 @@ export function NowMini() {
     return () => clearInterval(id);
   }, []);
   useUi(); // keep the store alive for toasts
+  useEffect(() => {
+    // The window grows (and shrinks back) to fit the card, so nothing is ever cut off.
+    let last = 0, t: ReturnType<typeof setTimeout> | undefined;
+    const fit = () => {
+      const card = document.querySelector(".now-card.mini");
+      if (!card) return;
+      const kids = Array.from(card.children) as HTMLElement[];
+      const h = Math.ceil(Math.max(...kids.map((k) => k.getBoundingClientRect().bottom), 60) + 12);
+      if (Math.abs(h - last) < 4) return;
+      last = h; clearTimeout(t);
+      t = setTimeout(() => fetch("/api/desktop/mini-fit", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ height: h }) }).catch(() => {}), 60);
+    };
+    const ro = new ResizeObserver(fit);
+    const mo = new MutationObserver(() => { const c = document.querySelector(".now-card.mini"); if (c) { ro.disconnect(); ro.observe(c); for (const k of Array.from(c.children)) ro.observe(k); fit(); } });
+    mo.observe(document.getElementById("root") || document.body, { childList: true, subtree: true });
+    return () => { ro.disconnect(); mo.disconnect(); clearTimeout(t); };
+  }, []);
   if (!connected) return <div className="now-card mini empty"><span className="now-title">Open Praxis to connect first.</span></div>;
   return <NowCard mini />;
 }

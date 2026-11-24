@@ -18,22 +18,56 @@ import { useNow } from "./useNow";
 import { CheckIcon, PlanBanner } from "./Timeline";
 
 const ROW_H = 70;           // one row of blocks
-const LABEL_MIN = 170;      // the least room a block's label gets
-/** Room a block's label needs (px), so labels of short blocks never run into each other. */
-export const labelPx = (title: string) => Math.min(380, Math.max(LABEL_MIN, 56 + title.length * 7.4));
+const LABEL_MIN = 120;      // the least room a block's label gets
+const LABEL_MAX = 380;      // past this, a long title ends in "…" (the full title is in the tooltip)
 const HOURS_VISIBLE = 13;   // how much of the day fits on screen at once
 
-type Item = { key: string; start: number; dur: number; label?: number };
+// Text is measured with the real font (in the page, so variable-font weights count), so a block is always at least as wide as its words.
+let meter: HTMLSpanElement | null = null;
+const widths = new Map<string, number>();
+function textW(text: string, font: string) {
+  if (typeof document === "undefined") return text.length * 7.4;
+  const k = font + "|" + text;
+  const hit = widths.get(k);
+  if (hit !== undefined) return hit;
+  if (!meter) {
+    meter = document.createElement("span");
+    meter.setAttribute("aria-hidden", "true");
+    meter.style.cssText = "position:absolute;left:-9999px;top:0;visibility:hidden;white-space:pre;pointer-events:none";
+    document.body.appendChild(meter);
+  }
+  meter.style.font = `${font} var(--sans)`;
+  meter.textContent = text;
+  const w = meter.getBoundingClientRect().width;
+  if (widths.size > 2000) widths.clear();
+  widths.set(k, w);
+  return w;
+}
+/** Room (px) a block needs for its title and its time line: check button, padding, and the longer of the two. */
+export const labelPx = (title: string, time = "12:00 PM – 12:30 PM · 30m") =>
+  Math.ceil(Math.min(LABEL_MAX, Math.max(LABEL_MIN, 66 + Math.max(textW(title, "600 14px"), textW(time, "12px")))));
+
+type Item = { key: string; start: number; dur: number; label?: number; endAnchored?: boolean };
+
+/** Where a block's box sits (px from the start of the day): as long as its time, or as wide as its words if
+ *  that's wider. A finished block grows to the left instead, so it never reaches past the "now" line. */
+export function boxOf(it: Item, hourW: number) {
+  const t0 = (it.start / 60) * hourW, t1 = t0 + Math.max((it.dur / 60) * hourW - 3, 10);
+  const w = Math.max(t1 - t0, it.label ?? LABEL_MIN);
+  if (!it.endAnchored) return { x0: t0, x1: t0 + w, t0, t1 };
+  const x0 = Math.max(0, t1 - w);
+  return { x0, x1: x0 + w, t0, t1 };
+}
 
 /** Puts blocks in rows so nothing (labels included) overlaps; earlier blocks take the top rows. */
 export function assignRows(items: Item[], hourW: number) {
   const rows: number[] = [];               // right edge (px) of the last thing in each row
   const out = new Map<string, number>();
-  for (const it of [...items].sort((a, b) => a.start - b.start || b.dur - a.dur)) {
-    const x0 = (it.start / 60) * hourW, x1 = Math.max(x0 + (it.dur / 60) * hourW, x0 + (it.label ?? LABEL_MIN)) + 10;
+  const boxes = items.map((it) => ({ it, ...boxOf(it, hourW) })).sort((a, b) => a.x0 - b.x0 || b.it.dur - a.it.dur);
+  for (const { it, x0, x1 } of boxes) {
     let r = rows.findIndex((edge) => edge <= x0);
     if (r < 0) { r = rows.length; rows.push(0); }
-    rows[r] = x1;
+    rows[r] = x1 + 10;
     out.set(it.key, r);
   }
   return { rows: out, count: rows.length };
@@ -41,6 +75,7 @@ export function assignRows(items: Item[], hourW: number) {
 
 export function HorizonPane() {
   const { today, events, projects, cfg, trayIds, loading } = useData();
+  const committedIds = useCommitted();
   const plan = useUi((s) => s.plan);
   const drag = useUi((s) => s.drag);
   const now = useNow();
@@ -48,6 +83,8 @@ export function HorizonPane() {
   const scrolled = useRef(false);
   const [hourW, setHourW] = useState(110);
   const [SKY_H, setSkyH] = useState(150);
+  const [, setFontsReady] = useState(0);
+  useEffect(() => { document.fonts?.ready.then(() => { widths.clear(); setFontsReady((n) => n + 1); }); }, []);
   // Set before positions are worked out this render (dragging reads it too).
   document.documentElement.style.setProperty("--hour-x", `${hourW}px`);
 
@@ -74,10 +111,13 @@ export function HorizonPane() {
   const aheadMin = ahead.reduce((s, b) => s + (b.end - Math.max(b.start, nowMin)), 0);
   const { rise, set } = useMemo(() => sunTimes(now), [ymd(now)]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  const timeText = (b: Block) => b.event ? `${fmtMin(b.start)} – ${fmtMin(b.end)}${b.event.location ? ` · ${b.event.location}` : ""}` : `${fmtMin(b.start)} – ${fmtMin(b.end)} · ${fmtSpan(b.dur)}`;
   const items: Item[] = [
-    ...blocks.map((b, i) => ({ key: b.task ? `t${b.task.id}` : `e${i}`, start: b.start, dur: b.dur, label: labelPx(b.task ? plain(b.task.content) : b.event?.title || "") })),
-    ...(plan.active ? plan.items.map((it, i) => ({ key: `p${i}`, start: it.start, dur: it.dur, label: labelPx(plain(it.task.content)) + 30 })) : []),
+    ...blocks.map((b, i) => ({ key: b.task ? `t${b.task.id}` : `e${i}`, start: b.start, dur: b.dur, endAnchored: b.end <= nowMin,
+      label: labelPx(b.task ? plain(b.task.content) + (b.task.due?.is_recurring ? " ↻" : "") + (b.task && committedIds.has(b.task.id) ? "★ " : "") : b.event?.title || "", timeText(b)) - (b.event ? 30 : 0) })),
+    ...(plan.active ? plan.items.map((it, i) => ({ key: `p${i}`, start: it.start, dur: it.dur, label: labelPx((it.committed ? "★ " : "") + plain(it.task.content), `${fmtMin(it.start)} – ${fmtMin(it.start + it.dur)} ${it.committed ? "" : "Bonus "}${it.source === "milestone" && it.milestone ? "◆ " + plain(it.milestone.content).slice(0, 24) : "Light"}` + "   ") - 30 })) : []),
   ];
+  const itemOf = new Map(items.map((it) => [it.key, it]));
   const { rows, count } = assignRows(items, hourW);
   const lanesH = Math.max(5, count + 1) * ROW_H + 24;
   const width = (TL_END - TL_START) * hourW;
@@ -93,9 +133,13 @@ export function HorizonPane() {
 
   const color = (t: Task) => colorOf(projects.get(t.project_id)?.color) || "var(--accent)";
   const lifting = (t: Task, idx?: number) => !!drag && (idx !== undefined ? drag.proposalIdx === idx : drag.proposalIdx === undefined && drag.task.id === t.id);
-  const pos = (start: number, dur: number, row: number, c: string): CSSProperties => ({
-    left: X(start), width: Math.max((dur / 60) * hourW - 3, 10), top: SKY_H + 30 + row * ROW_H, ["--c" as string]: c,
-  });
+  const pos = (start: number, dur: number, row: number, c: string, key?: string): CSSProperties => {
+    const it = (key && itemOf.get(key)) || { key: "", start, dur, label: labelPx(drag ? plain(drag.task.content) : "") };
+    const bx = boxOf({ ...it, start: start - TL_START * 60, dur }, hourW);
+    return { left: bx.x0, width: bx.x1 - bx.x0, top: SKY_H + 30 + row * ROW_H, ["--c" as string]: c,
+      ["--len-l" as string]: `${bx.t0 - bx.x0}px`, ["--len-w" as string]: `${bx.t1 - bx.t0}px` };
+  };
+  const isShort = (key: string, dur: number) => { const it = itemOf.get(key); return !!it && (it.label ?? LABEL_MIN) > (dur / 60) * hourW - 3; };
   const onBlockDown = (e: PointerEvent, b: Block) => {
     if (e.button !== 0 || (e.target as HTMLElement).closest(".blk-check") || !b.task) return;
     e.preventDefault();
@@ -144,15 +188,18 @@ export function HorizonPane() {
             {hours.map((h) => <span key={h} style={{ left: X(h * 60) }}>{new Date(2000, 0, 1, h % 24).toLocaleTimeString([], { hour: "numeric" })}</span>)}
           </div>
           <div className="hz-lanes" style={{ top: SKY_H + 30, height: lanesH, backgroundSize: `${hourW}px 100%` }} />
-          {work && <div className="hz-band work" style={{ left: X(work[0]), width: X(work[1]) - X(work[0]), top: SKY_H + 30, height: lanesH }}><span>Work</span></div>}
-          {dayEnd < TL_END * 60 && <div className="hz-band off" style={{ left: X(dayEnd), width: X(TL_END * 60) - X(dayEnd), top: SKY_H + 30, height: lanesH }}><span>Wind down</span></div>}
+          {work && <div className="hz-band work" id="hz-work" style={{ left: X(work[0]), width: X(work[1]) - X(work[0]), top: SKY_H + 30, height: lanesH }}>
+            {nowMin < work[1] && <span style={{ left: 8 + Math.max(0, Math.min(X(nowMin), X(work[1]) - 170) - X(work[0])) }}>Work hours · until {fmtMin(work[1])}</span>}</div>}
+          {dayEnd < TL_END * 60 && <div className="hz-band off" style={{ left: X(dayEnd), width: X(TL_END * 60) - X(dayEnd), top: SKY_H + 30, height: lanesH }}>
+            <span style={{ left: 8 + Math.max(0, X(nowMin) - X(dayEnd)) }}>Wind down</span></div>}
           {now.getHours() >= TL_START && <div className="hz-past" style={{ width: Math.max(0, X(nowMin)), top: 0, height: SKY_H + 30 + lanesH }} aria-hidden="true" />}
 
           {plan.active && plan.items.map((it, i) => {
             const wp = willpower(it.task, cfg);
             return (
-              <div key={`p${i}`} className={`tl-block proposed ${it.committed ? "committed" : "bonus"} ${lifting(it.task, i) ? "lifting" : ""}`} data-idx={i} data-committed={it.committed ? "1" : "0"}
-                   style={pos(it.start, it.dur, rows.get(`p${i}`) || 0, color(it.task))} onPointerDown={(e) => onProposalDown(e, i)}>
+              <div key={`p${i}`} className={`tl-block proposed ${it.committed ? "committed" : "bonus"} ${lifting(it.task, i) ? "lifting" : ""} ${isShort(`p${i}`, it.dur) ? "short" : ""}`} data-idx={i} data-committed={it.committed ? "1" : "0"}
+                   style={pos(it.start, it.dur, rows.get(`p${i}`) || 0, color(it.task), `p${i}`)} onPointerDown={(e) => onProposalDown(e, i)}>
+                <span className="blk-len" aria-hidden="true" />
                 <div className="blk-body">
                   <div className="blk-title">{it.committed ? <span className="commit-star" title="Committed">★ </span> : null}{plain(it.task.content)}</div>
                   <div className="blk-time">
@@ -168,20 +215,21 @@ export function HorizonPane() {
           })}
 
           {blocks.map((b, i) => b.event ? (
-            <div key={`e${i}`} className={`tl-block event ${b.end <= nowMin ? "past" : ""} ${b.event.transparent ? "free" : ""}`}
-                 style={pos(b.start, b.dur, rows.get(`e${i}`) || 0, b.event.color || "#8a8178")}
+            <div key={`e${i}`} className={`tl-block event ${b.end <= nowMin ? "past" : ""} ${b.event.transparent ? "free" : ""} ${isShort(`e${i}`, b.dur) ? "short" : ""}`}
+                 style={pos(b.start, b.dur, rows.get(`e${i}`) || 0, b.event.color || "#8a8178", `e${i}`)}
                  title={`${b.event.title} · ${fmtMin(b.start)}–${fmtMin(b.end)}${b.event.location ? " · " + b.event.location : ""}${b.event.calendar ? ` (${b.event.calendar})` : ""}`}>
+              <span className="blk-len" aria-hidden="true" />
               <div className="blk-body">
                 <div className="blk-title">{b.event.title}</div>
                 <div className="blk-time">{fmtMin(b.start)} – {fmtMin(b.end)}{b.event.location ? ` · ${b.event.location}` : ""}</div>
               </div>
             </div>
           ) : (
-            <HzTask key={b.task!.id} b={b} color={color(b.task!)} past={b.end <= nowMin} lifting={lifting(b.task!)} style={pos(b.start, b.dur, rows.get(`t${b.task!.id}`) || 0, color(b.task!))} onPointerDown={(e) => onBlockDown(e, b)} />
+            <HzTask key={b.task!.id} b={b} color={color(b.task!)} past={b.end <= nowMin} lifting={lifting(b.task!)} short={isShort(`t${b.task!.id}`, b.dur)} style={pos(b.start, b.dur, rows.get(`t${b.task!.id}`) || 0, color(b.task!), `t${b.task!.id}`)} onPointerDown={(e) => onBlockDown(e, b)} />
           ))}
 
           {target && (
-            <div className="tl-block preview" style={{ ...pos(target.start, target.dur, 0, "var(--accent)"), top: SKY_H + 30 + (drag?.kind !== "new" && drag?.proposalIdx === undefined ? (rows.get(`t${drag!.task.id}`) ?? 0) : drag?.proposalIdx !== undefined ? (rows.get(`p${drag.proposalIdx}`) ?? 0) : count) * ROW_H }}>
+            <div className="tl-block preview" style={{ ...pos(target.start, target.dur, 0, "var(--accent)", drag?.kind !== "new" && drag?.proposalIdx === undefined ? `t${drag!.task.id}` : drag?.proposalIdx !== undefined ? `p${drag.proposalIdx}` : undefined), top: SKY_H + 30 + (drag?.kind !== "new" && drag?.proposalIdx === undefined ? (rows.get(`t${drag!.task.id}`) ?? 0) : drag?.proposalIdx !== undefined ? (rows.get(`p${drag.proposalIdx}`) ?? 0) : count) * ROW_H }}>
               <div className="blk-body">
                 <div className="blk-title">{plain(drag!.task.content)}</div>
                 <div className="blk-time">{fmtMin(target.start)} – {fmtMin(target.start + target.dur)} · {fmtSpan(target.dur)}</div>
@@ -228,13 +276,14 @@ function SunArc({ width, rise, set, nowMin, X, skyH: SKY_H }: { width: number; r
   );
 }
 
-function HzTask({ b, color, past, lifting, style, onPointerDown }: { b: Block; color: string; past: boolean; lifting: boolean; style: CSSProperties; onPointerDown: (e: PointerEvent) => void }) {
+function HzTask({ b, color, past, lifting, short, style, onPointerDown }: { b: Block; color: string; past: boolean; lifting: boolean; short: boolean; style: CSSProperties; onPointerDown: (e: PointerEvent) => void }) {
   const committed = useCommitted();
   const t = b.task!;
   const rec = t.due && t.due.is_recurring;
   return (
-    <div className={`tl-block ${past ? "past" : ""} ${lifting ? "lifting" : ""}`} data-id={t.id} style={{ ...style, ["--c" as string]: color }}
+    <div className={`tl-block ${past ? "past" : ""} ${lifting ? "lifting" : ""} ${short ? "short" : ""}`} data-id={t.id} style={{ ...style, ["--c" as string]: color }}
          title={`${plain(t.content)} · ${fmtMin(b.start)}–${fmtMin(b.end)}`} onPointerDown={onPointerDown}>
+      <span className="blk-len" aria-hidden="true" />
       <button className="blk-check" title="Complete" aria-label="Complete task" onClick={() => completeTask(t)}><CheckIcon /></button>
       <div className="blk-body">
         <div className="blk-title">{committed.has(t.id) && <span className={`commit-star ${committed.get(t.id)!.star ? "the-one" : ""}`}>★ </span>}{plain(t.content)}{rec ? <span className="rec" title="Repeats"> ↻</span> : null}</div>

@@ -49,7 +49,7 @@ if (!app.requestSingleInstanceLock()) {
 async function start() {
   const { listen, store } = createPraxisServer({
     dataDir: app.getPath("userData"), staticDir: rendererDir,
-    desktop: { nudge: (action, key) => onNudgeAction(action, key), test: () => showNudge(testNudge(), true) },
+    desktop: { nudge: (action, key) => onNudgeAction(action, key), test: () => showNudge(testNudge(), true), miniFit },
   });
   readConfig = store.readConfig;
   startNudger();
@@ -167,6 +167,18 @@ function openMini() {
   const keep = () => { if (mini && !mini.isDestroyed()) writePrefs({ miniBounds: mini.getBounds() }); };
   mini.on("moved", keep); mini.on("resized", keep);
   mini.on("closed", () => { mini = null; });
+}
+
+/** The pop-out keeps the width you gave it; its height follows what it shows. It grows upward when it sits low on the screen. */
+function miniFit(height: number) {
+  if (!mini || mini.isDestroyed()) return;
+  const b = mini.getBounds();
+  const wa = screen.getDisplayMatching(b).workArea;
+  const h = Math.max(90, Math.min(height, 420, wa.height));
+  if (Math.abs(h - b.height) < 4) return;
+  const lowHalf = b.y + b.height / 2 > wa.y + wa.height / 2;
+  const y = Math.max(wa.y, Math.min(lowHalf ? b.y + b.height - h : b.y, wa.y + wa.height - h));
+  mini.setBounds({ x: b.x, y, width: b.width, height: h });
 }
 
 function toggleFullScreen() {

@@ -14,7 +14,7 @@ export interface ServerOptions {
   staticDir: string;
   todoistBase?: string;
   /** Only in the desktop app: reminders that float above other windows. */
-  desktop?: { nudge(action: string, key: string): void; test(): void };
+  desktop?: { nudge(action: string, key: string): void; test(): void; miniFit?(height: number): void };
 }
 
 const MIME: Record<string, string> = {
@@ -103,6 +103,15 @@ export function createPraxisServer(opts: ServerOptions) {
       let body: { action?: string; key?: string };
       try { body = JSON.parse((await readBody(req)) || "{}"); } catch { return sendJSON(res, 400, { error: "Invalid JSON" }); }
       opts.desktop.nudge(String(body.action || "").slice(0, 20), String(body.key || "").slice(0, 200));
+      return sendJSON(res, 200, { ok: true });
+    }
+
+    if (route === "POST /api/desktop/mini-fit") {
+      if (!opts.desktop?.miniFit) return sendJSON(res, 404, { error: "Only in the desktop app." });
+      let body: { height?: number };
+      try { body = JSON.parse((await readBody(req)) || "{}"); } catch { return sendJSON(res, 400, { error: "Invalid JSON" }); }
+      const h = Number(body.height);
+      if (Number.isFinite(h)) opts.desktop.miniFit(Math.round(h));
       return sendJSON(res, 200, { ok: true });
     }
 
