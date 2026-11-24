@@ -144,6 +144,17 @@ namespace PraxisWall {
         x = p.X; y = p.Y; w = mi.rcMonitor.Right - mi.rcMonitor.Left; h = mi.rcMonitor.Bottom - mi.rcMonitor.Top;
       } else { x = -GetSystemMetrics(76); y = -GetSystemMetrics(77); }
       SetWindowPos(me, IntPtr.Zero, x, y, w, h, 0x0004 | 0x0010 | 0x0040);
+      // Measure where it actually landed on screen and nudge it until it matches the main screen
+      // (the parent's coordinates can be offset or DPI-scaled in ways a single conversion gets wrong).
+      int tl = mi.rcMonitor.Left, tt = mi.rcMonitor.Top, tw = mi.rcMonitor.Right - mi.rcMonitor.Left, th = mi.rcMonitor.Bottom - mi.rcMonitor.Top;
+      if (tw > 0 && th > 0) for (int i = 0; i < 4; i++) {
+        RECT got; if (!GetWindowRect(me, out got)) break;
+        int gw = got.Right - got.Left, gh = got.Bottom - got.Top;
+        if (got.Left == tl && got.Top == tt && gw == tw && gh == th) break;
+        if (gw > 0 && gh > 0) { w = (int)Math.Round((double)w * tw / gw); h = (int)Math.Round((double)h * th / gh); }
+        x += tl - got.Left; y += tt - got.Top;
+        SetWindowPos(me, IntPtr.Zero, x, y, w, h, 0x0004 | 0x0010 | 0x0040);
+      }
       if (how == "progman") { IntPtr dv = FindWindowEx(progman, IntPtr.Zero, "SHELLDLL_DefView", null); if (dv != IntPtr.Zero) SetWindowPos(me, dv, x, y, w, h, 0x0010 | 0x0040); }
       return how + " " + x + "," + y + " " + w + "x" + h;
     }
