@@ -115,6 +115,12 @@ Praxis is built to be easy on the eyes on a big monitor all day:
 - **Readable type**: Atkinson Hyperlegible for text (designed for legibility) and Bricolage Grotesque for headings, bundled so they work offline.
 - **Calm motion**: finishing a task fills the circle and folds the row away; the focus timer is a ring that fills. If Windows has "Show animations" turned off, Praxis stops animating too.
 
+## Weather and motion (3.5)
+
+**The real weather.** With the wallpaper on, Praxis checks the weather here every 15 minutes with the US National Weather Service (weather.gov): the nearest station's reading, or the hourly forecast when the station has nothing. Rain falls as rain, fog lies as mist on the lake, overcast greys the light and hides most of the stars, and the wind sets how hard things move. In deep winter, cold rain falls as snow in the valley. No account or key: each request just names the app, as the service asks. Switch it off in the Wallpaper dialog.
+
+**A moving wallpaper (experimental).** Tick "Make it move" and the valley comes alive behind your desktop icons: grass and trees sway in the real wind, the lake shimmers, stars twinkle, mist drifts, rain or snow falls. It holds still while a full-screen app is in front, when the PC is locked and on battery. If Windows ever stops showing it, the still picture is always underneath.
+
 ## Your mottos on the valley (3.4)
 
 Turn it on under ⋯ → **Wallpaper…** (or the tray menu). Your Windows wallpaper becomes a landscape drawn live behind your mottos:
@@ -352,7 +358,7 @@ Pushes that don't change the version are only checked, not released.
 - ~~3.2.1: every block fits its words, the pop-out grows to fit~~ ✓
 - ~~3.3: stay in view: the edge horizon strip and the tray sundial~~ ✓
 - ~~3.4: the valley: your mottos on a living landscape as the wallpaper (seasons by date, light by the hour)~~ ✓
-- 3.5: real Milpitas weather on the wallpaper, and an optional live (moving) wallpaper
+- ~~3.5: real Milpitas weather on the wallpaper, and an optional live (moving) wallpaper~~ ✓
 - 3.6: never rot: offline queue, self-healing days, capture hotkey
 - 3.7: rewards: sky events, constellation legends, the Sunday letter, optional sound
 - 3.8: finish the theme: sunrise and sunset rituals, ideas as clouds, Areas in the sky, the Horizon clouds over as the day fills

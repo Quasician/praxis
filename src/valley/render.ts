@@ -57,7 +57,7 @@ const DESIGN_TO_CLIP = `vec4 clipOf(vec2 d) { return vec4(d.x / 5120.0 * 2.0 - 1
 const SKY_FS = COMMON + `
 uniform sampler2D uGrad;
 uniform vec3 uGlowC0, uGlowC1, uGlow0, uGlow1;   // colour; amount, width, height
-uniform float uGlowX, uWet, uDim, uMoonPhase, uUp;
+uniform float uGlowX, uGrey, uDim, uMoonPhase, uUp;
 uniform vec4 uSun;                                // x, y, radius
 uniform vec3 uSunC;
 void main() {
@@ -70,7 +70,7 @@ void main() {
   c = mix(c, uGlowC0, a0);
   float a1 = exp(-pow((p.x - uGlowX) / (5120.0 * uGlow1.y), 2.0)) * exp(-pow(up / (2160.0 * uGlow1.z), 2.0)) * uGlow1.x * calm;
   c = mix(c, uGlowC1, a1);
-  if (uWet > 0.5) { float m = (c.r + c.g + c.b) / 3.0; c = c * 0.78 + m * 0.14; }
+  if (uGrey > 0.0) { float m = (c.r + c.g + c.b) / 3.0; c = c * (1.0 - 0.22 * uGrey) + m * 0.14 * uGrey; }
   float px = 5120.0 / uRes.x;
   vec2 q = p - uSun.xy; float d = length(q), r = uSun.z;
   vec3 add = vec3(0.0);
@@ -477,6 +477,16 @@ export class ValleyRenderer {
     this.bind(p, "uNear", this.tex.near, 1);
   }
 
+  private fgCache: { key: string; tris: number[]; shore: number[]; corners: number[]; fg: number[]; fd: number[] } | null = null;
+  private forestCache: { key: string; data: number[] } | null = null;
+  private inkCache: { img: ImageBitmap | null | undefined; out: ReturnType<ValleyRenderer["inkPass"]> } | null = null;
+  /** The motto's ink, worked out once per motto (the live wallpaper draws many frames of the same one). */
+  private inkFor(img: ImageBitmap | null | undefined) {
+    if (this.inkCache && this.inkCache.img === img) return this.inkCache.out;
+    const out = this.inkPass(img);
+    this.inkCache = { img, out };
+    return out;
+  }
   /** The motto's lettering: a crisp mask, a quarter-size soft copy, its bounding box and where it's clear of words. */
   private inkPass(img: ImageBitmap | null | undefined) {
     const gl = this.gl;
@@ -557,7 +567,7 @@ export class ValleyRenderer {
   render(o: RenderOpts): RenderInfo {
     const t0 = performance.now();
     const gl = this.gl, P = this.progs, d = this.assets.data, mask = !!o.mask, time = o.time || 0, wind = o.wind ?? 0;
-    const ink = this.inkPass(mask ? null : o.motto);
+    const ink = this.inkFor(mask ? null : o.motto);
     const sc = sceneAt({ when: o.when, weather: o.weather, width: this.W, height: this.H, box: ink.box });
     const se = sc.season, L = sc.light, gs = se.groundSnow, winter = gs > 0.5;
     const pxD = DESIGN_W / this.W;                // design units per pixel
@@ -574,7 +584,7 @@ export class ValleyRenderer {
       const p = P.sky; this.common(p, sc, mask); this.bind(p, "uGrad", this.tex.grad, 2);
       gl.uniform3fv(p.u("uGlowC0"), sc.glows[0].color); gl.uniform3f(p.u("uGlow0"), sc.glows[0].amount, sc.glows[0].sx, sc.glows[0].sy);
       gl.uniform3fv(p.u("uGlowC1"), sc.glows[1].color); gl.uniform3f(p.u("uGlow1"), sc.glows[1].amount, sc.glows[1].sx, sc.glows[1].sy);
-      gl.uniform1f(p.u("uGlowX"), sc.glowX); gl.uniform1f(p.u("uWet"), sc.wet ? 1 : 0); gl.uniform1f(p.u("uDim"), sc.wet ? 0.5 : sc.weather === "cloudy" ? 0.75 : 1);
+      gl.uniform1f(p.u("uGlowX"), sc.glowX); gl.uniform1f(p.u("uGrey"), sc.grey); gl.uniform1f(p.u("uDim"), sc.wet ? 0.5 : sc.weather === "cloudy" ? 0.75 : 1);
       gl.uniform1f(p.u("uMoonPhase"), sc.moon); gl.uniform1f(p.u("uUp"), sc.up ? 1 : 0);
       gl.uniform4f(p.u("uSun"), sc.sunX, sc.sunY, sc.up ? 30 : 26, 0); gl.uniform3fv(p.u("uSunC"), sc.sun);
     });
@@ -628,7 +638,9 @@ export class ValleyRenderer {
 
     // 4. The forests on the hills, far to near.
     const flip = sc.lightX < 0;
-    const forest = this.treeInstances(d.forest, sc, winter);
+    const fk = `${sc.when.toDateString()}|${Math.floor(sc.minute / 5)}|${sc.weather}`;
+    const forest = this.forestCache?.key === fk ? this.forestCache.data : this.treeInstances(d.forest, sc, winter);
+    this.forestCache = { key: fk, data: forest };
     this.drawTrees(forest, sc, mask, flip, time, wind * 0.4);
 
     // 5. Mist lying in the valley.
@@ -659,16 +671,18 @@ export class ValleyRenderer {
     }, "over");
 
     // 8. Rocks, shrubs and trees on the near shore, then the dark corner firs.
+    const fgKey = `${sc.when.toDateString()}|${Math.floor(sc.minute)}|${sc.weather}|${flip}`;
+    const built = this.fgCache?.key === fgKey ? this.fgCache : null;
     const rg = rng(31);
     const nearAt = (x: number) => d.near[Math.max(0, Math.min(5119, Math.floor(x)))];
     const sideAt = (x: number) => d.side[Math.max(0, Math.min(5119, Math.floor(x)))];
     const meadowY = (x: number, t: number) => nearAt(x) + 8 + t * (2176 - nearAt(x));
     const hazeAt = (x: number): RGB => { const i = Math.max(0, Math.min(1023, Math.floor(x / 5120 * 1024))); return [sc.haze[i * 3], sc.haze[i * 3 + 1], sc.haze[i * 3 + 2]]; };
     const silAt = (x: number): RGB => { const h = hazeAt(x); return [h[0] * .09 + sc.dark[0] * .91, h[1] * .09 + sc.dark[1] * .91, h[2] * .09 + sc.dark[2] * .91]; };
-    const tris: number[] = [];
+    const tris: number[] = built ? built.tris : [];
     const litDir = sc.lightX >= 0 ? 1 : -1, vG = 0.12 + 0.42 * L;
     const rockc: RGB = [116, 112, 118];
-    for (let n = 0; n < 34; n++) {
+    for (let n = 0; n < (built ? 0 : 34); n++) {
       const x = rg() * 5120, t = Math.pow(rg(), .7), yb = meadowY(x, t);
       if (yb > 2170) continue;
       const sz = (16 + rg() * 28) * (.55 + 1.3 * t), s_ = silAt(x);
@@ -691,17 +705,17 @@ export class ValleyRenderer {
     }
     this.drawTris(tris, mask);
 
-    const shore = this.treeInstances(d.shore, sc, winter);
+    const shore = built ? built.shore : this.treeInstances(d.shore, sc, winter);
     this.drawTrees(shore, sc, mask, flip, time, wind);
-    const corners = this.treeInstances(d.corners, sc, winter);
+    const corners = built ? built.corners : this.treeInstances(d.corners, sc, winter);
     this.drawTrees(corners, sc, mask, flip, time, wind * 0.5);
 
     // 9. Reeds, grass, flowers or fallen leaves or snow drifts.
     const gcol = (x: number, k: number, lift = 0): RGB => { const s_ = silAt(x); return s_.map((v, i) => Math.min(255, v * (1 - vG) + se.grass[i] * vG * k + sc.sun[i] * lift * L)) as RGB; };
-    const fg: number[] = [], fd: number[] = [];
+    const fg: number[] = built ? built.fg : [], fd: number[] = built ? built.fd : [];
     const lakeCols: number[] = [];
     for (let x = 0; x < 5120; x += 4) if (nearAt(x) > d.lakeY + 30) lakeCols.push(x);
-    if (lakeCols.length) for (let n = 0; n < 46; n++) {
+    if (lakeCols.length && !built) for (let n = 0; n < 46; n++) {
       const x = lakeCols[Math.floor(rg() * lakeCols.length)], yb = nearAt(x) + 3;
       for (let b = 0, m = 5 + Math.floor(rg() * 7); b < m; b++) {
         const xx = x + (rg() * 52 - 26), hh = 20 + rg() * 28, lean = rg() * .24 - .12, c = gcol(x, .6 + rg() * .4);
@@ -711,7 +725,7 @@ export class ValleyRenderer {
       }
     }
     const tufts: [number, number, number][] = [];
-    for (let n = 0; n < 5200; n++) { const x = rg() * 5120, t = Math.pow(rg(), .75); tufts.push([meadowY(x, t), x, t]); }
+    if (!built) for (let n = 0; n < 5200; n++) { const x = rg() * 5120, t = Math.pow(rg(), .75); tufts.push([meadowY(x, t), x, t]); }
     tufts.sort((a, b) => a[0] - b[0]);
     for (const [yb, x, t] of tufts) {
       if (yb > 2200) continue;
@@ -726,7 +740,7 @@ export class ValleyRenderer {
     }
     const vf = .2 + .62 * L;
     const dot = (x: number, y: number, r: number, c: RGB) => { const s_ = silAt(x); fd.push(x, y, r, r * .8, ...s_.map((v, i) => v * (1 - vf) + c[i] * vf), 1, 0, 0, 0, 0); };
-    if (se.flowers > 0.02) {
+    if (se.flowers > 0.02 && !built) {
       for (let n = 0, m = Math.round(58 * se.flowers); n < m; n++) {
         const cx = rg() * 5120, ct = Math.pow(rg(), .7), c = se.flowerColors[Math.floor(rg() * se.flowerColors.length)];
         for (let f = 0, k = 14 + Math.floor(rg() * 26); f < k; f++) {
@@ -735,20 +749,21 @@ export class ValleyRenderer {
         }
       }
     }
-    if (se.fallen > 0.02) {
+    if (se.fallen > 0.02 && !built) {
       const cols: RGB[] = [[232, 178, 52], [206, 78, 40], [226, 122, 40], [150, 84, 42]];
       for (let n = 0, m = Math.round(1500 * se.fallen); n < m; n++) {
         const x = rg() * 5120, t = Math.pow(rg(), .7);
         if (rg() < .12 + .88 * sideAt(x)) dot(x, meadowY(x, t) - 1, 1.4 + 3.2 * t, cols[Math.floor(rg() * 4)]);
       }
     }
-    if (gs > 0.05) {
+    if (gs > 0.05 && !built) {
       const sc_ = sc.snowShade.map((v, i) => v * .45 + sc.snowLit[i] * .55) as RGB;
       for (let n = 0; n < 240; n++) {
         const x = rg() * 5120, t = Math.pow(rg(), .7), yb = meadowY(x, t), r = (5 + 20 * t) * (.6 + rg() * .7);
         fd.push(x, yb, r * 9, r * .5, sc_[0], sc_[1], sc_[2], (90 + rg() * 110) / 255 * .6 * Math.min(1, gs / 0.6), 9, 0, 0, 1);
       }
     }
+    if (!built) this.fgCache = { key: fgKey, tris, shore, corners, fg, fd };
     gl.bindFramebuffer(gl.FRAMEBUFFER, this.A.fb); gl.viewport(0, 0, this.W, this.H);
     gl.enable(gl.BLEND); gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
     this.drawSegs(fg, sc, false, time, wind, 0, mask);

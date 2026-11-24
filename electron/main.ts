@@ -43,7 +43,7 @@ if (!app.requestSingleInstanceLock()) {
   app.on("second-instance", (_e, argv) => { if (!runArgs(argv)) showWindow(); });
   app.whenReady().then(start).catch((e) => { log("startup failed", e?.stack || e); dialog.showErrorBox("Praxis couldn't start", String(e)); app.quit(); });
   app.on("before-quit", () => { quitting = true; });
-  app.on("will-quit", () => globalShortcut.unregisterAll());
+  app.on("will-quit", () => { globalShortcut.unregisterAll(); wallpaper?.stop(); });
   app.on("window-all-closed", () => { /* stay in the tray */ });
 }
 
@@ -239,6 +239,10 @@ async function wallpaperAction(action: string, arg?: string) {
     case "enable": return wallpaper.enable(arg);
     case "disable": return wallpaper.disable();
     case "refresh": return wallpaper.refresh();
+    case "live-on": return wallpaper.setLive(true);
+    case "live-off": return wallpaper.setLive(false);
+    case "weather-on": return wallpaper.setWeather(true);
+    case "weather-off": return wallpaper.setWeather(false);
     case "folder": return arg ? wallpaper.setFolder(arg) : wallpaper.state();
     case "pick-folder": {
       const st = wallpaper.state();

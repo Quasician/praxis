@@ -13,6 +13,9 @@ declare global {
       dataURL(type?: string, quality?: number, scale?: number): string;
       maskCount(box: [number, number, number, number]): number;
       wallpaper(job: WallpaperJob): Promise<{ file: string; ms: number }>;
+      live(job: WallpaperJob & { wind?: number }): Promise<void>;
+      pause(on: boolean): void;
+      fps(): number;
       error?: string;
     };
   }
@@ -82,6 +85,14 @@ export function ValleyPage() {
         for (let y = Math.floor(box[1] * k); y < Math.min(H, box[3] * k); y++) for (let x = Math.floor(box[0] * k); x < Math.min(W, box[2] * k); x++) if (px[(y * W + x) * 4] > 8) n++;
         return n;
       },
+      async live(job) {
+        const [w, h] = coverSize();
+        await ensure(w, h);
+        liveJob = job;
+        if (!loop && !paused) frame();
+      },
+      pause(on) { paused = on; if (!on && liveJob && !loop) frame(); },
+      fps() { const s = (performance.now() - since) / 1000; const f = frames / Math.max(1, s); frames = 0; since = performance.now(); return Math.round(f * 10) / 10; },
       /** Draws one wallpaper and hands it to the desktop app, which saves it and sets it. */
       async wallpaper(job) {
         const t0 = performance.now();
@@ -96,6 +107,30 @@ export function ValleyPage() {
         return { file, ms: Math.round(performance.now() - t0) };
       },
     };
+    // ---------- the live (moving) wallpaper: the same picture, redrawn ~12 times a second with the wind and water moving ----------
+    let liveJob: (WallpaperJob & { wind?: number }) | null = null, paused = false, frames = 0, since = performance.now(), loop = 0;
+    const live = location.search.includes("live=1");
+    const frame = async () => {
+      loop = 0;
+      if (!liveJob || paused || !renderer) return;
+      const t0 = performance.now();
+      try {
+        const motto = await mottoBitmap(liveJob.motto, renderer.W, renderer.H);
+        renderer.render({ when: new Date(), weather: liveJob.weather, motto, projects: liveJob.projects, time: t0 / 1000, wind: liveJob.wind ?? 0.2 });
+        renderer.present();
+        frames++;
+      } catch (e) { window.__valley!.error = String((e as Error)?.message || e); return; }
+      loop = window.setTimeout(frame, Math.max(4, 83 - (performance.now() - t0)));   // ~12 a second; timers, not animation frames, so it keeps going behind the icons
+    };
+    const coverSize = () => {
+      const dpr = window.devicePixelRatio || 1, w = Math.round(innerWidth * dpr), h = Math.round(innerHeight * dpr);
+      const W = Math.min(8192, Math.max(w, Math.round(h * 5120 / 2160)));
+      return [W, Math.round(W * 2160 / 5120)];
+    };
+    if (live) {
+      document.documentElement.classList.add("valley-live");
+      window.addEventListener("resize", () => { if (liveJob) { const [w, h] = coverSize(); ensure(w, h); } });
+    }
     (async () => {
       try { await ensure(640, 270); window.__valley!.ready = true; setStatus("Ready"); }
       catch (e) { window.__valley!.error = String((e as Error)?.message || e); setStatus(window.__valley!.error); }

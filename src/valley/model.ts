@@ -154,7 +154,7 @@ export interface Scene {
   stars: number; light: number;         // 0..1
   up: boolean; sunX: number; sunY: number; moon: number; moonLit: number;
   lightX: number; lightDir: [number, number, number];
-  season: Season; weather: Weather; wet: boolean;
+  season: Season; weather: Weather; wet: boolean; grey: number;   // grey: how overcast the light is (0..1)
   minute: number; when: Date;
 }
 
@@ -168,6 +168,7 @@ export const distOut = (x: number, y: number) => Math.hypot(Math.max(KEEP[0] - x
 export function sceneAt(o: SceneOpts): Scene {
   const when = o.when, weather = o.weather || "clear";
   const wet = weather === "rain" || weather === "snow";
+  const grey = wet ? 1 : weather === "cloudy" ? .6 : weather === "mist" ? .3 : 0;
   const { rise, set } = sunTimes(when, o.lat, o.lng);
   const minute = when.getHours() * 60 + when.getMinutes() + when.getSeconds() / 60;
   const w = phaseWeights(minute, rise, set);
@@ -215,10 +216,10 @@ export function sceneAt(o: SceneOpts): Scene {
       const a = Math.exp(-(((x - glowX) / (DESIGN_W * g.sx)) ** 2)) * Math.exp(-((Math.max(0, HZ - yh) / (DESIGN_H * g.sy)) ** 2)) * g.amount * calm;
       c = c.map((v, j) => v * (1 - a) + g.color[j] * a);
     }
-    if (wet) { const m = (c[0] + c[1] + c[2]) / 3; c = c.map((v) => v * .78 + m * .14); }
+    if (grey) { const m = (c[0] + c[1] + c[2]) / 3; c = c.map((v) => v * (1 - .22 * grey) + m * .14 * grey); }
     haze.set(c, i * 3);
   }
-  const L = P((p) => p.light) * (wet ? .6 : 1);
+  const L = P((p) => p.light) * (1 - .4 * grey);
   return {
     w: o.width || DESIGN_W, h: o.height || DESIGN_H, gradient, glows, glowX, haze,
     dark: C((p) => p.dark), sun: C((p) => p.sun),
@@ -227,6 +228,6 @@ export function sceneAt(o: SceneOpts): Scene {
     stars: P((p) => p.stars) * (wet ? .2 : weather === "cloudy" ? .45 : 1), light: L,
     up, sunX, sunY, moon: moonPhase(when), moonLit: up ? 0 : 1,
     lightX, lightDir: [ld[0] / ln, ld[1] / ln, ld[2] / ln],
-    season, weather, wet, minute, when,
+    season, weather, wet, grey, minute, when,
   };
 }

@@ -7,7 +7,11 @@ import { app, BrowserWindow, powerMonitor, screen } from "electron";
 import { execFile } from "child_process";
 import fs from "fs";
 import path from "path";
+import { spawn, type ChildProcess } from "child_process";
 import { safeMottoName } from "../server/app";
+import { currentWeather } from "./weather";
+import type { ValleyWeather } from "../src/valley/weather";
+import { DEFAULT_LAT, DEFAULT_LNG } from "../src/domain/sun";
 
 type Cfg = Record<string, unknown>;
 export interface WallpaperDeps {
@@ -20,6 +24,8 @@ export interface WallpaperCfg {
   bag?: string[]; current?: { name: string; hour: string } | null;
   tags?: Record<string, string>; saved?: Saved | null;
   last?: { at: string; file: string; motto: string; ms: number } | null; error?: string | null;
+  weather?: ValleyWeather | null; useWeather?: boolean; lat?: number; lng?: number;
+  liveHow?: string | null;
 }
 export interface WallpaperState extends WallpaperCfg { windows: boolean; mottos: number; defaultFolder: string }
 
@@ -86,6 +92,59 @@ namespace PraxisWall {
       return new string[] { status, wall, folder, opts, tick, pos };
     }
     public static void Set(string path, int position) { var d = D(); d.SetPosition(position); d.SetWallpaper(null, path); }
+
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)] static extern IntPtr FindWindow(string cls, string name);
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)] static extern IntPtr FindWindowEx(IntPtr parent, IntPtr after, string cls, string name);
+    [DllImport("user32.dll")] static extern IntPtr SendMessageTimeout(IntPtr h, uint msg, IntPtr w, IntPtr l, uint flags, uint timeout, out IntPtr result);
+    [DllImport("user32.dll")] static extern IntPtr SetParent(IntPtr child, IntPtr parent);
+    [DllImport("user32.dll")] static extern bool SetWindowPos(IntPtr h, IntPtr after, int x, int y, int cx, int cy, uint flags);
+    public delegate bool EnumProc(IntPtr h, IntPtr l);
+    [DllImport("user32.dll")] static extern bool EnumWindows(EnumProc cb, IntPtr l);
+    [DllImport("user32.dll")] static extern IntPtr GetForegroundWindow();
+    [DllImport("user32.dll")] static extern bool GetWindowRect(IntPtr h, out RECT r);
+    [DllImport("user32.dll")] static extern IntPtr MonitorFromWindow(IntPtr h, uint flags);
+    [StructLayout(LayoutKind.Sequential)] public struct MONITORINFO { public int cbSize; public RECT rcMonitor; public RECT rcWork; public uint dwFlags; }
+    [DllImport("user32.dll")] static extern bool GetMonitorInfo(IntPtr m, ref MONITORINFO mi);
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)] static extern int GetClassName(IntPtr h, System.Text.StringBuilder sb, int n);
+    [DllImport("user32.dll")] static extern int GetSystemMetrics(int i);
+    [DllImport("user32.dll")] static extern bool SetProcessDPIAware();
+
+    /** Puts a window behind the desktop icons, over the wallpaper, covering the main screen. */
+    public static string Attach(long hwnd, int w, int h) {
+      SetProcessDPIAware();
+      IntPtr me = new IntPtr(hwnd), r;
+      IntPtr progman = FindWindow("Progman", null);
+      if (progman == IntPtr.Zero) return "no-desktop";
+      SendMessageTimeout(progman, 0x052C, new IntPtr(0xD), new IntPtr(1), 0, 1000, out r);
+      SendMessageTimeout(progman, 0x052C, IntPtr.Zero, IntPtr.Zero, 0, 1000, out r);
+      IntPtr target = IntPtr.Zero; string how = "";
+      // Before Windows 11 24H2: a WorkerW next to the one that holds the icons.
+      EnumWindows(delegate (IntPtr top, IntPtr l) {
+        if (FindWindowEx(top, IntPtr.Zero, "SHELLDLL_DefView", null) != IntPtr.Zero) { IntPtr ww = FindWindowEx(IntPtr.Zero, top, "WorkerW", null); if (ww != IntPtr.Zero) target = ww; }
+        return true;
+      }, IntPtr.Zero);
+      if (target != IntPtr.Zero) how = "workerw";
+      // Windows 11 24H2 and later: the WorkerW lives inside Progman, under the icons.
+      if (target == IntPtr.Zero) { target = FindWindowEx(progman, IntPtr.Zero, "WorkerW", null); if (target != IntPtr.Zero) how = "progman-workerw"; }
+      if (target == IntPtr.Zero) { target = progman; how = "progman"; }
+      SetParent(me, target);
+      int x = -GetSystemMetrics(76), y = -GetSystemMetrics(77);   // where the main screen sits in the whole desktop
+      SetWindowPos(me, IntPtr.Zero, x, y, w, h, 0x0004 | 0x0010 | 0x0040);
+      if (how == "progman") { IntPtr dv = FindWindowEx(progman, IntPtr.Zero, "SHELLDLL_DefView", null); if (dv != IntPtr.Zero) SetWindowPos(me, dv, x, y, w, h, 0x0010 | 0x0040); }
+      return how;
+    }
+    /** "full" when the window in front covers its whole screen (a game, a full-screen video), else "normal". */
+    public static string Foreground() {
+      IntPtr f = GetForegroundWindow();
+      if (f == IntPtr.Zero) return "normal";
+      var sb = new System.Text.StringBuilder(256); GetClassName(f, sb, 256);
+      string c = sb.ToString();
+      if (c == "Progman" || c == "WorkerW" || c == "Shell_TrayWnd") return "normal";
+      RECT wr; if (!GetWindowRect(f, out wr)) return "normal";
+      var mi = new MONITORINFO(); mi.cbSize = Marshal.SizeOf(typeof(MONITORINFO));
+      if (!GetMonitorInfo(MonitorFromWindow(f, 2), ref mi)) return "normal";
+      return (wr.Left <= mi.rcMonitor.Left && wr.Top <= mi.rcMonitor.Top && wr.Right >= mi.rcMonitor.Right && wr.Bottom >= mi.rcMonitor.Bottom) ? "full" : "normal";
+    }
     public static void Slideshow(string folder, int options, uint tick, int position) {
       Guid iidItem = typeof(IShellItem).GUID, iidArr = typeof(IShellItemArray).GUID;
       IShellItem item; SHCreateItemFromParsingName(folder, IntPtr.Zero, ref iidItem, out item);
@@ -99,6 +158,8 @@ switch ($Action) {
   "status" { $s = [PraxisWall.W]::Status(); [ordered]@{ status = [int]$s[0]; wallpaper = $s[1]; folder = $s[2]; options = [int]$s[3]; tick = [int64]$s[4]; position = [int]$s[5] } | ConvertTo-Json -Compress }
   "set" { [PraxisWall.W]::Set($Path, $Position); "ok" }
   "slideshow" { [PraxisWall.W]::Slideshow($Folder, $Options, [uint32]$Tick, $Position); "ok" }
+  "attach" { [PraxisWall.W]::Attach([int64]$Path, $Tick, $Options) }
+  "watch" { while ($true) { [Console]::Out.WriteLine([PraxisWall.W]::Foreground()); [Console]::Out.Flush(); Start-Sleep -Milliseconds 2000 } }
 }
 `;
 
@@ -133,6 +194,18 @@ export function createWallpaper(deps: WallpaperDeps) {
   const folderOf = (w: WallpaperCfg) => w.folder || defaultFolder;
   const mottos = (w: WallpaperCfg) => { try { return fs.readdirSync(folderOf(w)).filter((n) => safeMottoName(n)).sort(); } catch { return []; } };
 
+  /** Resolves once the valley page in a window has loaded its land and trees. */
+  async function waitReady(w: BrowserWindow) {
+    const started = Date.now();
+    for (;;) {
+      if (w.isDestroyed()) throw new Error("The wallpaper window closed.");
+      const st = await w.webContents.executeJavaScript("window.__valley ? (window.__valley.error ? 'error:' + window.__valley.error : window.__valley.ready ? 'ready' : 'wait') : 'wait'").catch(() => "wait");
+      if (st === "ready") return;
+      if (String(st).startsWith("error:")) throw new Error(String(st).slice(6));
+      if (Date.now() - started > 60_000) throw new Error("The wallpaper took too long to load.");
+      await new Promise((r) => setTimeout(r, 400));
+    }
+  }
   function ensureWindow(): Promise<BrowserWindow> {
     return new Promise((resolve, reject) => {
       if (win && !win.isDestroyed()) return resolve(win);
@@ -177,22 +250,95 @@ export function createWallpaper(deps: WallpaperDeps) {
     return { width, height: Math.round(width * 2160 / 5120) };
   }
 
+  // ---------- real weather (every 15 minutes) ----------
+  let weatherAt = 0;
+  async function refreshWeather(force = false) {
+    const w = cfgOf();
+    if (!w.enabled || w.useWeather === false) return;
+    if (!force && Date.now() - weatherAt < 15 * 60_000) return;
+    weatherAt = Date.now();
+    try {
+      const now = await currentWeather(w.lat ?? DEFAULT_LAT, w.lng ?? DEFAULT_LNG);
+      const prev = cfgOf().weather;
+      save({ weather: now });
+      if (!prev || prev.kind !== now.kind || Math.abs((prev.wind || 0) - now.wind) > .2) { lastKey = ""; deps.log("weather", now.kind, now.text); }
+    } catch (e) { deps.log("weather failed", (e as Error).message); }
+  }
+  const weatherNow = () => { const w = cfgOf(); const x = w.useWeather === false ? null : w.weather; return x && Date.now() - Date.parse(x.at) < 3 * 3600_000 ? x : null; };
+
+  // ---------- the live (moving) wallpaper ----------
+  let live: BrowserWindow | null = null, watcher: ChildProcess | null = null, onBattery = false, fullApp = false;
+  const livePaused = () => locked || onBattery || fullApp;
+  function syncPause() { if (live && !live.isDestroyed()) live.webContents.executeJavaScript(`window.__valley && window.__valley.pause(${livePaused()})`).catch(() => undefined); }
+  async function startLive() {
+    if (live && !live.isDestroyed()) return;
+    const d = screen.getPrimaryDisplay(), b = d.bounds;
+    live = new BrowserWindow({ x: b.x, y: b.y, width: b.width, height: b.height, frame: false, resizable: false, movable: false, minimizable: false, maximizable: false,
+      fullscreenable: false, skipTaskbar: true, focusable: false, show: false, backgroundColor: "#000000", title: "Praxis live wallpaper", hasShadow: false,
+      webPreferences: { contextIsolation: true, sandbox: true, backgroundThrottling: false } });
+    live.on("page-title-updated", (e) => e.preventDefault());
+    live.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
+    live.webContents.on("will-navigate", (e) => e.preventDefault());
+    live.on("closed", () => {
+      live = null;
+      // Explorer restarting takes the window with it: come back if the live wallpaper is still on.
+      if (cfgOf().enabled && cfgOf().live) setTimeout(() => startLive().catch(() => undefined), 5000);
+    });
+    await live.loadURL(`${deps.baseUrl()}/?valley=1&live=1`);
+    await waitReady(live);
+    live.showInactive();
+    const hwnd = live.getNativeWindowHandle();
+    const id = hwnd.length >= 8 ? hwnd.readBigUInt64LE(0).toString() : String(hwnd.readUInt32LE(0));
+    try {
+      const how = await powershell(["-Action", "attach", "-Path", id, "-Tick", String(Math.round(b.width * d.scaleFactor)), "-Options", String(Math.round(b.height * d.scaleFactor))], deps.log);
+      save({ liveHow: how });
+      deps.log("live wallpaper attached", how);
+      if (!isWin) live.hide();
+    } catch (e) { deps.log("live wallpaper couldn't attach", (e as Error).message); save({ error: "The moving wallpaper couldn't get behind your desktop icons; showing the still picture instead." }); stopLive(); return; }
+    await feedLive();
+    if (isWin && !watcher) {
+      // One small helper keeps an eye on whether a full-screen app is in front (then the valley holds still).
+      const file = path.join(app.getPath("userData"), "praxis-wallpaper.ps1");
+      watcher = spawn("powershell.exe", ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", file, "-Action", "watch"], { windowsHide: true });
+      watcher.stdout?.on("data", (b: Buffer) => { const last = b.toString().trim().split(/\s+/).pop(); const full = last === "full"; if (full !== fullApp) { fullApp = full; syncPause(); } });
+      watcher.on("exit", () => { watcher = null; });
+    }
+  }
+  function stopLive() {
+    if (watcher) { watcher.kill(); watcher = null; }
+    const w = live; live = null;
+    if (w && !w.isDestroyed()) { w.removeAllListeners("closed"); w.destroy(); }
+  }
+  async function feedLive() {
+    if (!live || live.isDestroyed()) return;
+    const now = new Date(), wx = weatherNow();
+    const job = { when: now.toISOString(), weather: wx?.kind || "clear", wind: wx?.wind ?? 0.2, motto: cfgOf().current?.name || pickMotto(cfgOf(), now), projects: projectsOf(deps.readConfig()) };
+    await live.webContents.executeJavaScript(`window.__valley.live(${JSON.stringify(job)})`).catch((e) => deps.log("live feed failed", e?.message || e));
+    syncPause();
+  }
+  powerMonitor.on("on-battery", () => { onBattery = true; syncPause(); });
+  powerMonitor.on("on-ac", () => { onBattery = false; syncPause(); });
+  try { onBattery = powerMonitor.isOnBatteryPower(); } catch { /* older Electron */ }
+
   async function render(force = false) {
     const w = cfgOf();
     if (!w.enabled || busy || (locked && !force)) return;
     const now = new Date();
     const motto = pickMotto(cfgOf(), now);
     const projects = projectsOf(deps.readConfig());
-    const key = `${motto}|${Math.floor((now.getHours() * 60 + now.getMinutes()) / 10)}|${now.toDateString()}|${JSON.stringify(projects.map((p) => p.steps.filter((s) => s.lit).length))}`;
+    await refreshWeather();
+    const wx = weatherNow();
+    const key = `${motto}|${Math.floor((now.getHours() * 60 + now.getMinutes()) / 10)}|${now.toDateString()}|${JSON.stringify(projects.map((p) => p.steps.filter((s) => s.lit).length))}|${wx?.kind}|${Math.round((wx?.wind ?? 0) * 4)}`;
     if (!force && key === lastKey) return;
     busy = true;
     try {
       const v = await ensureWindow();
-      const job = { when: now.toISOString(), weather: "clear", motto, projects, ...size() };
+      const job = { when: now.toISOString(), weather: wx?.kind || "clear", motto, projects, ...size() };
       const out = await v.webContents.executeJavaScript(`window.__valley.wallpaper(${JSON.stringify(job)})`) as { file: string; ms: number };
       await powershell(["-Action", "set", "-Path", out.file, "-Position", "4"], deps.log);
       lastKey = key;
       save({ last: { at: now.toISOString(), file: out.file, motto: motto || "", ms: out.ms }, error: null });
+      if (cfgOf().live) { if (!live) startLive().catch((e) => deps.log("live wallpaper failed", e?.message || e)); else await feedLive(); }
       deps.log("wallpaper", motto, out.ms + "ms");
     } catch (e) {
       const msg = (e as Error)?.message || String(e);
@@ -207,8 +353,8 @@ export function createWallpaper(deps: WallpaperDeps) {
     setTimeout(() => render(true), 2500);
   }
   function stopTimer() { if (timer) clearInterval(timer); timer = null; }
-  powerMonitor.on("lock-screen", () => { locked = true; });
-  powerMonitor.on("unlock-screen", () => { locked = false; lastKey = ""; setTimeout(() => render(true), 1500); });
+  powerMonitor.on("lock-screen", () => { locked = true; syncPause(); });
+  powerMonitor.on("unlock-screen", () => { locked = false; lastKey = ""; syncPause(); setTimeout(() => render(true), 1500); });
   powerMonitor.on("resume", () => { lastKey = ""; setTimeout(() => render(true), 4000); });
   screen.on("display-metrics-changed", () => { lastKey = ""; });
 
@@ -240,6 +386,7 @@ export function createWallpaper(deps: WallpaperDeps) {
   }
   async function disable() {
     stopTimer();
+    stopLive();
     const s = cfgOf().saved;
     let error: string | null = null;
     try {
@@ -258,8 +405,11 @@ export function createWallpaper(deps: WallpaperDeps) {
 
   return {
     start() { if (cfgOf().enabled) { startTimer(); tagMottos().catch(() => undefined); } },
+    stop() { stopLive(); },
     enable, disable, state,
-    refresh: async () => { lastKey = ""; await render(true); return state(); },
+    refresh: async () => { lastKey = ""; await refreshWeather(true); await render(true); return state(); },
+    setLive: async (on: boolean) => { save({ live: on, error: null }); if (on && cfgOf().enabled) await startLive(); if (!on) { stopLive(); save({ liveHow: null }); } return state(); },
+    setWeather: async (on: boolean) => { save({ useWeather: on }); lastKey = ""; if (on) await refreshWeather(true); await render(true); return state(); },
     setFolder: async (folder: string) => { save({ folder, bag: [], current: null }); lastKey = ""; if (cfgOf().enabled) await render(true); return state(); },
     window: () => win,
   };

@@ -9,6 +9,7 @@ interface WState {
   enabled?: boolean; folder?: string; defaultFolder: string; live?: boolean; mottos: number; windows: boolean;
   current?: { name: string } | null; last?: { at: string; motto: string; ms: number } | null; error?: string | null;
   saved?: { status: number; folder: string } | null;
+  useWeather?: boolean; weather?: { kind: string; text: string; station?: string; source: string; at: string } | null; liveHow?: string | null;
 }
 
 export function WallpaperDialog() {
@@ -42,6 +43,13 @@ function Body() {
           <label className="switch-row"><input type="checkbox" id="wp-enabled" checked={!!st.enabled} disabled={!!busy}
             onChange={(e) => act(e.target.checked ? "enable" : "disable", e.target.checked ? "Drawing your first one…" : "Putting your wallpaper back…")} />
             <span>Use the valley as my desktop wallpaper</span></label>
+          <label className="switch-row"><input type="checkbox" id="wp-weather" checked={st.useWeather !== false} disabled={!!busy || !st.enabled}
+            onChange={(e) => act(e.target.checked ? "weather-on" : "weather-off", "Checking the weather…")} />
+            <span>Match the real weather here {st.weather && st.useWeather !== false ? <em className="wp-wx" id="wp-wx">· now: {st.weather.text.toLowerCase()}{st.weather.station ? ` (${st.weather.station})` : ""}</em> : null}</span></label>
+          <label className="switch-row"><input type="checkbox" id="wp-live" checked={!!st.live} disabled={!!busy || !st.enabled}
+            onChange={(e) => act(e.target.checked ? "live-on" : "live-off", e.target.checked ? "Starting the moving wallpaper…" : "Stopping it…")} />
+            <span>Make it move: grass and trees in the wind, water, falling rain or snow <em className="wp-wx">(experimental)</em></span></label>
+          {st.live && <p className="dialog-note" id="wp-live-note">The valley holds still while a full-screen app is in front, when the PC is locked, and on battery. If it ever stops showing, Praxis keeps the still picture underneath.</p>}
           <div className="form-row wp-folder"><span className="form-label">Mottos from</span>
             <span className="wp-path" id="wp-folder" title={folder}>{folder}</span>
             <button type="button" className="ghost-btn" id="wp-pick" disabled={!!busy} onClick={() => act("pick-folder", "Choosing…")}>Change…</button>
@@ -55,6 +63,7 @@ function Body() {
           <ul className="wp-notes">
             <li>Your mottos folder is only read, never changed. New mottos you add show up within the hour.</li>
             <li>Task names never appear on your wallpaper; your projects show only as stars.</li>
+            <li>Weather comes from the US National Weather Service (weather.gov), checked every 15 minutes.</li>
             <li>{st.saved && (st.saved.status & 2) ? "Turning this off puts your Windows slideshow back as it was." : "Turning this off puts your previous wallpaper back."}</li>
           </ul>
         </>
