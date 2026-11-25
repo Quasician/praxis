@@ -278,7 +278,7 @@ function trayDial(img16: string, img32: string, tip: string) {
 // A strip a few pixels tall along the top of the main screen: the day's sky, your blocks and the sun.
 // Clicks always go through it. Rest the mouse on the very top edge and it opens a small card with the next block;
 // move away and it closes.
-const STRIP_H = 5, STRIP_OPEN_H = 120, DWELL_MS = 450;
+const STRIP_H = 5, STRIP_OPEN_H = 168, DWELL_MS = 450;   // open: room for the card's three lines (it lets clicks through)
 let stripWin: BrowserWindow | null = null;
 let stripPoll: NodeJS.Timeout | null = null;
 function stripArea() { return screen.getPrimaryDisplay().bounds; } // bounds, not workArea: it sits above full-screen apps too
@@ -400,7 +400,7 @@ function startNudger() {
       // You're looking at Praxis already: skip the gentle ones.
       const looking = !!win?.isVisible() && win.isFocused();
       const next = list.find((n) => !(looking && (n.kind === "heads-up" || n.kind === "time-check")));
-      for (const n of list) sent.add(n.key);
+      for (const n of list) for (const k of n.key.split("|")) sent.add(k);   // a reminder can cover several blocks that start together
       if (next) showNudge(next, false);
     } catch (e) { log("nudge tick failed", (e as Error)?.message || e); }
   };

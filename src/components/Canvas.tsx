@@ -62,7 +62,7 @@ export function CanvasView() {
         <ConstellationLayer lit={lit} labels={zoom === "sky"} onArea={() => setDrawer("areas")} />
         {zoom === "day" && <aside className="cv-right" aria-label="The record"><RecordPanel /></aside>}
       </div>
-      {zoom !== "sky" && <div className={`cv-bottom ${zoom}`}>{zoom === "day" ? <HorizonPane /> : <WeekView />}</div>}
+      {zoom !== "sky" && <div className={`cv-bottom ${zoom}`}>{zoom === "day" ? <HorizonPane compact /> : <WeekView />}</div>}
       {zoom === "sky" && (
         <div className="cv-sky-actions">
           <button type="button" className="ghost-btn" id="cv-areas" onClick={() => setDrawer("areas")}>Areas in detail</button>

@@ -1595,7 +1595,7 @@ body { background-image: linear-gradient(180deg, color-mix(in srgb, var(--sky-no
 /* ---------- 5.0: one canvas ---------- */
 .cv-app { position: relative; overflow: hidden; }
 .cv { position: relative; height: 100%; display: flex; flex-direction: column; overflow: hidden; color: var(--ink);
-  --strip: clamp(300px, 38vh, 520px); --land-h: clamp(150px, 25vh, 320px); --glass: color-mix(in srgb, var(--panel) 82%, transparent); }
+  --strip: clamp(330px, 42vh, 560px); --land-h: clamp(150px, 25vh, 320px); --glass: color-mix(in srgb, var(--panel) 82%, transparent); }
 .cv[data-zoom="week"] { --strip: 56vh; }
 .cv[data-zoom="sky"] { --strip: 0px; --land-h: clamp(180px, 30vh, 380px); }
 .cv[data-zoom="week"] { --land-h: clamp(110px, 16vh, 220px); }
@@ -1725,3 +1725,18 @@ body { background-image: linear-gradient(180deg, color-mix(in srgb, var(--sky-no
 .rm-more { font-size: 11.5px; padding: 0 6px; border-radius: 999px; background: color-mix(in srgb, currentColor 16%, transparent); }
 .cv .topbar .ritual-marker:not(.evening) { background: var(--glass); backdrop-filter: blur(10px); }
 .topbar { position: relative; z-index: 40; }   /* the menu opens over the ritual panel in the tabs too */
+
+/* ---------- 4.5: overlapping blocks on the edge strip ---------- */
+/* Each block takes its lane: a slice of the strip's height (one lane: the whole bar, as before). */
+.es-block { --lane: 0; --lanes: 1; bottom: auto; height: calc(3px / var(--lanes)); top: calc(5px - 3px + 3px * var(--lane) / var(--lanes)); border-radius: 1px; }
+.edge-strip.open .es-block { height: calc(6px / var(--lanes)); top: calc(9px - 6px + 6px * var(--lane) / var(--lanes)); }
+.es-block[data-lane$="/1"] { border-radius: 2px 2px 0 0; }
+.es-text { display: flex; gap: 0; min-width: 0; }
+.es-one { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: inline-flex; align-items: baseline; }
+.es-one:first-child { flex-shrink: .4; }
+.es-sep { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--c); margin: 0 6px 0 9px; flex: none; align-self: center; }
+/* 4.5: in the canvas the day strip is short, so its header stays on one line and blocks get the height (overlaps stack in rows). */
+.cv .horizon-pane .timeline-head { padding: 12px 18px 8px; }
+.cv .horizon-pane .timeline-head .hint { display: none; }
+.edge-strip .es-card { width: 420px; }
+.es-more { flex: none; margin-left: 8px; font: 600 12px var(--sans); color: var(--ink-2); align-self: center; }

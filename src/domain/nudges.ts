@@ -67,14 +67,24 @@ export function dueNudges(input: NudgeInput, sent: Set<string>): Nudge[] {
   const push = (n: Nudge) => { if (!sent.has(n.key)) out.push(n); };
   const slots = [...input.slots].filter((s) => s.end > s.start).sort((a, b) => a.start - b.start);
 
-  for (const s of slots) {
-    const len = Math.round((s.end - s.start) / MIN);
-    if (r.blocks && t >= s.start && t < s.start + START_GRACE) {
-      push({ key: `start:${s.id}:${s.start}`, kind: "start", title: s.title, body: `Starts now · ${mins(len)}, until ${clockText(s.end)}`, at: s.start, taskId: s.id, sticky: true });
+  // 4.5: blocks that start together (or overlap their starts) are one reminder naming all of them, not one card that hides
+  // the rest. A reminder's key lists every block it covers, joined with "|" (the desktop app marks each as sent).
+  const also = (rest: Slot[]) => rest.length ? ` Also ${rest.length === 1 ? "starting" : "starting with it"}: ${rest.map((x) => `${x.title} (until ${clockText(x.end)})`).join(", ")}.` : "";
+  const title = (g: Slot[]) => g[0].title + (g.length > 1 ? ` + ${g.length - 1} more` : "");
+  if (r.blocks) {
+    const starting = slots.filter((s) => t >= s.start && t < s.start + START_GRACE && !sent.has(`start:${s.id}:${s.start}`));
+    if (starting.length) {
+      const [s, ...rest] = starting, len = Math.round((s.end - s.start) / MIN);
+      push({ key: starting.map((x) => `start:${x.id}:${x.start}`).join("|"), kind: "start", title: title(starting),
+        body: `Starts now · ${mins(len)}, until ${clockText(s.end)}.${also(rest)}`, at: s.start, taskId: s.id, sticky: true });
     }
-    if (r.blocks && r.headsUp > 0 && t >= s.start - r.headsUp * MIN && t < s.start) {
-      const left = Math.max(1, Math.ceil((s.start - t) / MIN));
-      push({ key: `heads-up:${s.id}:${s.start}`, kind: "heads-up", title: s.title, body: `Starts in ${mins(left)}, at ${clockText(s.start)}. Time to find a stopping point.`, at: s.start, taskId: s.id, sticky: false });
+  }
+  if (r.blocks && r.headsUp > 0) {
+    const soon = slots.filter((s) => t >= s.start - r.headsUp * MIN && t < s.start && !sent.has(`heads-up:${s.id}:${s.start}`));
+    if (soon.length) {
+      const [s, ...rest] = soon, left = Math.max(1, Math.ceil((s.start - t) / MIN));
+      push({ key: soon.map((x) => `heads-up:${x.id}:${x.start}`).join("|"), kind: "heads-up", title: title(soon),
+        body: `Starts in ${mins(left)}, at ${clockText(s.start)}. Time to find a stopping point.${rest.length ? ` Then: ${rest.map((x) => `${x.title} at ${clockText(x.start)}`).join(", ")}.` : ""}`, at: s.start, taskId: s.id, sticky: false });
     }
   }
 

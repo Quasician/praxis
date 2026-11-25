@@ -19,7 +19,7 @@ import { usePending } from "../data/pending";
 import { CheckIcon, PlanBanner } from "./Timeline";
 import { DayWeatherLayer, IdeaClouds, dayWeather } from "./SkyClouds";
 
-const ROW_H = 70;           // one row of blocks
+const ROW_H_FULL = 70;      // one row of blocks (64 in the canvas, where the strip is shorter)
 const LABEL_MIN = 120;      // the least room a block's label gets
 const LABEL_MAX = 380;      // past this, a long title ends in "…" (the full title is in the tooltip)
 const HOURS_VISIBLE = 13;   // how much of the day fits on screen at once
@@ -75,7 +75,8 @@ export function assignRows(items: Item[], hourW: number) {
   return { rows: out, count: rows.length };
 }
 
-export function HorizonPane() {
+/** compact (4.5, in the canvas): the big sky is already behind it, so its own sky is a thin band and the rows get the room. */
+export function HorizonPane({ compact = false }: { compact?: boolean } = {}) {
   const { today, events, projects, cfg, trayIds, loading, config } = useData();
   const committedIds = useCommitted();
   const plan = useUi((s) => s.plan);
@@ -98,12 +99,13 @@ export function HorizonPane() {
     // The sky gets about a third of the pane: it's the clock you read at a glance.
     const ro = el && pane ? new ResizeObserver(() => {
       setHourW(Math.max(84, Math.min(240, Math.floor((pane.clientWidth - 24) / HOURS_VISIBLE))));
-      setSkyH(Math.round(Math.min(280, Math.max(140, el.clientHeight * 0.32))));
+      setSkyH(compact ? Math.round(Math.min(84, Math.max(52, el.clientHeight * 0.18))) : Math.round(Math.min(280, Math.max(140, el.clientHeight * 0.32))));
     }) : null;
     if (ro && pane) ro.observe(pane);
     return () => { ro?.disconnect(); delete document.documentElement.dataset.layout; };
   }, []);
 
+  const ROW_H = compact ? 64 : ROW_H_FULL;
   const X = (m: number) => (m / 60 - TL_START) * hourW;
   const todayList = useMemo(() => today.filter((t) => !trayIds.has(t.id)), [today, trayIds]);
   const blocks = useMemo(() => layoutBlocks(todayList, visibleEvents(events, todayList)), [todayList, events, now]); // eslint-disable-line
