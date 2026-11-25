@@ -25,6 +25,8 @@ declare global {
       live(job: WallpaperJob & { wind?: number }): Promise<void>;
       pause(on: boolean): void;
       fps(): number;
+      /** 4.0.1: the moving wallpaper has drawn at least one frame (the desktop app waits for this before putting it behind the icons). */
+      drawn?: boolean;
       error?: string;
     };
   }
@@ -186,7 +188,7 @@ export function ValleyPage() {
         const city = liveJob.scene === "city" ? await cityInput(now, liveJob.weather, renderer.W) : null;
         renderer.render({ when: now, weather: liveJob.weather, motto, projects: liveJob.projects, time: t0 / 1000, wind: liveJob.wind ?? 0.2, events: eventsAt(liveJob.events, Date.now()), city });
         renderer.present();
-        frames++;
+        frames++; window.__valley!.drawn = true;
       } catch (e) { window.__valley!.error = String((e as Error)?.message || e); return; }
       loop = window.setTimeout(frame, Math.max(4, 83 - (performance.now() - t0)));   // ~12 a second; timers, not animation frames, so it keeps going behind the icons
     };
