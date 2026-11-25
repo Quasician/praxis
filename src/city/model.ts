@@ -39,13 +39,15 @@ export function cityBlend(minute: number, rise: number, set: number): [CityMomen
 }
 
 export interface CityBody { x: number; y: number; r: number; strength: number; color: RGB }
-/** The sun rises and sets at the centre of the horizon (where the paintings put it) and arcs up over the viewpoint, out of the top
- *  of the frame, in between. Design units: 5120 x 2160, y down. */
+/** The sun rises and sets at the centre of the horizon (where the paintings put it) and climbs to the top of the sky in between,
+ *  where it stays in the picture through the middle of the day (3.9.3; before, it left through the top of the frame).
+ *  Design units: 5120 x 2160, y down. */
+export const CITY_SUN_TOP = 0.09;   // the sun's centre at midday, as a fraction of the height from the top
 export function citySun(minute: number, rise: number, set: number): CityBody {
   const p = (minute - rise) / (set - rise);
   const el = Math.sin(Math.PI * Math.max(-.12, Math.min(1.12, p)));     // just below the horizon either side of the day
   const x = (.5 + .05 * Math.sin(2 * Math.PI * Math.max(0, Math.min(1, p)))) * 5120;
-  const y = (CITY_HORIZON - Math.sign(el) * Math.pow(Math.abs(el), 1.7) * 1.3) * 2160;   // low for a while, then quickly up and over
+  const y = (CITY_HORIZON - Math.sign(el) * Math.pow(Math.abs(el), 1.7) * (CITY_HORIZON - CITY_SUN_TOP)) * 2160;   // low for a while, then up to the top of the sky
   const low = 1 - Math.min(1, Math.max(0, el) * 2.2);                   // 1 at the horizon, 0 well up
   const strength = p > -.1 && p < 1.1 ? sm((el + .12) / .2) : 0;
   return { x, y, r: (.026 + .010 * low) * 2160, strength: strength * (.75 + .25 * low), color: [255, (.93 - .28 * low) * 255, (.78 - .52 * low) * 255] };
