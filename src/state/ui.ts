@@ -9,7 +9,7 @@ import type { Proposal } from "../domain/dump";
 export type CheerKind = "confetti" | "meteor" | "aurora" | "sunrise" | "sunset";
 
 export type View = "day" | "week" | "areas" | "progress";
-export type DialogName = "triage" | "planner" | "calendars" | "areas" | "dump" | "claude" | "shutdown" | "help" | "morning" | "backlog" | "fresh" | "reminders" | "constellation" | "wallpaper" | "heal" | "letter";
+export type DialogName = "triage" | "planner" | "calendars" | "areas" | "dump" | "claude" | "shutdown" | "help" | "morning" | "backlog" | "fresh" | "reminders" | "constellation" | "wallpaper" | "heal" | "letter" | "review";
 
 export interface Toast { id: number; msg: string; action?: { label: string; run: () => void } }
 
@@ -27,7 +27,9 @@ export interface DragState {
   unschedule: boolean;
 }
 
-export interface PlanState { active: boolean; items: PlanItem[]; unplaced: Candidate[]; freeMin: number; seed: number; fillWhy?: string }
+export interface PlanState { active: boolean; items: PlanItem[]; unplaced: Candidate[]; freeMin: number; seed: number; fillWhy?: string;
+  /** 4.0, from the record: what you usually finish on a day like today (over how many days), and where your weak hours start. */
+  capacityMin?: number | null; capacityDays?: number; weakFrom?: number | null; weakAll?: boolean }
 
 interface UiState {
   view: View; setView: (v: View) => void;
@@ -64,7 +66,7 @@ export const useUi = create<UiState>((set) => ({
     toastTimer = setTimeout(() => set({ toast: null }), 5000);
   },
   hideToast: () => set({ toast: null }),
-  dialogs: { triage: false, planner: false, calendars: false, areas: false, dump: false, claude: false, shutdown: false, help: false, morning: false, backlog: false, fresh: false, reminders: false, constellation: false, wallpaper: false, heal: false, letter: false },
+  dialogs: { triage: false, planner: false, calendars: false, areas: false, dump: false, claude: false, shutdown: false, help: false, morning: false, backlog: false, fresh: false, reminders: false, constellation: false, wallpaper: false, heal: false, letter: false, review: false },
   openDialog: (d) => set((s) => ({ dialogs: { ...s.dialogs, [d]: true } })),
   closeDialog: (d) => set((s) => ({ dialogs: { ...s.dialogs, [d]: false } })),
   plan: EMPTY_PLAN,

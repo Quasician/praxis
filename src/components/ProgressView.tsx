@@ -2,6 +2,8 @@ import { dayStats, effectiveFill, habitStreak, timeSense, learn, rate, rateByAre
 import { fmtMin, fromYmd } from "../lib/dates";
 import { colorOf } from "../lib/text";
 import { useActive, useCompleted } from "../data/queries";
+import { bands, capacity, CAPACITY_DAYS, insights, recordDays, span, timedBlocks, weakHours, WEAK_MIN_BLOCKS } from "../domain/record";
+import { useUi } from "../state/ui";
 import { useData } from "../data/useData";
 
 const pct = (r: number | null) => (r === null ? "—" : `${Math.round(r * 100)}%`);
@@ -10,8 +12,14 @@ const sum = (xs: DayStat[], k: keyof DayStat) => xs.reduce((s, d) => s + (d[k] a
 export function ProgressView() {
   const { config, cfg, connected } = useData();
   const completedQ = useCompleted(connected);
-  useActive(connected); // so repeating-task completions get their labels
+  const activeQ = useActive(connected); // so repeating-task completions get their labels
   const completed = completedQ.data || [];
+  // 4.0: the record in hours and by time of day.
+  const record = recordDays(config, completed, activeQ.data || []);
+  const bs = bands(config, completed), weak = weakHours(bs);
+  const says = insights(record, weak, config);
+  const cap = capacity(record, cfg);
+  const bandMax = Math.max(1, ...bs.map((b) => b.planned));
   const days = dayStats(config, completed, 28);
   const today = days[days.length - 1];
   const thisWeek = days.slice(-7), lastWeek = days.slice(-14, -7);
@@ -32,6 +40,7 @@ export function ProgressView() {
           <h2>The numbers</h2>
           <p className="areas-sub">What you planned vs. what got done, over the last four weeks. Tick things off as you finish them (on your phone too) so this stays true.</p>
         </div>
+        <button type="button" id="pv-review" className="ghost-btn" onClick={() => useUi.getState().openDialog("review")}>Review the week</button>
       </div>
 
       <div className="pv-tiles">
@@ -43,6 +52,29 @@ export function ProgressView() {
       </div>
 
       {!hasHistory && <div className="pv-empty" id="pv-empty">Nothing to show yet. Accept a plan or do the morning commit, and each day's plan vs. done fills in here.</div>}
+
+      <section className="pv-card pv-record" id="pv-record">
+        <header><h3>What the record says</h3><span className="pv-record-sub">Praxis plans around these. They update every day.</span></header>
+        <div className="pv-record-grid">
+          <ul className="pv-says" id="pv-says">
+            {says.map((s) => <li key={s.id} data-id={s.id}><b>{s.text}</b><span>{s.detail}</span></li>)}
+            {record.length < CAPACITY_DAYS && <li className="wait" id="pv-says-wait"><b>Your typical day: {record.length} of {CAPACITY_DAYS} planned days so far.</b><span>After {CAPACITY_DAYS} days with a plan, Praxis knows how much you usually finish and stops your commitments there.</span></li>}
+            {cap && <li data-id="capacity"><b>Today's commitments stop at about {span(cap.min)}.</b><span>What you usually finish on {cap.kind === "work" ? "a work day" : cap.kind === "off" ? "a day off" : "a planned day"} ({cap.days} days on record).</span></li>}
+            {!weak && <li className="wait" id="pv-weak-wait"><b>{timedBlocks(bs) < WEAK_MIN_BLOCKS * 2 ? `Time of day: ${timedBlocks(bs)} of about ${WEAK_MIN_BLOCKS * 2} blocks so far.` : "Time of day: no weak hours so far."}</b><span>{timedBlocks(bs) < WEAK_MIN_BLOCKS * 2 ? "With enough blocks before and after a given hour, Praxis can tell whether late ones get done, and plans around it." : "Your blocks get done about as often early as late."}</span></li>}
+          </ul>
+          <div className="pv-bands" id="pv-bands" role="img" aria-label="Planned blocks by the time they were due to start, and how many got done">
+            <div className="pv-bands-title">Blocks by start time{weak ? <em> · weak after {fmtMin(weak.from)}</em> : null}</div>
+            <div className="pv-bands-row">
+              {bs.filter((b) => b.from >= 360 && b.from < 1380).map((b) => (
+                <div key={b.from} className={`pv-band${weak && b.from >= weak.from ? " weak" : ""}`} title={`${fmtMin(b.from)}–${fmtMin(b.from + 120)}: ${b.done} of ${b.planned} done`}>
+                  <div className="pv-band-stack"><div className="pv-band-all" style={{ height: `${(b.planned / bandMax) * 100}%` }}><div className="pv-band-done" style={{ height: `${b.planned ? (b.done / b.planned) * 100 : 0}%` }} /></div></div>
+                  <span>{fmtMin(b.from).replace(":00", "")}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
 
       <section className="pv-card" id="pv-days">
         <header><h3>Last 28 days</h3>

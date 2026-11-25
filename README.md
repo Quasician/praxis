@@ -116,6 +116,24 @@ Praxis is built to be easy on the eyes on a big monitor all day:
 - **Readable type**: Atkinson Hyperlegible for text (designed for legibility) and Bricolage Grotesque for headings, bundled so they work offline.
 - **Calm motion**: finishing a task fills the circle and folds the row away; the focus timer is a ring that fills. If Windows has "Show animations" turned off, Praxis stops animating too.
 
+## The feedback loop (4.0)
+
+Praxis already kept each day's plan and what got done. 4.0 reads that record in hours and by time of day, plans around it, and asks you once a week what to do about projects that have stopped moving.
+
+**The record.** Each planned block now remembers its length and when it was due to start. Progress → **What the record says** puts the findings in words: how much you plan against how much you finish on a typical day, whether blocks after a certain hour rarely get done, your hardest and best weekdays, and how often every commitment was kept. Each finding waits until there is enough behind it (five planned days for the typical day; about sixteen blocks for the time of day), and says how far along it is until then.
+
+**Plans that adjust.** Once Praxis knows what you usually finish on a day like today (work days and days off are kept apart), your commitments stop there and the rest of the plan is bonus. The morning commit shows the two side by side; if you star more than fits, **Trim to fit** turns the last ones back into bonus. Work goes before your weak hours when it fits; a block that only fits after them is marked **late slot** and isn't made a commitment. These follow the "learn" switch in Planner settings, and are skipped on low-energy and slammed days.
+
+**The weekly review.** On Sunday (from 9:00) and Monday a card offers the review; it's also under ⋯ → Weekly review and on the Progress tab any day. It shows the week against the plan, the projects that moved, and every project with no star lit in three weeks, each with a decision:
+
+- **Do the next step**: puts its next step on a day you pick.
+- **Start smaller**: adds a ten-minute first step on that day (worded by Claude when it's connected).
+- **Set it down**: the project rests. It stays in Todoist and, faint, in your sky; its steps lose their dates and stay out of plans until you pick it back up (from the review, or by clicking it in the sky).
+
+When your commitments are rarely all kept (or always are), the review also offers one change to how many you commit to each day.
+
+**Fading.** A project with no star lit for ten days begins to fade in the sky and on the wallpaper, and is faintest at three weeks. Lighting a star, or deciding to keep going in a review, brings it back.
+
 ## The city (3.9)
 
 **A second scene for the wallpaper.** Under ⋯ → **Wallpaper…**, choose **Valley** or **City**. The city is a lofi anime cityscape painted as 32 keyframes (4 seasons × dawn, sunrise, noon, golden hour, sunset, dusk, night and a grey day) at 5120 × 2160. Praxis blends the two paintings for the minute you're in, timed from the real sunrise and sunset here, and draws the rest live on top:
@@ -372,6 +390,7 @@ npm run serve     # build + run the server, then open http://localhost:4321 in a
 npm start         # build + run the desktop app
 npm run dev       # live-reloading UI (run `npm run serve` alongside for the API)
 npm run typecheck
+npm test          # the planner, the record and the weekly review (tests/)
 npm run dist      # build a Windows installer into release/
 ```
 
@@ -411,4 +430,5 @@ Pushes that don't change the version are only checked, not released.
 - ~~3.6: never rot: offline queue, self-healing days, capture hotkey~~ ✓
 - ~~3.7: rewards: sky events, constellation legends, the Sunday letter, optional sound~~ ✓
 - ~~3.8: finish the theme: sunrise and sunset rituals, ideas as clouds, Areas in the sky, the Horizon clouds over as the day fills~~ ✓
+- ~~4.0: the feedback loop: the record in hours and by time of day, plans that stop at what you finish, the weekly review, fading constellations~~ ✓
 - ~~1.1: morning commit, committed vs. bonus, adaptive plans, Now card, first steps, backlog cleanup, Progress, learning~~ ✓

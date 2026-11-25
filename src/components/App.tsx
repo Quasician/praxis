@@ -39,6 +39,7 @@ import { WallpaperDialog } from "./WallpaperDialog";
 import { startPending } from "../data/pending";
 import { HealAskDialog } from "./HealNote";
 import { LetterDialog, useRewards } from "./Rewards";
+import { ReviewDialog } from "./ReviewDialog";
 import { morningHeal } from "../data/heal";
 
 export function App() {
@@ -89,6 +90,7 @@ function Shell() {
       <WallpaperDialog />
       <HealAskDialog />
       <LetterDialog />
+      <ReviewDialog />
       <Celebration />
       <Toast />
       <DragGhost />

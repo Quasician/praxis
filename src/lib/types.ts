@@ -91,7 +91,8 @@ export interface CalendarSetting { id: string; name: string; url: string; color:
 export interface TaskMemory { due: string; moves: number }
 
 /** What the plan held on a day (for the Progress view and adaptive planning). */
-export interface PlannedItem { id: string; content: string; wp: number; project: string; committed: boolean; star?: boolean; tiny?: string }
+/** min and start (4.0): the block's length and its start (minutes of the day), so the record can be read in hours and by time of day. */
+export interface PlannedItem { id: string; content: string; wp: number; project: string; committed: boolean; star?: boolean; tiny?: string; min?: number; start?: number }
 export type Energy = "full" | "low" | "slammed";
 export interface DayRecord {
   planned: PlannedItem[];
@@ -124,6 +125,7 @@ export interface Config {
   rewards?: import("../domain/rewards").Rewards;
   letters?: Record<string, import("../domain/rewards").Letter>;
   ideas?: import("../data/ideas").Idea[];
+  reviews?: Record<string, import("../domain/review").Review>;   // 4.0: the weekly review's decisions, by the week's Sunday
   [key: string]: unknown;
 }
 
