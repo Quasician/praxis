@@ -106,7 +106,7 @@ export interface DayRecord {
 export interface Sample { wp: number; est: number; actual: number; at: string; guess?: number }
 export interface Focus { taskId: string; content: string; startedAt: string; minutes: number; guess?: number }
 
-/** canvas (5.0): the one canvas instead of the four tabs (a preview you switch on in the menu). */
+/** canvas: the one canvas instead of the four tabs (4.1 preview; the default since 4.4, false = the tabs). */
 export interface Appearance { theme?: "auto" | "dark" | "light"; warmEvenings?: boolean; focus?: boolean; dayLayout?: "horizon" | "classic"; canvas?: boolean }
 
 export interface Config {

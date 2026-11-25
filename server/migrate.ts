@@ -3,12 +3,19 @@
 // To change the file's shape in a release: add a step here, raise CONFIG_VERSION, and add a test in tests/migrate.test.ts.
 export type Config = Record<string, unknown>;
 
-export const CONFIG_VERSION = 1;
+export const CONFIG_VERSION = 2;
 
 /** STEPS[n] turns a version n-1 file into a version n file. */
 const STEPS: Record<number, (c: Config) => Config> = {
   // 1 (Praxis 4.3): files from before had no version. Nothing about them changes except that they now say which version they are.
   1: (c) => c,
+  // 2 (Praxis 4.4): the one canvas becomes the default (on for everyone, once; it can be switched off in the menu), and the
+  // valley wallpaper is retired: a wallpaper set to the valley moves to the city.
+  2: (c) => ({
+    ...c,
+    ui: { ...((c.ui as Record<string, unknown>) || {}), canvas: true },
+    ...(c.wallpaper && typeof c.wallpaper === "object" ? { wallpaper: { ...(c.wallpaper as Record<string, unknown>), scene: "city" } } : {}),
+  }),
 };
 
 export interface Migrated { config: Config; from: number; changed: boolean; newer: boolean }

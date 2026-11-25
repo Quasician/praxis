@@ -245,8 +245,6 @@ async function wallpaperAction(action: string, arg?: string) {
     case "live-off": return wallpaper.setLive(false);
     case "weather-on": return wallpaper.setWeather(true);
     case "weather-off": return wallpaper.setWeather(false);
-    case "scene-valley": return wallpaper.setScene("valley");
-    case "scene-city": return wallpaper.setScene("city");
     case "pick-city-folder": {
       const r = await dialog.showOpenDialog(win!, { title: "Choose your city kit's 5K paintings folder", properties: ["openDirectory"], defaultPath: wallpaper.state().city.folder });
       return r.canceled || !r.filePaths[0] ? wallpaper.state() : wallpaper.setCityFolder(r.filePaths[0]);

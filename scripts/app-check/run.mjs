@@ -78,13 +78,14 @@ try {
   page.setDefaultTimeout(10000);
   console.log(`Praxis ${PKG.version}: release checks`);
 
-  await check("settings from before 4.3 are upgraded to a versioned file", async () => {
+  await check("settings from before 4.3 are upgraded (versioned, the canvas on)", async () => {
     const c = await config();
-    if (c.configVersion !== 1) throw new Error(`configVersion is ${c.configVersion}`);
+    if (!(c.configVersion >= 2)) throw new Error(`configVersion is ${c.configVersion}`);
+    if (c.ui?.canvas !== true) throw new Error("the canvas wasn't switched on");
     if (Object.keys(c.history || {}).length !== 10) throw new Error("history was not kept");
   });
-  await check("the day opens with today's tasks", async () => {
-    await page.goto(BASE); await page.waitForSelector("#app"); await tick(3000);
+  await check("the day opens on the canvas with today's tasks", async () => {
+    await page.goto(BASE); await page.waitForSelector("#canvas"); await tick(3000);
     await waitFor(async () => (await page.locator("#list li.task").count()) >= 4, "four tasks in the list");
   });
   await check("the week view drafts the week", async () => {
@@ -93,7 +94,7 @@ try {
   });
   await check("the sky shows the projects as constellations", async () => {
     await page.click('[data-view="areas"]'); await tick();
-    await waitFor(async () => (await page.locator(".sky-con").count()) >= 2, "two constellations");
+    await waitFor(async () => (await page.locator(".cvs-con, .sky-con").count()) >= 2, "two constellations");
   });
   await check("progress leads with what the record says", async () => {
     await page.click('[data-view="progress"]'); await tick();
@@ -122,20 +123,22 @@ try {
     await page.keyboard.press("Escape"); await tick(500);
     if (await page.locator(".ritual-panel").count()) throw new Error("the panel didn't close");
   });
-  await check("the one canvas: zoom levels, numbers, and back to the tabs", async () => {
-    await page.click("#menu-btn"); await page.click("#canvas-layout"); await tick(2000);
-    await page.waitForSelector("#canvas .cvs-con");
+  await check("the canvas zooms, and the four tabs are still there when it's switched off", async () => {
     await page.click('[data-view="week"]'); await tick(); await page.waitForSelector(".cv-bottom.week #week-view");
     await page.click('[data-view="areas"]'); await tick(); await page.waitForSelector('#canvas[data-zoom="sky"]');
     await page.click('[data-view="progress"]'); await tick(); await page.waitForSelector("#cv-drawer #pv-says");
     await page.keyboard.press("Escape"); await tick(500);
     if (await page.locator("#cv-drawer").count()) throw new Error("the numbers didn't close");
-    await page.click("#menu-btn"); await page.click("#canvas-layout"); await tick(1000);   // off again: back to the tabs, on the same view
-    await page.waitForSelector("#areas-view"); if (await page.locator("#canvas").count()) throw new Error("the canvas is still on");
+    await page.click('[data-view="day"]'); await tick(500);
+    await page.click("#menu-btn"); await page.click("#canvas-layout"); await tick(1500);   // off: the tabs
+    await page.waitForSelector("main.layout #list li.task");
+    await page.click('[data-view="areas"]'); await tick(); await waitFor(async () => (await page.locator(".sky-con").count()) >= 2, "the Sky tab");
+    await page.click("#menu-btn"); await page.click("#canvas-layout"); await tick(1500);   // and back on
+    await page.waitForSelector("#canvas");
   });
   await check("diagnostics gather nothing private", async () => {
     const d = await (await fetch(`${BASE}/api/diagnostics`, { headers: { "X-Planner": "1" } })).json();
-    if (!d.settings || d.settings.configVersion !== 1) throw new Error("no settings in the diagnostics");
+    if (!d.settings || !(d.settings.configVersion >= 2)) throw new Error("no settings in the diagnostics");
     const text = JSON.stringify(d);
     for (const secret of ["check", "Learn the piano piece", "Morning block"]) if (text.includes(`"${secret}"`) || text.includes(secret + "\"")) throw new Error(`diagnostics include "${secret}"`);
   });
