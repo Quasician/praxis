@@ -19,7 +19,7 @@ jobs:
       - run: npm run typecheck
       - run: npm run build
 
-  # The wallpaper's PowerShell helper only runs on Windows: build its DLL and check the script loads it without compiling.
+  # The wallpaper's helper only runs on Windows: build it and check it is a windowed program that answers.
   windows-helper:
     runs-on: windows-latest
     steps:

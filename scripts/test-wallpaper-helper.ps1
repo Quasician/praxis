@@ -1,30 +1,40 @@
 # Checks the wallpaper helper on Windows (run by CI after `npm run build:node`):
-#   1. the build made the helper DLL;
-#   2. with that DLL the script loads its types without compiling anything (the C# source isn't even there);
-#   3. without a DLL the script builds one from the source, once, and then loads it the same way.
+#   1. the build made the helper program;
+#   2. it is a windowed program, not a console one, so starting it can't open a terminal window;
+#   3. it answers when started the way Praxis starts it (output read through a pipe).
 $ErrorActionPreference = "Stop"
-$helper = Join-Path $PSScriptRoot "..\electron\wallpaper-helper.ps1"
-$source = Join-Path $PSScriptRoot "..\electron\wallpaper-native.cs"
-$missing = Join-Path $env:TEMP "praxis-no-such-source.cs"
-function Ping([string]$dll, [string]$src) {
-  $out = & powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $helper -Action ping -Dll $dll -Src $src
-  if ($LASTEXITCODE -ne 0) { throw "helper exited with $LASTEXITCODE" }
-  if (("$out").Trim() -ne "PraxisWall.W") { throw "unexpected answer: $out" }
-}
-
-$built = @(Get-ChildItem (Join-Path $PSScriptRoot "..\native-build") -Filter "praxis-wall-*.dll")
-if ($built.Count -ne 1) { throw "expected one prebuilt DLL in native-build, found $($built.Count)" }
+$built = @(Get-ChildItem (Join-Path $PSScriptRoot "..\native-build") -Filter "praxis-wall-*.exe")
+if ($built.Count -ne 1) { throw "expected one prebuilt helper in native-build, found $($built.Count)" }
+$exe = $built[0].FullName
 Write-Host "1. build made $($built[0].Name)"
 
-Ping $built[0].FullName $missing
-Write-Host "2. prebuilt DLL loads with no source present, so nothing was compiled"
+# The PE header says which kind of program it is: 2 = windowed (no console), 3 = console.
+$bytes = [IO.File]::ReadAllBytes($exe)
+$pe = [BitConverter]::ToInt32($bytes, 0x3C)
+$subsystem = [BitConverter]::ToUInt16($bytes, $pe + 4 + 20 + 68)
+if ($subsystem -ne 2) { throw "the helper's subsystem is $subsystem; it must be 2 (windowed), or it can open a terminal window" }
+Write-Host "2. the helper is a windowed program (no console)"
 
-$fresh = Join-Path $env:TEMP ("praxis-wall-test-" + [guid]::NewGuid().ToString("N") + ".dll")
-Ping $fresh $source
-if (-not (Test-Path -LiteralPath $fresh)) { throw "the fallback didn't write its DLL" }
-Ping $fresh $missing
-Write-Host "3. fallback built its DLL once and reloads it with no source present"
+function Run([string[]]$a) {
+  $psi = New-Object System.Diagnostics.ProcessStartInfo
+  $psi.FileName = $exe; $psi.Arguments = ($a -join " "); $psi.UseShellExecute = $false; $psi.CreateNoWindow = $true
+  $psi.RedirectStandardOutput = $true; $psi.RedirectStandardError = $true
+  $p = [System.Diagnostics.Process]::Start($psi)
+  $out = $p.StandardOutput.ReadToEnd(); $err = $p.StandardError.ReadToEnd()
+  if (-not $p.WaitForExit(30000)) { $p.Kill(); throw "helper '$a' didn't finish" }
+  return @{ code = $p.ExitCode; out = $out.Trim(); err = $err.Trim() }
+}
+$r = Run @("ping")
+if ($r.code -ne 0 -or $r.out -ne "PraxisWall.W") { throw "ping: exit $($r.code), said '$($r.out)' '$($r.err)'" }
+$r = Run @("nonsense")
+if ($r.code -ne 2) { throw "an unknown action should exit with 2, got $($r.code)" }
+$r = Run @("status")
+if ($r.code -ne 0) { throw "status: exit $($r.code) '$($r.err)'" }
+$null = $r.out | ConvertFrom-Json
+Write-Host "3. ping and status answered through a pipe: $($r.out)"
 
-$status = & powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $helper -Action status -Dll $built[0].FullName -Src $missing
-Write-Host "status action answered: $status"
+# watch stops by itself once the program that started it is gone (here: a process id that doesn't exist).
+$r = Run @("watch", "999999")
+if ($r.code -ne 0) { throw "watch with a dead parent: exit $($r.code) '$($r.err)'" }
+Write-Host "4. watch stops when its parent is gone"
 Write-Host "All wallpaper helper checks passed."
