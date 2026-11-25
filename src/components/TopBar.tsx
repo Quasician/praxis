@@ -6,11 +6,13 @@ import { queryClient, qk, refreshAll } from "../data/queries";
 import { useData } from "../data/useData";
 import { useUi, type View } from "../state/ui";
 import { useNow } from "./useNow";
-import { ShutdownPill } from "./ShutdownDialog";
+import { RitualMarker } from "./ShutdownDialog";
 import { StreakChip } from "./Habits";
 import { RELEASE_URL, VERSION } from "../lib/version";
 import { updateConfig } from "../data/actions";
 import { flush, usePending } from "../data/pending";
+import { copyDiagnostics } from "../lib/diagnostics";
+import { toast } from "../state/ui";
 
 const VIEWS: { id: View; label: string; title: string }[] = [
   { id: "day", label: "Day", title: "Plan your day (D)" },
@@ -63,7 +65,7 @@ export function TopBar() {
         {pending.count > 0 && <button id="pending-chip" className="pending-chip" title="Todoist couldn't be reached, so these changes are kept here and sent as soon as it's back. Click to try now." onClick={() => flush()}>
           {pending.count} change{pending.count === 1 ? "" : "s"} waiting for Todoist</button>}
         <span id="sync-status" className="sync-status">{status}</span>
-        <ShutdownPill />
+        <RitualMarker />
         <button id="dump-btn" className="ghost-btn dump-btn" title="Brain dump: Claude turns a messy list into tasks (B)" onClick={() => openDialog("dump")}>✦ Brain dump</button>
         <button id="refresh-btn" className={`icon-btn ${todayQ.isFetching ? "spinning" : ""}`} title="Refresh (R)" aria-label="Refresh" onClick={() => refreshAll(true)}>
           <svg viewBox="0 0 24 24" width="18" height="18"><path fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" d="M20 11a8 8 0 1 0-2.3 5.7M20 5v6h-6" /></svg>
@@ -97,6 +99,11 @@ export function TopBar() {
               <label className="menu-switch" onClick={(e) => e.stopPropagation()}><input type="checkbox" id="focus-mode" checked={!!config?.ui?.focus} onChange={(e) => updateConfig((c) => ({ ...c, ui: { ...(c.ui || {}), focus: e.target.checked } }))} /> Focus mode (F): only what's next</label>
             </div>
             <button id="help-btn" onClick={() => { setMenu(false); openDialog("help"); }}>Keyboard shortcuts (?)</button>
+            <button id="diagnostics-btn" title="Copies the version, settings (nothing private) and recent log, to paste into a chat with Claude when something's wrong" onClick={async () => {
+              setMenu(false);
+              try { toast(await copyDiagnostics() ? "Diagnostics copied. Paste them into your chat with Claude." : "Couldn't copy the diagnostics."); }
+              catch (e) { toast(`Couldn't gather the diagnostics: ${(e as Error).message}`); }
+            }}>Copy diagnostics</button>
             <a href="https://app.todoist.com/app/today" target="_blank" rel="noopener">Open Todoist</a>
             <button id="disconnect-btn" onClick={async () => {
               if (!confirm("Disconnect Todoist? Your tasks stay in Todoist; Praxis just forgets the token.")) return;

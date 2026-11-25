@@ -48,7 +48,7 @@ export function CanvasView() {
   const closeDrawer = () => { setDrawer(null); if (numbers) setView(zoom === "sky" ? "areas" : zoom); };
   useEffect(() => {
     if (!numbers && !drawer) return;
-    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape" && !document.querySelector("dialog[open]")) closeDrawer(); };
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape" && !document.querySelector("dialog[open], .ritual-panel")) closeDrawer(); };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
   }); // eslint-disable-line react-hooks/exhaustive-deps

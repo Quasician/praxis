@@ -178,7 +178,7 @@ function useShortcuts() {
     const onKey = (e: KeyboardEvent) => {
       const ui = useUi.getState();
       const el = document.activeElement as HTMLElement | null;
-      const typing = (el && /INPUT|TEXTAREA|SELECT/.test(el.tagName)) || !!document.querySelector("dialog[open]");
+      const typing = (el && /INPUT|TEXTAREA|SELECT/.test(el.tagName)) || !!document.querySelector("dialog[open], .ritual-panel");
       if (e.key === "Escape") {
         if (isDragging()) { cancelDrag(); return; }
         el?.blur();

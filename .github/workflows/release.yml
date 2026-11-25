@@ -41,8 +41,25 @@ jobs:
             echo "release=true" >> "$GITHUB_OUTPUT"
           fi
 
-  windows:
+  # 4.3: nothing is published until the app has been clicked through: the main screens, the rituals, the canvas.
+  app-check:
     needs: version
+    if: needs.version.outputs.release == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm test
+      - run: npm run build
+      - run: npx playwright install --with-deps chromium
+      - run: npm run check:app
+
+  windows:
+    needs: [version, app-check]
     if: needs.version.outputs.release == 'true'
     runs-on: windows-latest
     steps:

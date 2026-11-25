@@ -4,6 +4,7 @@
 // In the desktop app this folder is %APPDATA%/Praxis; when run from source it's the project folder.
 import fs from "fs";
 import path from "path";
+import { migrate } from "./migrate";
 
 export type Config = Record<string, unknown> & { calendars?: CalendarConfig[] };
 export interface CalendarConfig { id: string; name: string; url: string; color: string; enabled?: boolean }
@@ -40,8 +41,24 @@ export function createStore(dataDir: string) {
     setToken(token: string | null) { setSecret("TODOIST_TOKEN", token); },
     getClaudeKey: () => process.env.ANTHROPIC_API_KEY || env.ANTHROPIC_API_KEY || "",
     setClaudeKey(key: string | null) { setSecret("ANTHROPIC_API_KEY", key); },
+    /** Your settings, upgraded to this version's shape if an older Praxis wrote them (4.3, server/migrate.ts).
+     *  A file that can't be read as settings is moved aside (never overwritten) and Praxis starts from empty settings. */
     readConfig(): Config {
-      try { return JSON.parse(fs.readFileSync(configFile, "utf8")); } catch { return {}; }
+      let text: string;
+      try { text = fs.readFileSync(configFile, "utf8"); } catch { return {}; }       // no file yet
+      let raw: unknown;
+      try { raw = JSON.parse(text); } catch { raw = null; }
+      if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+        const aside = configFile.replace(/\.json$/, "") + `.unreadable-${new Date().toISOString().replace(/[:.]/g, "-")}.json`;
+        try { fs.renameSync(configFile, aside); } catch { /* leave it where it is */ }
+        console.warn(`Settings file couldn't be read; moved it to ${aside}`);
+        return {};
+      }
+      const m = migrate(raw as Config);
+      if (m.changed) {
+        try { this.writeConfig(m.config as Config); } catch { /* still usable this session; tried again next time */ }
+      }
+      return m.config as Config;
     },
     writeConfig(cfg: Config) {
       // Write to a temp file first so a crash mid-write can't corrupt your settings.

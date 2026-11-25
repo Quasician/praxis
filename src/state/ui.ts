@@ -11,6 +11,9 @@ export type CheerKind = "confetti" | "meteor" | "aurora" | "sunrise" | "sunset";
 export type View = "day" | "week" | "areas" | "progress";
 export type DialogName = "triage" | "planner" | "calendars" | "areas" | "dump" | "claude" | "shutdown" | "help" | "morning" | "backlog" | "fresh" | "reminders" | "constellation" | "wallpaper" | "heal" | "letter" | "review";
 
+/** 4.3: the rituals open in one docked panel at the side (one at a time), not as pop-ups over everything. */
+export const RITUALS: DialogName[] = ["morning", "shutdown", "review", "letter", "triage", "backlog", "fresh", "heal"];
+
 export interface Toast { id: number; msg: string; action?: { label: string; run: () => void } }
 
 export interface DragState {
@@ -67,7 +70,12 @@ export const useUi = create<UiState>((set) => ({
   },
   hideToast: () => set({ toast: null }),
   dialogs: { triage: false, planner: false, calendars: false, areas: false, dump: false, claude: false, shutdown: false, help: false, morning: false, backlog: false, fresh: false, reminders: false, constellation: false, wallpaper: false, heal: false, letter: false, review: false },
-  openDialog: (d) => set((s) => ({ dialogs: { ...s.dialogs, [d]: true } })),
+  openDialog: (d) => set((s) => {
+    const dialogs = { ...s.dialogs };
+    if (RITUALS.includes(d)) for (const r of RITUALS) dialogs[r] = false;   // one ritual at a time
+    dialogs[d] = true;
+    return { dialogs };
+  }),
   closeDialog: (d) => set((s) => ({ dialogs: { ...s.dialogs, [d]: false } })),
   plan: EMPTY_PLAN,
   setPlan: (p) => set((s) => ({ plan: { ...s.plan, ...p } })),
