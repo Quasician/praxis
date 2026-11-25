@@ -11,7 +11,7 @@ import path from "path";
 import { spawn, type ChildProcess } from "child_process";
 import { safeMottoName } from "../server/app";
 import { currentWeather } from "./weather";
-import type { ValleyWeather } from "../src/valley/weather";
+import { dayIcon, type SkyIcon, type ValleyWeather } from "../src/valley/weather";
 import { DEFAULT_LAT, DEFAULT_LNG } from "../src/domain/sun";
 import { CITY_FILES } from "../src/city/model";
 import NATIVE_CS from "./wallpaper-native.cs";
@@ -33,7 +33,7 @@ export interface WallpaperCfg {
   /** 3.9: the valley (drawn) or the city (paintings from the city kit folder). */
   scene?: "valley" | "city"; cityFolder?: string;
   /** 3.9: the warmest and coldest readings seen today (°C), so the high stays right after the forecast has moved on. */
-  tempDay?: { date: string; hi: number; lo: number } | null;
+  tempDay?: { date: string; hi: number; lo: number; seen?: Partial<Record<SkyIcon, number>> } | null;
 }
 export interface WallpaperState extends WallpaperCfg { windows: boolean; mottos: number; defaultFolder: string; city: { folder: string; found: number; total: number } }
 
@@ -161,7 +161,11 @@ export function createWallpaper(deps: WallpaperDeps) {
       const prev = cfgOf().weather;
       const today = new Date().toDateString(), td = cfgOf().tempDay;
       const seen = td && td.date === today ? td : null;
-      const tempDay = now.tempC === null ? seen : { date: today, hi: Math.max(now.tempC, seen?.hi ?? -99), lo: Math.min(now.tempC, seen?.lo ?? 99) };
+      // Each check (every 15 minutes) counts as a quarter of an hour of whatever it was doing outside.
+      const tally = { ...(seen?.seen || {}) };
+      if (now.icon) tally[now.icon] = (tally[now.icon] || 0) + .25;
+      const tempDay = now.tempC === null ? (seen ? { ...seen, seen: tally } : null)
+        : { date: today, hi: Math.max(now.tempC, seen?.hi ?? -99), lo: Math.min(now.tempC, seen?.lo ?? 99), seen: tally };
       save({ weather: now, tempDay });
       if (!prev || prev.kind !== now.kind || Math.abs((prev.wind || 0) - now.wind) > .2) { lastKey = ""; deps.log("weather", now.kind, now.text); }
     } catch (e) { deps.log("weather failed", (e as Error).message); }
@@ -174,7 +178,7 @@ export function createWallpaper(deps: WallpaperDeps) {
     const td = cfgOf().tempDay, seen = td && td.date === new Date().toDateString() ? td : null;
     const his = [x.tempC, x.hiC, seen?.hi].filter((v): v is number => typeof v === "number"), los = [x.tempC, x.loC, seen?.lo].filter((v): v is number => typeof v === "number");
     const f = (c: number) => Math.round(c * 9 / 5 + 32);
-    return { now: f(x.tempC), hi: f(Math.max(...his)), lo: f(Math.min(...los)) };
+    return { now: f(x.tempC), hi: f(Math.max(...his)), lo: f(Math.min(...los)), icon: dayIcon(x.icons, seen?.seen) || x.icon || null };
   };
 
   // ---------- the live (moving) wallpaper ----------
@@ -239,7 +243,7 @@ export function createWallpaper(deps: WallpaperDeps) {
     const projects = projectsOf(deps.readConfig()), events = eventsOf(deps.readConfig());
     await refreshWeather();
     const wx = weatherNow(), temp = tempNow();
-    const key = `${sceneOf(w)}|${temp ? `${temp.now}/${temp.hi}/${temp.lo}` : ""}|${motto}|${Math.floor((now.getHours() * 60 + now.getMinutes()) / 10)}|${now.toDateString()}|${JSON.stringify(projects.map((p) => p.steps.filter((s) => s.lit).length))}|${wx?.kind}|${Math.round((wx?.wind ?? 0) * 4)}|${events.meteorAt || ""}|${events.aurora}`;
+    const key = `${sceneOf(w)}|${temp ? `${temp.now}/${temp.hi}/${temp.lo}/${temp.icon}` : ""}|${motto}|${Math.floor((now.getHours() * 60 + now.getMinutes()) / 10)}|${now.toDateString()}|${JSON.stringify(projects.map((p) => p.steps.filter((s) => s.lit).length))}|${wx?.kind}|${Math.round((wx?.wind ?? 0) * 4)}|${events.meteorAt || ""}|${events.aurora}`;
     if (!force && key === lastKey) return;
     busy = true;
     try {
