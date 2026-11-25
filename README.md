@@ -454,6 +454,7 @@ Pushes that don't change the version are only checked, not released.
 - ~~3.6: never rot: offline queue, self-healing days, capture hotkey~~ ✓
 - ~~3.7: rewards: sky events, constellation legends, the Sunday letter, optional sound~~ ✓
 - ~~3.8: finish the theme: sunrise and sunset rituals, ideas as clouds, Areas in the sky, the Horizon clouds over as the day fills~~ ✓
+- ~~4.3.1: reminders no longer light up the taskbar button, so an auto-hidden taskbar can hide again~~ ✓
 - ~~4.3: one place for the rituals; release checks, versioned settings, copy diagnostics~~ ✓
 - ~~4.2: forecasts for projects; Progress leads with the findings, charts below, done in green~~ ✓
 - ~~4.1: one canvas (preview): the sky as the backdrop by time of day, Day/Week/Sky as zoom levels, the record beside your day~~ ✓
