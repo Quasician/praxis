@@ -116,6 +116,10 @@ Praxis is built to be easy on the eyes on a big monitor all day:
 - **Readable type**: Atkinson Hyperlegible for text (designed for legibility) and Bricolage Grotesque for headings, bundled so they work offline.
 - **Calm motion**: finishing a task fills the circle and folds the row away; the focus timer is a ring that fills. If Windows has "Show animations" turned off, Praxis stops animating too.
 
+## The canvas is the default; the city is the wallpaper (4.4)
+
+Praxis opens on the one canvas. The four tabs are still there: untick ⋯ → **One canvas** to go back to them (and tick it to return). The valley wallpaper is retired: the wallpaper is the city, and a wallpaper that was set to the valley moved to the city with this update. (Some of the notes below, from 3.4 to 3.7, describe the valley; the city does the same things.)
+
 ## One place for the rituals, and safer releases (4.3)
 
 **The ritual panel.** The morning commit, the shutdown, the weekly review, the Sunday letter, Needs a decision, the backlog cleanup, the fresh start and the leftovers question now open in one panel docked at the right, one at a time, instead of as pop-ups over everything: your day stays in view beside it (and you can drag blocks while the morning commit is open). Esc or × closes it. **One marker** in the top bar shows what's waiting (the shutdown in the evening, the review on Sunday, your letter, decisions to make), in place of the evening pill and the cards at the top of the list; the panel's top line offers whatever else is waiting.
@@ -131,9 +135,9 @@ Praxis is built to be easy on the eyes on a big monitor all day:
 
 **Progress** (the Numbers panel in the canvas) now opens with what the record says, in words, followed by how Praxis plans for you, three tiles for this week, and the charts folded away below (they stay open if you open them). Finished work is green; work outside the plan is a quiet grey.
 
-## One canvas (4.1, preview)
+## One canvas (4.1)
 
-Switch it on under ⋯ → **One canvas (preview)**; switch it off there to go back to the tabs.
+The default since 4.4; untick ⋯ → **One canvas** to go back to the tabs.
 
 The four tabs become one screen. The sky is the backdrop, lit by the real time of day (night, dawn, day, golden hour, dusk) over a mountain landscape, with your projects as constellations in it: by day they're drawn like a star chart, dark lines and white stars, so they still read on a blue sky. Today's list and the Now card sit at the left, **the record** (what Praxis has learned, today's limit, stalled projects, the last seven days) at the right, and your day along the bottom.
 
@@ -159,7 +163,7 @@ When your commitments are rarely all kept (or always are), the review also offer
 
 ## The city (3.9)
 
-**A second scene for the wallpaper.** Under ⋯ → **Wallpaper…**, choose **Valley** or **City**. The city is a lofi anime cityscape painted as 32 keyframes (4 seasons × dawn, sunrise, noon, golden hour, sunset, dusk, night and a grey day) at 5120 × 2160. Praxis blends the two paintings for the minute you're in, timed from the real sunrise and sunset here, and draws the rest live on top:
+**A second scene for the wallpaper** (the only one since 4.4). The city is a lofi anime cityscape painted as 32 keyframes (4 seasons × dawn, sunrise, noon, golden hour, sunset, dusk, night and a grey day) at 5120 × 2160. Praxis blends the two paintings for the minute you're in, timed from the real sunrise and sunset here, and draws the rest live on top:
 
 - **The season** changes on the calendar dates (spring 20 March, summer 21 June, autumn 22 September, winter 21 December).
 - **The sun** rises and sets at the centre of the horizon and arcs up over you in between; **the moon** crosses the night in its real phase. Both hide behind the towers and the hills and dim behind cloud.
@@ -454,6 +458,7 @@ Pushes that don't change the version are only checked, not released.
 - ~~3.6: never rot: offline queue, self-healing days, capture hotkey~~ ✓
 - ~~3.7: rewards: sky events, constellation legends, the Sunday letter, optional sound~~ ✓
 - ~~3.8: finish the theme: sunrise and sunset rituals, ideas as clouds, Areas in the sky, the Horizon clouds over as the day fills~~ ✓
+- ~~4.4: the canvas is the default; the valley wallpaper is retired (the city stays)~~ ✓
 - ~~4.3.1: reminders no longer light up the taskbar button, so an auto-hidden taskbar can hide again~~ ✓
 - ~~4.3: one place for the rituals; release checks, versioned settings, copy diagnostics~~ ✓
 - ~~4.2: forecasts for projects; Progress leads with the findings, charts below, done in green~~ ✓

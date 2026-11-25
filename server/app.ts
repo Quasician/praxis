@@ -191,7 +191,7 @@ export function createPraxisServer(opts: ServerOptions) {
       let body: { action?: unknown; folder?: unknown } = {};
       if (req.method === "POST") { try { body = JSON.parse((await readBody(req)) || "{}"); } catch { return sendJSON(res, 400, { error: "Invalid JSON" }); } }
       const action = req.method === "GET" ? "state" : String(body.action || "");
-      if (!["state", "enable", "disable", "refresh", "folder", "pick-folder", "live-on", "live-off", "weather-on", "weather-off", "scene-valley", "scene-city", "pick-city-folder"].includes(action)) return sendJSON(res, 400, { error: "Unknown action." });
+      if (!["state", "enable", "disable", "refresh", "folder", "pick-folder", "live-on", "live-off", "weather-on", "weather-off", "pick-city-folder"].includes(action)) return sendJSON(res, 400, { error: "Unknown action." });
       try { return sendJSON(res, 200, await opts.desktop.wallpaper(action, typeof body.folder === "string" ? body.folder.slice(0, 500) : undefined)); }
       catch (e) { return sendJSON(res, 500, { error: (e as Error).message }); }
     }

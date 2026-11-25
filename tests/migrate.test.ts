@@ -47,3 +47,12 @@ test("store: no file yet means empty settings, and nothing is created by reading
   assert.deepEqual(createStore(dir).readConfig(), {});
   assert.deepEqual(fs.readdirSync(dir).filter((n) => n.endsWith(".json")), []);
 });
+
+test("migrate 2 (4.4): the canvas becomes the default and a valley wallpaper moves to the city", () => {
+  const m = migrate({ configVersion: 1, ui: { theme: "dark", canvas: false }, wallpaper: { enabled: true, scene: "valley", live: true } });
+  assert.deepEqual(m.config.ui, { theme: "dark", canvas: true });
+  assert.deepEqual(m.config.wallpaper, { enabled: true, scene: "city", live: true });
+  const none = migrate({ configVersion: 1 });
+  assert.deepEqual(none.config.ui, { canvas: true });
+  assert.equal("wallpaper" in none.config, false);   // no wallpaper settings: none are made up
+});

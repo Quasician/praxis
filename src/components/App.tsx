@@ -58,7 +58,7 @@ function Shell() {
   const view = useUi((s) => s.view);
   const wide = useMedia("(min-width: 2200px)"); // ultrawide: show areas beside the day
   const { config } = useData();
-  const canvas = !!config?.ui?.canvas;   // 5.0: the one canvas, while it's a preview you switch on
+  const canvas = config?.ui?.canvas !== false;   // 4.4: the one canvas is the default; the tabs are still there if you switch it off
   const phase = usePhase();              // in the canvas the sky sets light or dark, for its dialogs too
   // Day → Week zooms out, Week → Day zooms in (the new view animates as it mounts).
   const ZOOM = { day: 0, week: 1, areas: 1, progress: 2 } as Record<string, number>;

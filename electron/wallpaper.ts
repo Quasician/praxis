@@ -108,7 +108,8 @@ export function createWallpaper(deps: WallpaperDeps) {
   let busy = false, lastKey = "", locked = false;
   const defaultFolder = path.join(app.getPath("pictures"), "Mottos");
   const defaultCity = path.join(app.getPath("pictures"), "Praxis city kit", "keyframes-5k");
-  const sceneOf = (w: WallpaperCfg) => (w.scene === "city" ? "city" : "valley") as "valley" | "city";
+  // 4.4: the valley is retired; the city is the wallpaper's only scene (an old "valley" setting is read as the city).
+  const sceneOf = (_w: WallpaperCfg) => "city" as const;
   const cfgOf = (): WallpaperCfg => (deps.readConfig().wallpaper as WallpaperCfg) || {};
   const save = (patch: Partial<WallpaperCfg>) => { const c = deps.readConfig(); deps.writeConfig({ ...c, wallpaper: { ...((c.wallpaper as WallpaperCfg) || {}), ...patch } }); };
   const folderOf = (w: WallpaperCfg) => w.folder || defaultFolder;
@@ -379,8 +380,7 @@ export function createWallpaper(deps: WallpaperDeps) {
     refresh: async () => { lastKey = ""; await refreshWeather(true); await render(true); return state(); },
     setLive: async (on: boolean) => { liveFailed = false; save({ live: on, error: null }); if (on && cfgOf().enabled) await startLive(); if (!on) { stopLive(); save({ liveHow: null }); lastKey = ""; await render(true); } return state(); },
     setWeather: async (on: boolean) => { save({ useWeather: on }); lastKey = ""; if (on) await refreshWeather(true); await render(true); return state(); },
-    setScene: async (scene: "valley" | "city") => { save({ scene, error: null }); lastKey = ""; if (cfgOf().enabled) { await render(true); if (live && !live.isDestroyed()) await feedLive(); } return state(); },
-    setCityFolder: async (cityFolder: string) => { save({ cityFolder }); lastKey = ""; if (cfgOf().enabled && sceneOf(cfgOf()) === "city") await render(true); return state(); },
+    setCityFolder: async (cityFolder: string) => { save({ cityFolder }); lastKey = ""; if (cfgOf().enabled) await render(true); return state(); },
     setFolder: async (folder: string) => { save({ folder, bag: [], current: null }); lastKey = ""; if (cfgOf().enabled) await render(true); return state(); },
     window: () => win,
   };
