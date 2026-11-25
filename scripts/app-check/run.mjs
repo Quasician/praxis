@@ -136,6 +136,29 @@ try {
     await page.click("#menu-btn"); await page.click("#canvas-layout"); await tick(1500);   // and back on
     await page.waitForSelector("#canvas");
   });
+  await check("overlapping blocks: separate rows on the day, lanes on the edge strip, all of them named", async () => {
+    await page.click('[data-view="day"]'); await tick(1000);
+    const tops = await page.$$eval("#timeline .tl-block:not(.proposed)", (els) => Object.fromEntries(els.map((e) => [e.textContent.replace(/\s+/g, " ").trim().slice(0, 18), Math.round(e.getBoundingClientRect().top)])));
+    const rows = ["Write the report", "Call the bank", "Review the slides"].map((t) => Object.entries(tops).find(([k]) => k.includes(t.slice(0, 12)))?.[1]);
+    if (rows.some((r) => r === undefined)) throw new Error(`blocks missing on the day: ${JSON.stringify(tops)}`);
+    if (new Set(rows).size !== 3) throw new Error(`overlapping blocks share a row: ${JSON.stringify(rows)}`);
+    const strip = await ctx.newPage();
+    await strip.clock.install({ time: now });
+    strip.on("pageerror", (e) => pageErrors.push(`strip: ${e.message}`));
+    await strip.setViewportSize({ width: 1920, height: 168 });   // the strip window's open height (electron/main.ts STRIP_OPEN_H)
+    await strip.goto(`${BASE}/?strip=1`); await strip.clock.runFor(3000); await strip.waitForTimeout(300);
+    const lanes = await strip.$$eval(".es-block", (els) => els.map((e) => e.dataset.lane));
+    if (!lanes.includes("3/3")) throw new Error(`no three-lane blocks on the strip: ${lanes.join(" ")}`);
+    const x = Math.round(((14 * 60 + 20 - 6 * 60) / (18 * 60)) * 1920);
+    await strip.evaluate((x) => window.dispatchEvent(new CustomEvent("praxis:strip", { detail: { open: true, x } })), x); await strip.clock.runFor(300); await strip.waitForTimeout(200);
+    const card = await strip.locator("#es-card").textContent();
+    // Two titles per line, then "+N more": the three at 2 PM show as two names and "+1 more".
+    for (const t of ["Stand-up notes", "Inbox zero", "Write the report", "Call the bank", "+1 more"]) if (!card.includes(t)) throw new Error(`the strip's card doesn't name "${t}": ${card}`);
+    const fits = await strip.$eval("#es-card", (e) => e.getBoundingClientRect().bottom <= window.innerHeight);
+    if (!fits) throw new Error("the strip's card is cut off at the bottom");
+    if (SHOTS) await strip.screenshot({ path: path.join(SHOTS, "strip-card.png") });
+    await strip.close();
+  });
   await check("diagnostics gather nothing private", async () => {
     const d = await (await fetch(`${BASE}/api/diagnostics`, { headers: { "X-Planner": "1" } })).json();
     if (!d.settings || !(d.settings.configVersion >= 2)) throw new Error("no settings in the diagnostics");

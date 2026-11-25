@@ -1,7 +1,7 @@
 // 3.3 Stay in view: the edge horizon (a thin strip across the top of the screen) and the tray sundial.
 // Both are for the moments Praxis is out of sight: a full-screen app, a game, deep work in another window.
 import { useEffect, useMemo, useState } from "react";
-import { layoutBlocks, TL_END, TL_START, visibleEvents, type Block } from "../domain/layout";
+import { blocksAt, layoutBlocks, nextBlocks, TL_END, TL_START, visibleEvents, type Block } from "../domain/layout";
 import { skyStops, sunTimes } from "../domain/sun";
 import { fmtMin, minOfDay, ymd } from "../lib/dates";
 import { colorOf, plain } from "../lib/text";
@@ -32,7 +32,10 @@ export function useGlance() {
 const title = (b: Block) => (b.task ? plain(b.task.content) : b.event?.title || "");
 
 // ---------- the edge horizon ----------
-/** The strip window's page (?strip=1). The desktop app sizes it: a few pixels tall, or taller while you hover the top edge. */
+
+/** The strip window's page (?strip=1). The desktop app sizes it: a few pixels tall, or taller while you hover the top edge.
+ *  4.5: overlapping blocks share the line in lanes (each a slice of its height) instead of painting over each other,
+ *  and the hover card names every block that's on now, next, or under the pointer. */
 export function EdgeStrip() {
   useAppearance();
   useUi();
@@ -53,36 +56,44 @@ export function EdgeStrip() {
   const stops = skyStops(rise, set, TL_START * 60, TL_END * 60).map(([v, p]) => `var(${v}) ${p.toFixed(1)}%`).join(", ");
   const w = typeof window === "undefined" ? 1 : window.innerWidth || 1;
   const atX = TL_START * 60 + (peek.x / w) * span;
-  const under = blocks.find((b) => b.start <= atX && b.end > atX);
-  const current = blocks.find((b) => b.start <= nowMin && b.end > nowMin && b.task);
-  const next = blocks.filter((b) => b.start > nowMin).sort((a, b) => a.start - b.start)[0];
-  const cardX = Math.max(12, Math.min(w - 352, peek.x - 170));
+  const current = blocksAt(blocks, nowMin);
+  const next = nextBlocks(blocks, nowMin);
+  const under = blocksAt(blocks, atX).filter((b) => !current.includes(b) && !next.includes(b));
+  const cardX = Math.max(12, Math.min(w - 432, peek.x - 210));
+  const many = (g: Block[], label: string) => (g.length > 1 ? `${label} · ${g.length} at once` : label);
 
   return (
     <div className={`edge-strip ${peek.open ? "open" : ""}`} id="edge-strip">
       <div className="es-line" style={{ background: `linear-gradient(to right, ${stops})` }}>
         <div className="es-past" style={{ width: `${pct(nowMin)}%` }} />
         {blocks.map((b, i) => (
-          <span key={i} className={`es-block ${b.event ? "event" : ""} ${b.end <= nowMin ? "past" : ""}`}
-                style={{ left: `${pct(b.start)}%`, width: `max(3px, ${pct(b.end) - pct(b.start)}%)`, ["--c" as string]: color(b) }} />
+          <span key={i} className={`es-block ${b.event ? "event" : ""} ${b.end <= nowMin ? "past" : ""}`} data-lane={`${b.col + 1}/${b.cols}`}
+                style={{ left: `${pct(b.start)}%`, width: `max(3px, ${pct(b.end) - pct(b.start)}%)`, ["--c" as string]: color(b), ["--lane" as string]: b.col, ["--lanes" as string]: b.cols }} />
         ))}
         <span className="es-now" style={{ left: `${pct(nowMin)}%` }} />
       </div>
       {peek.open && (
         <div className="es-card" id="es-card" style={{ left: cardX }}>
-          {under && under !== current && under !== next ? (
-            <Row label={`${fmtMin(under.start)} – ${fmtMin(under.end)}`} text={title(under)} c={color(under)} />
-          ) : null}
-          {current && <Row label={`Now · until ${fmtMin(current.end)}`} text={title(current)} c={color(current)} />}
-          {next ? <Row label={`Next · ${fmtMin(next.start)} · in ${inMin(next.start - nowMin)}`} text={title(next)} c={color(next)} />
+          {under.length > 0 && <Row label={many(under, `${fmtMin(Math.min(...under.map((b) => b.start)))} – ${fmtMin(Math.max(...under.map((b) => b.end)))}`)} blocks={under} color={color} />}
+          {current.length > 0 && <Row label={many(current, `Now · until ${fmtMin(Math.min(...current.map((b) => b.end)))}`)} blocks={current} color={color} />}
+          {next.length ? <Row label={many(next, `Next · ${fmtMin(next[0].start)} · in ${inMin(next[0].start - nowMin)}`)} blocks={next} color={color} />
             : <div className="es-row"><span className="es-label">Nothing else planned today</span></div>}
         </div>
       )}
     </div>
   );
 }
-function Row({ label, text, c }: { label: string; text: string; c: string }) {
-  return <div className="es-row" style={{ ["--c" as string]: c }}><span className="es-dot" /><span className="es-label">{label}</span><span className="es-text">{text}</span></div>;
+/** One line of the hover card: a label, and the blocks' titles side by side (each with its colour), shortened to fit. */
+function Row({ label, blocks, color }: { label: string; blocks: Block[]; color: (b: Block) => string }) {
+  return (
+    <div className="es-row" style={{ ["--c" as string]: color(blocks[0]) }}>
+      <span className="es-dot" /><span className="es-label">{label}</span>
+      <span className="es-text" title={blocks.map(title).join(" · ")}>
+        {blocks.slice(0, 2).map((b, i) => <span key={i} className="es-one" style={{ ["--c" as string]: color(b) }}>{i > 0 && <i className="es-sep" aria-hidden="true" />}{title(b)}</span>)}
+        {blocks.length > 2 && <span className="es-more">+{blocks.length - 2} more</span>}
+      </span>
+    </div>
+  );
 }
 
 // ---------- the tray sundial ----------
@@ -140,11 +151,11 @@ export function useTrayDial() {
       const frac = up ? (nowMin - rise) / (set - rise) : ((nowMin - set + 1440) % 1440) / (1440 - (set - rise));
       const accent = getComputedStyle(document.documentElement).getPropertyValue("--accent").trim() || "#5b5bd6";
       const o = { frac, up, left, dark, accent };
-      const next = blocks.filter((b) => b.start > nowMin).sort((a, b) => a.start - b.start)[0];
+      const nextAll = nextBlocks(blocks, nowMin), next = nextAll[0];
       const tip = [
         "Praxis",
         committedCount ? (left ? `${left} of ${committedCount} commitment${committedCount > 1 ? "s" : ""} left` : "All commitments done ✓") : "No commitments yet today",
-        next ? `next: ${title(next).slice(0, 40)} at ${fmtMin(next.start)}` : "",
+        next ? `next: ${title(next).slice(0, 40)}${nextAll.length > 1 ? ` (+${nextAll.length - 1})` : ""} at ${fmtMin(next.start)}` : "",
         up ? `sunset ${fmtMin(set)}` : `sunrise ${fmtMin(rise)}`,
       ].filter(Boolean).join(" · ");
       await api("/api/desktop/tray", { method: "POST", body: { img16: drawDial(16, o), img32: drawDial(32, o), tip } }).catch(() => undefined);

@@ -116,6 +116,16 @@ Praxis is built to be easy on the eyes on a big monitor all day:
 - **Readable type**: Atkinson Hyperlegible for text (designed for legibility) and Bricolage Grotesque for headings, bundled so they work offline.
 - **Calm motion**: finishing a task fills the circle and folds the row away; the focus timer is a ring that fills. If Windows has "Show animations" turned off, Praxis stops animating too.
 
+## Overlapping blocks (4.5)
+
+Tasks and events that overlap now show clearly everywhere:
+- **The edge strip** (top of the screen): overlapping blocks share the line in lanes instead of painting over each other, and the hover card names every block on now, next and under the pointer (two by name, then "+N more").
+- **Reminders**: blocks that start together come as one reminder naming all of them ("Write the report + 1 more · Also starting: Call the bank"). Before, only the first was shown and the others were lost.
+- **The canvas**: the day along the bottom gives its room to the blocks (its own sky is a thin band there), so four rows of overlapping blocks fit.
+- **The tray tooltip** counts the blocks starting next ("next: Write the report (+1) at 2:00 PM").
+
+The release checks now include overlapping blocks.
+
 ## The canvas is the default; the city is the wallpaper (4.4)
 
 Praxis opens on the one canvas. The four tabs are still there: untick ⋯ → **One canvas** to go back to them (and tick it to return). The valley wallpaper is retired: the wallpaper is the city, and a wallpaper that was set to the valley moved to the city with this update. (Some of the notes below, from 3.4 to 3.7, describe the valley; the city does the same things.)
@@ -458,6 +468,7 @@ Pushes that don't change the version are only checked, not released.
 - ~~3.6: never rot: offline queue, self-healing days, capture hotkey~~ ✓
 - ~~3.7: rewards: sky events, constellation legends, the Sunday letter, optional sound~~ ✓
 - ~~3.8: finish the theme: sunrise and sunset rituals, ideas as clouds, Areas in the sky, the Horizon clouds over as the day fills~~ ✓
+- ~~4.5: overlapping blocks: lanes on the edge strip, one reminder for blocks that start together, room for them on the canvas~~ ✓
 - ~~4.4: the canvas is the default; the valley wallpaper is retired (the city stays)~~ ✓
 - ~~4.3.1: reminders no longer light up the taskbar button, so an auto-hidden taskbar can hide again~~ ✓
 - ~~4.3: one place for the rituals; release checks, versioned settings, copy diagnostics~~ ✓

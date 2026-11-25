@@ -78,3 +78,11 @@ export function layoutBlocks(todayTasks: Task[], events: CalEvent[] = []): Block
   if (cluster.length) flush();
   return items;
 }
+
+/** Every block covering minute m (overlapping blocks: all of them), earliest first. */
+export const blocksAt = (blocks: Block[], m: number) => blocks.filter((b) => b.start <= m && b.end > m).sort((a, b) => a.start - b.start || a.col - b.col);
+/** The block(s) starting next after minute m: all of those that start at that same minute. */
+export function nextBlocks(blocks: Block[], m: number) {
+  const first = Math.min(...blocks.filter((b) => b.start > m).map((b) => b.start));
+  return Number.isFinite(first) ? blocks.filter((b) => b.start === first).sort((a, b) => a.col - b.col) : [];
+}

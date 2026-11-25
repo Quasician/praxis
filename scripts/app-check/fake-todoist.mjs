@@ -25,6 +25,10 @@ export function startFakeTodoist(port, now = new Date()) {
   project("m3", "Apartment move", "home", [["Must-haves", 14], ["Shortlist", 12], ["Viewings", null], ["Decide", null]], ymd(new Date(+d0 + 6 * DAY)));
   [["Draft the project update", 60, ["deep"]], ["Reply to the landlord", 20, ["light"]], ["Plan next week's meals", 45, []], ["Review the budget", 60, []]].forEach(([c, m, l], i) =>
     tasks.push(T({ id: `t${i}`, content: c, project_id: i % 2 ? "home" : "work", labels: l, due: { date: ymd(d0) }, duration: { amount: m, unit: "minute" }, child_order: i })));
+  // Overlapping blocks (4.5): two on now (the checks run at 10:00), three around 2 PM, two of them starting together.
+  const timed = (h, m) => `${ymd(d0)}T${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:00`;
+  [["Stand-up notes", 9, 45, 30], ["Inbox zero", 10, 0, 20], ["Write the report", 14, 0, 60], ["Call the bank", 14, 0, 30], ["Review the slides", 14, 15, 45]].forEach(([c, h, m, min], i) =>
+    tasks.push(T({ id: `o${i}`, content: c, project_id: i % 2 ? "work" : "home", due: { date: timed(h, m) }, duration: { amount: min, unit: "minute" }, child_order: 10 + i })));
   for (let n = 1; n <= 10; n++) completed.push(T({ id: `h${n}-0`, content: "Morning block", completed_at: at(n, 10), duration: { amount: 60, unit: "minute" } }));
 
   const sent = [];
