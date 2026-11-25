@@ -124,7 +124,7 @@ Praxis is built to be easy on the eyes on a big monitor all day:
 - **The sun** rises and sets at the centre of the horizon and arcs up over you in between; **the moon** crosses the night in its real phase. Both hide behind the towers and the hills and dim behind cloud.
 - **Window lights** come on one by one through dusk, about half go out after 11:30 PM, and the rest go out around sunrise.
 - **Weather**: cloudy days take their light from the grey-day painting, rain flattens and cools the light with haze along the horizon, and rain or snow falls. Stars and your constellations show only where there's sky.
-- **Today's temperature** sits in the top-left corner: now, and today's high and low (°F). It's there in both scenes whenever "Match the real weather" is on.
+- **Today's weather** sits in the top-left corner as one tidy block: the temperature now and a symbol for most of the day (sun, partly cloudy, cloudy, fog, rain, thunderstorm or snow) on top, today's high and low under them (°F). The symbol is whichever covers the most of today's hours: the forecast for the hours ahead plus what Praxis saw for the hours gone. It's there in both scenes whenever "Match the real weather" is on.
 
 The paintings aren't part of the app: Praxis reads them (never changes them) from `Pictures\Praxis city kit\keyframes-5k`, or another folder you choose in the dialog. It needs `spring-dawn.png` … `winter-overcast.png` and one mask per season (`spring-mask.png` …), which `scripts/city/build_masks.py` and `scripts/city/pack_masks.py` make from the paintings.
 

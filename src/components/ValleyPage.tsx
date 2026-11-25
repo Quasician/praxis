@@ -4,12 +4,14 @@ import { useEffect, useRef, useState } from "react";
 import { loadAssets, ValleyRenderer, type CityInput, type RenderOpts, type SkyProject, type ValleyAssets } from "../valley/render";
 import type { Weather } from "../valley/model";
 import { cityPlan } from "../city/model";
+import { drawSkyIcon } from "../valley/skyIcons";
+import type { SkyIcon } from "../valley/weather";
 
 /** 3.7: the rewards in the sky. meteorAt: when you finished "the one"; aurora: 1 while it's out. */
 export interface JobEvents { meteorAt?: string | null; aurora?: number }
 /** scene: 3.9, the valley (drawn) or the city (paintings from your city kit folder). */
 /** temp: 3.9, now / today's high / today's low in °F, shown in the top-left corner (null: not shown). */
-export interface JobTemp { now: number; hi: number; lo: number }
+export interface JobTemp { now: number; hi: number; lo: number; icon?: SkyIcon | null }
 export interface WallpaperJob { when: string; weather?: Weather; motto?: string | null; projects?: SkyProject[]; width?: number; height?: number; save?: boolean; events?: JobEvents; scene?: "valley" | "city"; temp?: JobTemp | null }
 const eventsAt = (e: JobEvents | undefined, at: number) => (e ? { aurora: e.aurora || 0, meteorAge: e.meteorAt ? (at - Date.parse(e.meteorAt)) / 1000 : null } : undefined);
 declare global {
@@ -32,7 +34,7 @@ let assets: Promise<ValleyAssets> | null = null;
 const mottoCache = new Map<string, ImageBitmap>();
 async function mottoBitmap(name: string | null | undefined, w: number, h: number, temp?: JobTemp | null) {
   if (!name && !temp) return null;
-  const key = `${name || ""}|${w}x${h}|${temp ? `${temp.now}/${temp.hi}/${temp.lo}` : ""}`;
+  const key = `${name || ""}|${w}x${h}|${temp ? `${temp.now}/${temp.hi}/${temp.lo}/${temp.icon || ""}` : ""}`;
   if (mottoCache.has(key)) return mottoCache.get(key)!;
   let bmp: ImageBitmap | null = null;
   if (name) {
@@ -48,10 +50,23 @@ async function mottoBitmap(name: string | null | undefined, w: number, h: number
     if (bmp) { g.drawImage(bmp, 0, 0, w, h); bmp.close(); }
     g.fillStyle = "#fff"; g.textBaseline = "alphabetic";
     const face = '"Segoe UI Variable Display", "Segoe UI", system-ui, sans-serif';
+    // One tidy block: the temperature and the day's symbol on top, today's high and low under them spread to the same width,
+    // so the left and right edges line up.
+    const x0 = 150 * k, base = 290 * k, s = Math.round(170 * k), iw = s * .92 * .96;   // the symbol's drawn width
     g.font = `300 ${Math.round(150 * k)}px ${face}`;
-    g.fillText(`${temp.now}°`, 150 * k, 290 * k);
-    g.font = `400 ${Math.round(56 * k)}px ${face}`;
-    g.fillText(`H ${temp.hi}°   L ${temp.lo}°`, 158 * k, 380 * k);
+    const tw = g.measureText(`${temp.now}°`).width;
+    const gap = 44 * k, width = tw + (temp.icon ? gap + iw : 0);
+    g.textAlign = "left"; g.fillText(`${temp.now}°`, x0, base);
+    if (temp.icon) {
+      const ic = new OffscreenCanvas(s * 2, s * 2), ig = ic.getContext("2d")!;
+      drawSkyIcon(ig, temp.icon, s, s, s * .92, Math.max(2, 7.5 * k));
+      g.drawImage(ic, x0 + width - iw / 2 - s, 236 * k - s);
+    }
+    g.font = `400 ${Math.round(60 * k)}px ${face}`;
+    const row = base + 92 * k;
+    g.textAlign = "left"; g.fillText(`H ${temp.hi}°`, x0 + 8 * k, row);
+    g.textAlign = "right"; g.fillText(`L ${temp.lo}°`, x0 + width, row);
+    g.textAlign = "left";
     bmp = c.transferToImageBitmap();
   }
   if (!bmp) return null;
