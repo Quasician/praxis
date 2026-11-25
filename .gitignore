@@ -14,5 +14,6 @@ praxis.config.json.tmp
 # Build output and dependencies
 node_modules/
 dist/
+native-build/
 release/
 .praxis-data/
