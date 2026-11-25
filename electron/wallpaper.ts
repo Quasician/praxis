@@ -208,6 +208,9 @@ export function createWallpaper(deps: WallpaperDeps) {
   let live: BrowserWindow | null = null, watcher: ChildProcess | null = null, onBattery = false, fullApp = false;
   /** Set when the moving wallpaper couldn't get behind the icons: don't try again at every redraw (until restart, or it's switched on again). */
   let liveFailed = false;
+  /** True while the moving wallpaper's window is in place behind the icons. Setting the still wallpaper makes Windows rebuild the
+   *  desktop layer, which destroys that window: so while this is true, redraws only feed the moving picture (4.0.1). */
+  let liveAttached = false;
   const livePaused = () => locked || onBattery || fullApp;
   function syncPause() { if (live && !live.isDestroyed()) live.webContents.executeJavaScript(`window.__valley && window.__valley.pause(${livePaused()})`).catch(() => undefined); }
   async function startLive() {
@@ -217,28 +220,39 @@ export function createWallpaper(deps: WallpaperDeps) {
     // everything, even for a second, looks like a terminal taking over the screen. The helper moves it into place.
     const off = isWin ? { x: -32000, y: -32000 } : { x: b.x, y: b.y };
     live = new BrowserWindow({ ...off, width: b.width, height: b.height, frame: false, resizable: false, movable: false, minimizable: false, maximizable: false,
-      fullscreenable: false, skipTaskbar: true, focusable: false, show: false, backgroundColor: "#000000", title: "Praxis live wallpaper", hasShadow: false,
+      fullscreenable: false, skipTaskbar: true, focusable: false, show: false, backgroundColor: "#1b2233", title: "Praxis live wallpaper", hasShadow: false,
       webPreferences: { contextIsolation: true, sandbox: true, backgroundThrottling: false } });
     live.on("page-title-updated", (e) => e.preventDefault());
     live.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
     live.webContents.on("will-navigate", (e) => e.preventDefault());
     live.on("closed", () => {
-      live = null;
+      live = null; liveAttached = false;
+      deps.log("live wallpaper window closed");
       // Explorer restarting takes the window with it: come back if the live wallpaper is still on.
       if (cfgOf().enabled && cfgOf().live && !liveFailed) setTimeout(() => startLive().catch(() => undefined), 5000);
     });
     await live.loadURL(`${deps.baseUrl()}/?valley=1&live=1`);
     await waitReady(live);
     live.showInactive();
+    // Draw the first frame while it's still off-screen, so it never sits behind the icons as an empty dark rectangle
+    // while the paintings load (4.0.1). Skipped when it's paused (a full-screen app in front, the screen locked).
+    await feedLive();
+    for (const t0 = Date.now(); !livePaused() && Date.now() - t0 < 15_000;) {
+      if (!live || live.isDestroyed()) return;
+      if (await live.webContents.executeJavaScript("!!(window.__valley && (window.__valley.drawn || window.__valley.error))").catch(() => false)) break;
+      await new Promise((r) => setTimeout(r, 150));
+    }
+    if (!live || live.isDestroyed()) return;
     const hwnd = live.getNativeWindowHandle();
     const id = hwnd.length >= 8 ? hwnd.readBigUInt64LE(0).toString() : String(hwnd.readUInt32LE(0));
     try {
       const how = await helper(["attach", id, String(Math.round(b.width * d.scaleFactor)), String(Math.round(b.height * d.scaleFactor))], deps.log);
       if (how.startsWith("no-desktop")) throw new Error("the desktop window wasn't found");
       save({ liveHow: how });
+      liveAttached = true;
       deps.log("live wallpaper attached", how);
       if (!isWin) live.hide();
-    } catch (e) { deps.log("live wallpaper couldn't attach", (e as Error).message); save({ error: "The moving wallpaper couldn't get behind your desktop icons; showing the still picture instead." }); liveFailed = true; stopLive(); return; }
+    } catch (e) { deps.log("live wallpaper couldn't attach", (e as Error).message); save({ error: "The moving wallpaper couldn't get behind your desktop icons; showing the still picture instead." }); liveFailed = true; lastKey = ""; stopLive(); return; }
     await feedLive();
     if (isWin && !watcher) {
       // One small helper keeps an eye on whether a full-screen app is in front (then the valley holds still).
@@ -249,7 +263,7 @@ export function createWallpaper(deps: WallpaperDeps) {
   }
   function stopLive() {
     if (watcher) { watcher.kill(); watcher = null; }
-    const w = live; live = null;
+    const w = live; live = null; liveAttached = false;
     if (w && !w.isDestroyed()) { w.removeAllListeners("closed"); w.destroy(); }
   }
   async function feedLive() {
@@ -275,6 +289,15 @@ export function createWallpaper(deps: WallpaperDeps) {
     if (!force && key === lastKey) return;
     busy = true;
     try {
+      // The moving wallpaper is up: give it the new motto, weather and stars, and leave the still wallpaper alone.
+      // (Setting it would destroy the moving window, which then had to be put back, at every redraw.)
+      if (cfgOf().live && live && !live.isDestroyed() && liveAttached) {
+        await feedLive();
+        lastKey = key;
+        save({ last: { at: now.toISOString(), file: cfgOf().last?.file || "", motto: motto || "", ms: 0 }, error: null });
+        deps.log("wallpaper (moving)", sceneOf(w), motto, temp ? `${temp.now}F` : wx ? "no temperature" : "no weather");
+        return;
+      }
       const v = await ensureWindow();
       const job = { when: now.toISOString(), weather: wx?.kind || "clear", motto, projects, events, scene: sceneOf(w), temp, ...size() };
       const out = await v.webContents.executeJavaScript(`window.__valley.wallpaper(${JSON.stringify(job)})`) as { file: string; ms: number };
@@ -354,7 +377,7 @@ export function createWallpaper(deps: WallpaperDeps) {
     stop() { stopLive(); },
     enable, disable, state,
     refresh: async () => { lastKey = ""; await refreshWeather(true); await render(true); return state(); },
-    setLive: async (on: boolean) => { liveFailed = false; save({ live: on, error: null }); if (on && cfgOf().enabled) await startLive(); if (!on) { stopLive(); save({ liveHow: null }); } return state(); },
+    setLive: async (on: boolean) => { liveFailed = false; save({ live: on, error: null }); if (on && cfgOf().enabled) await startLive(); if (!on) { stopLive(); save({ liveHow: null }); lastKey = ""; await render(true); } return state(); },
     setWeather: async (on: boolean) => { save({ useWeather: on }); lastKey = ""; if (on) await refreshWeather(true); await render(true); return state(); },
     setScene: async (scene: "valley" | "city") => { save({ scene, error: null }); lastKey = ""; if (cfgOf().enabled) { await render(true); if (live && !live.isDestroyed()) await feedLive(); } return state(); },
     setCityFolder: async (cityFolder: string) => { save({ cityFolder }); lastKey = ""; if (cfgOf().enabled && sceneOf(cfgOf()) === "city") await render(true); return state(); },
