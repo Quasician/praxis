@@ -39,14 +39,14 @@ export function TopBar() {
   const status = todayQ.isError ? "Couldn't sync — retrying soon" : todayQ.isFetching && !todayQ.data ? "Syncing…" : synced;
 
   return (
-    <header className="topbar">
+    <header className="topbar">{/* in the canvas (5.0) the same bar sits on the sky; Day, Week and Sky are zoom levels, Progress pulls in from the right */}
       <div className="dateblock">
         <div id="weekday" className="weekday">{now.toLocaleDateString([], { weekday: "long" })}<span id="version-tag" className="version-tag" title={`Praxis ${VERSION}`}>v{VERSION}</span></div>
         <div id="fulldate" className="fulldate">{now.toLocaleDateString([], { month: "long", day: "numeric", year: "numeric" })}</div>
       </div>
       <nav className="views" role="tablist" aria-label="View">
         {VIEWS.map((v) => (
-          <button key={v.id} role="tab" data-view={v.id} className={`view-btn ${view === v.id ? "active" : ""}`} title={v.title} onClick={() => setView(v.id)}>{v.label}</button>
+          <button key={v.id} role="tab" data-view={v.id} className={`view-btn ${view === v.id ? "active" : ""}`} title={v.title} onClick={() => setView(v.id)}>{config?.ui?.canvas && v.id === "progress" ? "Numbers" : v.label}</button>
         ))}
       </nav>
       <div className="summary" id="summary" hidden={view !== "day"}>
@@ -92,6 +92,7 @@ export function TopBar() {
                 ))}
               </div>
               <label className="menu-switch" onClick={(e) => e.stopPropagation()}><input type="checkbox" id="warm-evenings" checked={config?.ui?.warmEvenings !== false} onChange={(e) => updateConfig((c) => ({ ...c, ui: { ...(c.ui || {}), warmEvenings: e.target.checked } }))} /> Warmer colors after 8 PM</label>
+              <label className="menu-switch" onClick={(e) => e.stopPropagation()}><input type="checkbox" id="canvas-layout" checked={!!config?.ui?.canvas} onChange={(e) => { const on = e.target.checked; updateConfig((c) => ({ ...c, ui: { ...(c.ui || {}), canvas: on } })); if (useUi.getState().view === "progress") setView("day"); }} /> One canvas (preview)</label>
               <label className="menu-switch" onClick={(e) => e.stopPropagation()}><input type="checkbox" id="horizon-layout" checked={config?.ui?.dayLayout !== "classic"} onChange={(e) => updateConfig((c) => ({ ...c, ui: { ...(c.ui || {}), dayLayout: e.target.checked ? "horizon" : "classic" } }))} /> Day as a horizon (left to right)</label>
               <label className="menu-switch" onClick={(e) => e.stopPropagation()}><input type="checkbox" id="focus-mode" checked={!!config?.ui?.focus} onChange={(e) => updateConfig((c) => ({ ...c, ui: { ...(c.ui || {}), focus: e.target.checked } }))} /> Focus mode (F): only what's next</label>
             </div>

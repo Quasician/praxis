@@ -164,7 +164,7 @@ export function SkyView({ allAreas = false, selectedArea = null, onArea, actions
   );
 }
 
-function nextAndToday(active: Task[]) {
+export function nextAndToday(active: Task[]) {
   const nextIds = new Map<string, string>(), todayIds = new Set<string>();
   const tonight = +startOfToday() + 864e5;
   for (const m of active.filter(isMilestone)) {
@@ -175,7 +175,7 @@ function nextAndToday(active: Task[]) {
   return { nextIds, todayIds };
 }
 
-function Picked({ c, active, right, onClose }: { c: ConstellationView; active: Task[]; right: boolean; onClose: () => void }) {
+export function Picked({ c, active, right, onClose }: { c: ConstellationView; active: Task[]; right: boolean; onClose: () => void }) {
   const next = c.nextStep && active.find((t) => t.id === c.nextStep!.id);
   return (
     <div className={`sky-card ${right ? "right" : ""}`} id="sky-card" onClick={(e) => e.stopPropagation()} style={{ "--c": c.color } as React.CSSProperties}>
