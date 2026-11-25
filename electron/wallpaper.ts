@@ -13,6 +13,7 @@ import { safeMottoName } from "../server/app";
 import { currentWeather } from "./weather";
 import type { ValleyWeather } from "../src/valley/weather";
 import { DEFAULT_LAT, DEFAULT_LNG } from "../src/domain/sun";
+import { CITY_FILES } from "../src/city/model";
 import NATIVE_CS from "./wallpaper-native.cs";
 import PS1 from "./wallpaper-helper.ps1";
 
@@ -29,8 +30,12 @@ export interface WallpaperCfg {
   last?: { at: string; file: string; motto: string; ms: number } | null; error?: string | null;
   weather?: ValleyWeather | null; useWeather?: boolean; lat?: number; lng?: number;
   liveHow?: string | null;
+  /** 3.9: the valley (drawn) or the city (paintings from the city kit folder). */
+  scene?: "valley" | "city"; cityFolder?: string;
+  /** 3.9: the warmest and coldest readings seen today (°C), so the high stays right after the forecast has moved on. */
+  tempDay?: { date: string; hi: number; lo: number } | null;
 }
-export interface WallpaperState extends WallpaperCfg { windows: boolean; mottos: number; defaultFolder: string }
+export interface WallpaperState extends WallpaperCfg { windows: boolean; mottos: number; defaultFolder: string; city: { folder: string; found: number; total: number } }
 
 const isWin = process.platform === "win32";
 
@@ -81,6 +86,8 @@ export function createWallpaper(deps: WallpaperDeps) {
   let timer: NodeJS.Timeout | null = null;
   let busy = false, lastKey = "", locked = false;
   const defaultFolder = path.join(app.getPath("pictures"), "Mottos");
+  const defaultCity = path.join(app.getPath("pictures"), "Praxis city kit", "keyframes-5k");
+  const sceneOf = (w: WallpaperCfg) => (w.scene === "city" ? "city" : "valley") as "valley" | "city";
   const cfgOf = (): WallpaperCfg => (deps.readConfig().wallpaper as WallpaperCfg) || {};
   const save = (patch: Partial<WallpaperCfg>) => { const c = deps.readConfig(); deps.writeConfig({ ...c, wallpaper: { ...((c.wallpaper as WallpaperCfg) || {}), ...patch } }); };
   const folderOf = (w: WallpaperCfg) => w.folder || defaultFolder;
@@ -152,11 +159,23 @@ export function createWallpaper(deps: WallpaperDeps) {
     try {
       const now = await currentWeather(w.lat ?? DEFAULT_LAT, w.lng ?? DEFAULT_LNG);
       const prev = cfgOf().weather;
-      save({ weather: now });
+      const today = new Date().toDateString(), td = cfgOf().tempDay;
+      const seen = td && td.date === today ? td : null;
+      const tempDay = now.tempC === null ? seen : { date: today, hi: Math.max(now.tempC, seen?.hi ?? -99), lo: Math.min(now.tempC, seen?.lo ?? 99) };
+      save({ weather: now, tempDay });
       if (!prev || prev.kind !== now.kind || Math.abs((prev.wind || 0) - now.wind) > .2) { lastKey = ""; deps.log("weather", now.kind, now.text); }
     } catch (e) { deps.log("weather failed", (e as Error).message); }
   }
   const weatherNow = () => { const w = cfgOf(); const x = w.useWeather === false ? null : w.weather; return x && Date.now() - Date.parse(x.at) < 3 * 3600_000 ? x : null; };
+  /** 3.9: now, today's high and today's low in °F, for the top-left corner (only with real weather on). */
+  const tempNow = () => {
+    const x = weatherNow();
+    if (!x || x.tempC === null || x.tempC === undefined) return null;
+    const td = cfgOf().tempDay, seen = td && td.date === new Date().toDateString() ? td : null;
+    const his = [x.tempC, x.hiC, seen?.hi].filter((v): v is number => typeof v === "number"), los = [x.tempC, x.loC, seen?.lo].filter((v): v is number => typeof v === "number");
+    const f = (c: number) => Math.round(c * 9 / 5 + 32);
+    return { now: f(x.tempC), hi: f(Math.max(...his)), lo: f(Math.min(...los)) };
+  };
 
   // ---------- the live (moving) wallpaper ----------
   let live: BrowserWindow | null = null, watcher: ChildProcess | null = null, onBattery = false, fullApp = false;
@@ -204,7 +223,7 @@ export function createWallpaper(deps: WallpaperDeps) {
   async function feedLive() {
     if (!live || live.isDestroyed()) return;
     const now = new Date(), wx = weatherNow();
-    const job = { when: now.toISOString(), weather: wx?.kind || "clear", wind: wx?.wind ?? 0.2, motto: cfgOf().current?.name || pickMotto(cfgOf(), now), projects: projectsOf(deps.readConfig()), events: eventsOf(deps.readConfig()) };
+    const job = { when: now.toISOString(), weather: wx?.kind || "clear", wind: wx?.wind ?? 0.2, motto: cfgOf().current?.name || pickMotto(cfgOf(), now), projects: projectsOf(deps.readConfig()), events: eventsOf(deps.readConfig()), scene: sceneOf(cfgOf()), temp: tempNow() };
     await live.webContents.executeJavaScript(`window.__valley.live(${JSON.stringify(job)})`).catch((e) => deps.log("live feed failed", e?.message || e));
     syncPause();
   }
@@ -219,13 +238,13 @@ export function createWallpaper(deps: WallpaperDeps) {
     const motto = pickMotto(cfgOf(), now);
     const projects = projectsOf(deps.readConfig()), events = eventsOf(deps.readConfig());
     await refreshWeather();
-    const wx = weatherNow();
-    const key = `${motto}|${Math.floor((now.getHours() * 60 + now.getMinutes()) / 10)}|${now.toDateString()}|${JSON.stringify(projects.map((p) => p.steps.filter((s) => s.lit).length))}|${wx?.kind}|${Math.round((wx?.wind ?? 0) * 4)}|${events.meteorAt || ""}|${events.aurora}`;
+    const wx = weatherNow(), temp = tempNow();
+    const key = `${sceneOf(w)}|${temp ? `${temp.now}/${temp.hi}/${temp.lo}` : ""}|${motto}|${Math.floor((now.getHours() * 60 + now.getMinutes()) / 10)}|${now.toDateString()}|${JSON.stringify(projects.map((p) => p.steps.filter((s) => s.lit).length))}|${wx?.kind}|${Math.round((wx?.wind ?? 0) * 4)}|${events.meteorAt || ""}|${events.aurora}`;
     if (!force && key === lastKey) return;
     busy = true;
     try {
       const v = await ensureWindow();
-      const job = { when: now.toISOString(), weather: wx?.kind || "clear", motto, projects, events, ...size() };
+      const job = { when: now.toISOString(), weather: wx?.kind || "clear", motto, projects, events, scene: sceneOf(w), temp, ...size() };
       const out = await v.webContents.executeJavaScript(`window.__valley.wallpaper(${JSON.stringify(job)})`) as { file: string; ms: number };
       await powershell(["-Action", "set", "-Path", out.file, "-Position", "4"], deps.log);
       lastKey = key;
@@ -292,7 +311,10 @@ export function createWallpaper(deps: WallpaperDeps) {
   }
   function state(): WallpaperState {
     const w = cfgOf();
-    return { ...w, windows: isWin, mottos: mottos(w).length, defaultFolder };
+    const cf = w.cityFolder || defaultCity;
+    let found = 0;
+    try { const have = new Set(fs.readdirSync(cf)); found = CITY_FILES.filter((n) => have.has(`${n}.png`)).length; } catch { /* no kit yet */ }
+    return { ...w, windows: isWin, mottos: mottos(w).length, defaultFolder, city: { folder: cf, found, total: CITY_FILES.length } };
   }
 
   return {
@@ -302,6 +324,8 @@ export function createWallpaper(deps: WallpaperDeps) {
     refresh: async () => { lastKey = ""; await refreshWeather(true); await render(true); return state(); },
     setLive: async (on: boolean) => { save({ live: on, error: null }); if (on && cfgOf().enabled) await startLive(); if (!on) { stopLive(); save({ liveHow: null }); } return state(); },
     setWeather: async (on: boolean) => { save({ useWeather: on }); lastKey = ""; if (on) await refreshWeather(true); await render(true); return state(); },
+    setScene: async (scene: "valley" | "city") => { save({ scene, error: null }); lastKey = ""; if (cfgOf().enabled) { await render(true); if (live && !live.isDestroyed()) await feedLive(); } return state(); },
+    setCityFolder: async (cityFolder: string) => { save({ cityFolder }); lastKey = ""; if (cfgOf().enabled && sceneOf(cfgOf()) === "city") await render(true); return state(); },
     setFolder: async (folder: string) => { save({ folder, bag: [], current: null }); lastKey = ""; if (cfgOf().enabled) await render(true); return state(); },
     window: () => win,
   };

@@ -3,7 +3,17 @@
 // This file only turns the service's answers into the valley's few kinds of weather; the desktop app does the fetching.
 import type { Weather } from "./model";
 
-export interface ValleyWeather { kind: Weather; wind: number; tempC: number | null; text: string; at: string; source: "station" | "forecast"; station?: string }
+export interface ValleyWeather { kind: Weather; wind: number; tempC: number | null; text: string; at: string; source: "station" | "forecast"; station?: string;
+  /** 3.9: the forecast's highest and lowest for the rest of today (the desktop app adds what it has already seen since midnight). */
+  hiC?: number | null; loC?: number | null }
+
+/** 3.9: the highest and lowest temperature the hourly forecast still expects today (periods of forecastHourly). */
+export function todayRange(periods: Record<string, unknown>[] | undefined, now = new Date()): { hiC: number | null; loC: number | null } {
+  const day = now.toDateString();
+  const temps = (periods || []).filter((p) => typeof p?.startTime === "string" && new Date(p.startTime as string).toDateString() === day && typeof p.temperature === "number")
+    .map((p) => (p.temperatureUnit === "C" ? (p.temperature as number) : ((p.temperature as number) - 32) * 5 / 9));
+  return temps.length ? { hiC: Math.max(...temps), loC: Math.min(...temps) } : { hiC: null, loC: null };
+}
 
 const KMH = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : null);
 const RAIN = /rain|drizzle|shower|thunder|storm/i, SNOW = /snow|sleet|ice pellets|flurr|blizzard|freezing/i, MIST = /fog|mist|haze|smoke/i, CLOUD = /cloudy|overcast/i;
