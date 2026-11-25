@@ -40,7 +40,8 @@ import { startPending } from "../data/pending";
 import { HealAskDialog } from "./HealNote";
 import { LetterDialog, useRewards } from "./Rewards";
 import { ReviewDialog } from "./ReviewDialog";
-import { CanvasView } from "./Canvas";
+import { CanvasView, usePhase } from "./Canvas";
+import { isLit } from "../canvas/backdrop";
 import { morningHeal } from "../data/heal";
 
 export function App() {
@@ -58,6 +59,7 @@ function Shell() {
   const wide = useMedia("(min-width: 2200px)"); // ultrawide: show areas beside the day
   const { config } = useData();
   const canvas = !!config?.ui?.canvas;   // 5.0: the one canvas, while it's a preview you switch on
+  const phase = usePhase();              // in the canvas the sky sets light or dark, for its dialogs too
   // Day → Week zooms out, Week → Day zooms in (the new view animates as it mounts).
   const ZOOM = { day: 0, week: 1, areas: 1, progress: 2 } as Record<string, number>;
   const prev = useRef(view), dir = useRef("");
@@ -71,7 +73,7 @@ function Shell() {
   useShortcuts();
   useRewards();
   return (
-    <div id="app" className={`app${canvas ? " cv-app" : ""}`} data-anim={canvas ? undefined : dir.current}>
+    <div id="app" className={`app${canvas ? " cv-app" : ""}`} data-anim={canvas ? undefined : dir.current} data-theme={canvas ? (isLit(phase) ? "light" : "dark") : undefined}>
       {canvas ? <CanvasView /> : <>
       <TopBar />
       {view === "day" && <main className={`layout${wide ? " wide" : ""}`}><TasksPane />{config?.ui?.dayLayout === "classic" ? <TimelinePane /> : <HorizonPane />}{wide && <AreasView side />}</main>}

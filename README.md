@@ -116,6 +116,12 @@ Praxis is built to be easy on the eyes on a big monitor all day:
 - **Readable type**: Atkinson Hyperlegible for text (designed for legibility) and Bricolage Grotesque for headings, bundled so they work offline.
 - **Calm motion**: finishing a task fills the circle and folds the row away; the focus timer is a ring that fills. If Windows has "Show animations" turned off, Praxis stops animating too.
 
+## Forecasts and a clearer Progress (4.2)
+
+**Forecasts.** Once two of a project's stars are lit, Praxis says when it finishes at the pace you've been lighting them: on the constellation ("Dec 9 at this pace"), in its card, and in the weekly review. The pace comes from its recent stars measured up to today, so a quiet spell pushes the date out. A project that would finish more than a week past its deadline is called out in the record and gets its own group in the weekly review ("moving, but too slowly for its deadline"), with the same three choices as a stalled one.
+
+**Progress** (the Numbers panel in the canvas) now opens with what the record says, in words, followed by how Praxis plans for you, three tiles for this week, and the charts folded away below (they stay open if you open them). Finished work is green; work outside the plan is a quiet grey.
+
 ## One canvas (4.1, preview)
 
 Switch it on under ⋯ → **One canvas (preview)**; switch it off there to go back to the tabs.
@@ -438,6 +444,7 @@ Pushes that don't change the version are only checked, not released.
 - ~~3.6: never rot: offline queue, self-healing days, capture hotkey~~ ✓
 - ~~3.7: rewards: sky events, constellation legends, the Sunday letter, optional sound~~ ✓
 - ~~3.8: finish the theme: sunrise and sunset rituals, ideas as clouds, Areas in the sky, the Horizon clouds over as the day fills~~ ✓
+- ~~4.2: forecasts for projects; Progress leads with the findings, charts below, done in green~~ ✓
 - ~~4.1: one canvas (preview): the sky as the backdrop by time of day, Day/Week/Sky as zoom levels, the record beside your day~~ ✓
 - ~~4.0: the feedback loop: the record in hours and by time of day, plans that stop at what you finish, the weekly review, fading constellations~~ ✓
 - ~~1.1: morning commit, committed vs. bonus, adaptive plans, Now card, first steps, backlog cleanup, Progress, learning~~ ✓

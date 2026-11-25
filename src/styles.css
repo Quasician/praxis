@@ -798,8 +798,9 @@ kbd { font: 600 12px var(--sans); color: var(--ink); background: var(--bg); bord
 .commit-star.the-one { color: var(--accent); }
 
 /* ---------- Progress ---------- */
-:root { --done: #c8553d; --extra: #3b78d8; }
-@media (prefers-color-scheme: dark) { :root { --done: #d4614b; --extra: #4f8be6; } }
+/* 4.2: done is the theme's green (it was red, which read as a warning); work outside the plan is a quiet neutral. */
+:root, [data-theme="light"] { --extra: #9aa3b5; }
+[data-theme="dark"] { --extra: #6d7689; }
 .progress-view { flex: 1; min-height: 0; overflow-y: auto; padding: 0 28px 32px; display: flex; flex-direction: column; gap: 14px; }
 .pv-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; }
 .pv-tile, .pv-card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 14px 16px; }
@@ -1689,3 +1690,17 @@ body { background-image: linear-gradient(180deg, color-mix(in srgb, var(--sky-no
 .cv-drawer .pv-numbers-head h2 { display: none; }
 .cv-drawer .areas-view.side .areas-head h2 { display: none; }
 @media (prefers-reduced-motion: reduce) { .cv-drawer { animation: none; } }
+
+/* ---------- 4.2: Progress, findings first ---------- */
+.pv-says li.warn { border-left-color: var(--late); }
+.pv-says li.warn b { color: var(--late); }
+.pv-learn-title { margin: 18px 0 8px; font-size: 12px; font-weight: 600; color: var(--ink-2); }
+.pv-charts { display: flex; flex-direction: column; gap: 14px; }
+.pv-charts > summary { cursor: pointer; padding: 10px 14px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel); font-size: 13.5px; font-weight: 600; color: var(--ink-2); list-style-position: inside; }
+.pv-charts > summary:hover { color: var(--ink); }
+.pv-charts[open] > summary { margin-bottom: 14px; }
+.pv-charts > .pv-card + .pv-grid { margin-top: 14px; }
+.pv-trend.up { color: var(--done) !important; }
+.sky-card-pace { margin: -4px 0 12px; font-size: 13px; color: var(--night-ink-2); }
+.sky-card-pace b { color: var(--night-ink); }
+.sky-card-pace.behind, .sky-card-pace.behind b { color: #ffc98a; }

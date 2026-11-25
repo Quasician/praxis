@@ -23,7 +23,7 @@ export function ReviewCard() {
 function ReviewCardBody({ open }: { open: () => void }) {
   const { sky } = useSkyRecord();   // brings the sky up to date with Todoist, even if the Sky tab hasn't been opened
   const r = reviewProjects(sky);
-  const bits = [r.moved.length ? `${r.moved.length} moved` : "", r.stalled.length ? `${r.stalled.length} stalled` : ""].filter(Boolean).join(", ");
+  const bits = [r.moved.length ? `${r.moved.length} moved` : "", r.stalled.length ? `${r.stalled.length} stalled` : "", r.behind.length ? `${r.behind.length} behind` : ""].filter(Boolean).join(", ");
   return (
     <div className="letter-card review-card" id="review-card" role="status">
       <span className="letter-seal" aria-hidden="true">◎</span>
@@ -57,7 +57,7 @@ function ReviewBody() {
   const { sky, ready } = useSkyRecord();
   const [fixed, setFixed] = useState<ReturnType<typeof reviewProjects> | null>(null);
   useEffect(() => { if (ready && !fixed) setFixed(reviewProjects(sky)); }, [ready]); // eslint-disable-line react-hooks/exhaustive-deps
-  const projects = fixed || { moved: [], quiet: [], stalled: [], resting: [], finished: [] };
+  const projects = fixed || { moved: [], quiet: [], stalled: [], resting: [], finished: [], behind: [] };
   // On Sunday and Monday it's the review of the week that just ended; any other day, a look at the last seven days.
   const onTime = new Date().getDay() <= 1;
   const when = new Date(`${reviewWeek()}T12:00:00`).toLocaleDateString([], { month: "long", day: "numeric" });
@@ -105,13 +105,16 @@ function ReviewBody() {
       <section id="review-projects">
         <h3>Projects</h3>
         {projects.finished.map((p) => <p key={p.id} className="rv-line"><span className="rv-dot done" />{p.name} <small>finished this week</small></p>)}
-        {projects.moved.map((p) => <p key={p.id} className="rv-line"><span className="rv-dot on" />{p.name} <small>{p.litWeek} {p.litWeek === 1 ? "star" : "stars"} lit · {p.lit} of {p.total}</small></p>)}
+        {projects.moved.map((p) => <p key={p.id} className="rv-line"><span className="rv-dot on" />{p.name} <small>{p.litWeek} {p.litWeek === 1 ? "star" : "stars"} lit · {p.lit} of {p.total}{p.pace ? ` · done around ${p.pace.when}` : ""}</small></p>)}
         {projects.quiet.map((p) => <p key={p.id} className="rv-line"><span className="rv-dot" />{p.name} <small>nothing this week · last star {dayWord(p.quiet)} ago</small></p>)}
         {!fixed && <p className="dialog-sub">Reading your projects…</p>}
-        {fixed && !projects.moved.length && !projects.quiet.length && !projects.stalled.length && !projects.resting.length && !projects.finished.length && <p className="dialog-sub">No projects in your sky yet.</p>}
+        {fixed && !projects.moved.length && !projects.quiet.length && !projects.stalled.length && !projects.behind.length && !projects.resting.length && !projects.finished.length && <p className="dialog-sub">No projects in your sky yet.</p>}
 
         {projects.stalled.length > 0 && <p className="rv-ask">{projects.stalled.length === 1 ? "One project hasn't" : `${projects.stalled.length} projects haven't`} had a star lit in three weeks or more. Decide what happens to {projects.stalled.length === 1 ? "it" : "each"}:</p>}
         {projects.stalled.map((p) => <Stalled key={p.id} p={p} answer={decided[p.id]} busy={busy === p.id} run={run} />)}
+
+        {projects.behind.length > 0 && <p className="rv-ask">{projects.behind.length === 1 ? "One project is" : `${projects.behind.length} projects are`} moving, but too slowly for {projects.behind.length === 1 ? "its deadline" : "their deadlines"}:</p>}
+        {projects.behind.map((p) => <Stalled key={p.id} p={p} answer={decided[p.id]} busy={busy === p.id} run={run} />)}
 
         {projects.resting.length > 0 && <h4>Set down</h4>}
         {projects.resting.map((p) => (
@@ -150,7 +153,7 @@ function Stalled({ p, answer, busy, run }: { p: ReviewProject; answer?: { d: Dec
     <div className={`rv-stalled${answer ? " decided" : ""}`} data-id={p.id}>
       <div className="rv-stalled-head">
         <b>{p.name}</b>
-        <small>{p.lit} of {p.total} stars · no star in {dayWord(p.quiet)}{p.target ? ` · due ${new Date(`${p.target.slice(0, 10)}T12:00:00`).toLocaleDateString([], { month: "short", day: "numeric" })}` : ""}</small>
+        <small>{p.lit} of {p.total} stars · {p.pace?.lateText ? `at this pace ${p.pace.when}, about ${p.pace.lateText} late` : `no star in ${dayWord(p.quiet)}`}{p.target ? ` · due ${new Date(`${p.target.slice(0, 10)}T12:00:00`).toLocaleDateString([], { month: "short", day: "numeric" })}` : ""}</small>
       </div>
       {p.next && <p className="rv-next">Next step: {p.next.title}</p>}
       {answer ? <p className="rv-answer">{answer.note}</p> : p.next ? (
