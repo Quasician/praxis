@@ -5,7 +5,10 @@ import { useActive, useCompleted } from "../data/queries";
 import { bands, capacity, CAPACITY_DAYS, insights, recordDays, span, timedBlocks, weakHours, WEAK_MIN_BLOCKS } from "../domain/record";
 import { useUi } from "../state/ui";
 import { useData } from "../data/useData";
+import { useState } from "react";
+import { behindProjects } from "../domain/forecast";
 
+const CHARTS_KEY = "praxis.progress.charts";
 const pct = (r: number | null) => (r === null ? "—" : `${Math.round(r * 100)}%`);
 const sum = (xs: DayStat[], k: keyof DayStat) => xs.reduce((s, d) => s + (d[k] as number), 0);
 
@@ -20,6 +23,7 @@ export function ProgressView() {
   const says = insights(record, weak, config);
   const cap = capacity(record, cfg);
   const bandMax = Math.max(1, ...bs.map((b) => b.planned));
+  const behind = behindProjects(config?.sky);
   const days = dayStats(config, completed, 28);
   const today = days[days.length - 1];
   const thisWeek = days.slice(-7), lastWeek = days.slice(-14, -7);
@@ -33,25 +37,21 @@ export function ProgressView() {
   const max = Math.max(1, ...days.map((d) => Math.max(d.planned, d.plannedDone + d.extra)));
   const wr = rate(sum(thisWeek, "plannedDone"), sum(thisWeek, "planned")), lr = rate(sum(lastWeek, "plannedDone"), sum(lastWeek, "planned"));
 
+  const thisPlanned = sum(thisWeek, "planned"), thisDone = sum(thisWeek, "plannedDone"), thisExtra = sum(thisWeek, "extra");
+  const streakDays = habitStreak(config, completed).days;
+  const [charts, setCharts] = useState(() => { try { return localStorage.getItem(CHARTS_KEY) === "1"; } catch { return false; } });
+  const toggleCharts = (open: boolean) => { setCharts(open); try { localStorage.setItem(CHARTS_KEY, open ? "1" : "0"); } catch { /* ignore */ } };
+
+  // 4.2: what the record says comes first, in words; three tiles for this week; the charts are folded away below.
   return (
     <main id="progress-view" className="progress-view">
       <div className="areas-head pv-numbers-head">
         <div>
           <h2>The numbers</h2>
-          <p className="areas-sub">What you planned vs. what got done, over the last four weeks. Tick things off as you finish them (on your phone too) so this stays true.</p>
+          <p className="areas-sub">What you planned against what got done, and what Praxis has learned from it. Tick things off as you finish them (on your phone too) so this stays true.</p>
         </div>
         <button type="button" id="pv-review" className="ghost-btn" onClick={() => useUi.getState().openDialog("review")}>Review the week</button>
       </div>
-
-      <div className="pv-tiles">
-        <Tile id="pv-today" label="Committed today" value={today.committed ? `${today.committedDone} / ${today.committed}` : "—"} sub={today.committed ? (today.committedDone === today.committed ? "All done. Anything else is a bonus." : "★ tasks in your list") : "Commit in the morning (M)"} />
-        <Tile id="pv-week" label="Plan done this week" value={pct(wr)} sub={lr === null ? `${sum(thisWeek, "plannedDone")} of ${sum(thisWeek, "planned")} planned tasks` : `last week ${pct(lr)}`} trend={wr !== null && lr !== null ? Math.sign(wr - lr) : 0} />
-        <Tile id="pv-extra" label="Done outside the plan" value={String(sum(thisWeek, "extra"))} sub="this week" />
-        <Tile id="pv-streak" label="Streak (never miss twice)" value={`${habitStreak(config, completed).days}`} sub={`days · closed ${streak(config, "shutdown")} in a row · mornings ${streak(config, "committedAt")}`} />
-        <TimeSenseTile sense={timeSense(config?.samples)} />
-      </div>
-
-      {!hasHistory && <div className="pv-empty" id="pv-empty">Nothing to show yet. Accept a plan or do the morning commit, and each day's plan vs. done fills in here.</div>}
 
       <section className="pv-card pv-record" id="pv-record">
         <header><h3>What the record says</h3><span className="pv-record-sub">Praxis plans around these. They update every day.</span></header>
@@ -60,6 +60,7 @@ export function ProgressView() {
             {says.map((s) => <li key={s.id} data-id={s.id}><b>{s.text}</b><span>{s.detail}</span></li>)}
             {record.length < CAPACITY_DAYS && <li className="wait" id="pv-says-wait"><b>Your typical day: {record.length} of {CAPACITY_DAYS} planned days so far.</b><span>After {CAPACITY_DAYS} days with a plan, Praxis knows how much you usually finish and stops your commitments there.</span></li>}
             {cap && <li data-id="capacity"><b>Today's commitments stop at about {span(cap.min)}.</b><span>What you usually finish on {cap.kind === "work" ? "a work day" : cap.kind === "off" ? "a day off" : "a planned day"} ({cap.days} days on record).</span></li>}
+            {behind.map((f) => <li key={f.id} data-id="behind" className="warn"><b>{f.name}: {f.text}</b><span>{f.detail}</span></li>)}
             {!weak && <li className="wait" id="pv-weak-wait"><b>{timedBlocks(bs) < WEAK_MIN_BLOCKS * 2 ? `Time of day: ${timedBlocks(bs)} of about ${WEAK_MIN_BLOCKS * 2} blocks so far.` : "Time of day: no weak hours so far."}</b><span>{timedBlocks(bs) < WEAK_MIN_BLOCKS * 2 ? "With enough blocks before and after a given hour, Praxis can tell whether late ones get done, and plans around it." : "Your blocks get done about as often early as late."}</span></li>}
           </ul>
           <div className="pv-bands" id="pv-bands" role="img" aria-label="Planned blocks by the time they were due to start, and how many got done">
@@ -74,63 +75,73 @@ export function ProgressView() {
             </div>
           </div>
         </div>
+        <h4 className="pv-learn-title">How Praxis plans for you</h4>
+        <ul className="pv-learn" id="pv-learned">
+          <li id="pv-fill"><b>Plans fill {fill.fill}% of your free time.</b> {fill.why ? `Because ${fill.why}.` : cfg.adaptive ? "This adjusts weekly to how much you finish." : "Fixed (adaptive planning is off)."}</li>
+          <li id="pv-hours">{learned.deepHour !== null
+            ? <><b>Your Deep work gets done around {fmtMin(learned.deepHour)}–{fmtMin(learned.deepHour + 120)}.</b> The planner puts Deep tasks there when it can.</>
+            : <>Best hours for Deep work: needs {Math.max(0, 5 - learned.deepEvents)} more finished Deep task{5 - learned.deepEvents === 1 ? "" : "s"} to tell.</>}</li>
+          <li id="pv-durations">{learned.samples >= 5
+            ? <><b>Real durations:</b> {([[3, "Deep"], [2, "Medium"], [1, "Light"]] as const).map(([wp, n]) => `${n} ${learned.factor[wp] === 1 ? "as estimated" : `${learned.factor[wp]}×`}`).join(" · ")} ({learned.samples} timed sessions).</>
+            : <>Real durations: time tasks with the <b>Now</b> card's Start button ({learned.samples}/5 sessions so far) and plans will use how long things really take.</>}</li>
+        </ul>
       </section>
 
-      <section className="pv-card" id="pv-days">
-        <header><h3>Last 28 days</h3>
-          <div className="pv-legend"><span><i className="sw done" />Planned, done</span><span><i className="sw extra" />Done, not planned</span><span><i className="sw track" />Planned, not done</span></div>
-        </header>
-        <div className="pv-chart" role="img" aria-label="Planned and completed tasks per day for the last 28 days">
-          {days.map((d) => {
-            const date = fromYmd(d.day);
-            const tip = `${date.toLocaleDateString([], { weekday: "short", month: "short", day: "numeric" })}: ${d.plannedDone} of ${d.planned} planned done${d.extra ? `, +${d.extra} not planned` : ""}${d.committed ? ` · ★ ${d.committedDone}/${d.committed}` : ""}`;
-            return (
-              <div key={d.day} className={`pv-col ${date.getDay() === 1 ? "monday" : ""}`} title={tip} data-day={d.day}>
-                <div className="pv-stack">
-                  <div className="pv-track" style={{ height: `${(d.planned / max) * 100}%` }} />
-                  <div className="pv-fill" style={{ height: `${((d.plannedDone + d.extra) / max) * 100}%` }}>
-                    {d.extra > 0 && <div className="pv-extra" style={{ flexGrow: d.extra }} />}
-                    {d.plannedDone > 0 && <div className="pv-done" style={{ flexGrow: d.plannedDone }} />}
-                  </div>
-                </div>
-                <span className="pv-x">{date.getDay() === 1 || d === today ? date.toLocaleDateString([], { month: "short", day: "numeric" }) : ""}</span>
-              </div>
-            );
-          })}
-        </div>
-      </section>
-
-      <div className="pv-grid">
-        <section className="pv-card" id="pv-weeks">
-          <h3>Plan done, week by week</h3>
-          {weeks.map((w, i) => {
-            const r = rate(sum(w, "plannedDone"), sum(w, "planned"));
-            return <Bar key={i} label={i === 3 ? "This week" : `${3 - i} week${3 - i === 1 ? "" : "s"} ago`} r={r} detail={`${sum(w, "plannedDone")}/${sum(w, "planned")}`} />;
-          })}
-        </section>
-        <section className="pv-card" id="pv-effort">
-          <h3>By effort</h3>
-          {([[3, "Deep"], [2, "Medium"], [1, "Light"]] as const).map(([wp, name]) => <Bar key={wp} label={name} r={rate(byWp[wp][0], byWp[wp][1])} detail={`${byWp[wp][0]}/${byWp[wp][1]}`} />)}
-          {byWp[3][1] >= 4 && byWp[1][1] >= 4 && (rate(byWp[3][0], byWp[3][1]) ?? 0) < (rate(byWp[1][0], byWp[1][1]) ?? 0) - 0.25 &&
-            <p className="pv-note">Deep tasks get done much less often. Try "First steps" in Needs a decision to make them easier to start.</p>}
-        </section>
-        <section className="pv-card" id="pv-areas">
-          <h3>By area</h3>
-          {areas.map((a) => { const [d, n] = byArea.get(a.id) || [0, 0]; return <Bar key={a.id} label={a.name} r={rate(d, n)} detail={`${d}/${n}`} color={colorOf(a.color)} />; })}
-        </section>
-        <section className="pv-card" id="pv-learned">
-          <h3>What Praxis has learned</h3>
-          <ul className="pv-learn">
-            <li id="pv-fill"><b>Plans fill {fill.fill}% of your free time.</b> {fill.why ? `Because ${fill.why}.` : cfg.adaptive ? "This adjusts weekly to how much you finish." : "Fixed (adaptive planning is off)."}</li>
-            <li id="pv-hours">{learned.deepHour !== null
-              ? <><b>Your Deep work gets done around {fmtMin(learned.deepHour)}–{fmtMin(learned.deepHour + 120)}.</b> The planner puts Deep tasks there when it can.</>
-              : <>Best hours for Deep work: needs {Math.max(0, 5 - learned.deepEvents)} more finished Deep task{5 - learned.deepEvents === 1 ? "" : "s"} to tell.</>}</li>
-            <li id="pv-durations">{learned.samples >= 5
-              ? <><b>Real durations:</b> {([[3, "Deep"], [2, "Medium"], [1, "Light"]] as const).map(([wp, n]) => `${n} ${learned.factor[wp] === 1 ? "as estimated" : `${learned.factor[wp]}×`}`).join(" · ")} ({learned.samples} timed sessions).</>
-              : <>Real durations: time tasks with the <b>Now</b> card's Start button ({learned.samples}/5 sessions so far) and plans will use how long things really take.</>}</li>
-          </ul>
-        </section>
+      <div className="pv-tiles">
+        <Tile id="pv-week" label="This week" value={thisPlanned ? `${thisDone} of ${thisPlanned}` : "—"}
+          sub={`${thisPlanned ? `planned done (${pct(wr)})` : "nothing planned yet"}${lr !== null ? ` · last week ${pct(lr)}` : ""}${thisExtra ? ` · +${thisExtra} outside the plan` : ""}`}
+          trend={wr !== null && lr !== null ? Math.sign(wr - lr) : 0} />
+        <Tile id="pv-streak" label="Streak (never miss twice)" value={`${streakDays} ${streakDays === 1 ? "day" : "days"}`} sub={`closed ${streak(config, "shutdown")} in a row · mornings ${streak(config, "committedAt")}`} />
+        <TimeSenseTile sense={timeSense(config?.samples)} />
       </div>
+
+      {!hasHistory && <div className="pv-empty" id="pv-empty">Nothing to show yet. Accept a plan or do the morning commit, and each day's plan against what got done fills in here.</div>}
+
+      <details className="pv-charts" id="pv-charts" open={charts} onToggle={(e) => toggleCharts((e.target as HTMLDetailsElement).open)}>
+        <summary>Charts: the last 28 days, week by week, by effort and by area</summary>
+        <section className="pv-card" id="pv-days">
+          <header><h3>Last 28 days</h3>
+            <div className="pv-legend"><span><i className="sw done" />Planned, done</span><span><i className="sw extra" />Done, not planned</span><span><i className="sw track" />Planned, not done</span></div>
+          </header>
+          <div className="pv-chart" role="img" aria-label="Planned and completed tasks per day for the last 28 days">
+            {days.map((d) => {
+              const date = fromYmd(d.day);
+              const tip = `${date.toLocaleDateString([], { weekday: "short", month: "short", day: "numeric" })}: ${d.plannedDone} of ${d.planned} planned done${d.extra ? `, +${d.extra} not planned` : ""}${d.committed ? ` · ★ ${d.committedDone}/${d.committed}` : ""}`;
+              return (
+                <div key={d.day} className={`pv-col ${date.getDay() === 1 ? "monday" : ""}`} title={tip} data-day={d.day}>
+                  <div className="pv-stack">
+                    <div className="pv-track" style={{ height: `${(d.planned / max) * 100}%` }} />
+                    <div className="pv-fill" style={{ height: `${((d.plannedDone + d.extra) / max) * 100}%` }}>
+                      {d.extra > 0 && <div className="pv-extra" style={{ flexGrow: d.extra }} />}
+                      {d.plannedDone > 0 && <div className="pv-done" style={{ flexGrow: d.plannedDone }} />}
+                    </div>
+                  </div>
+                  <span className="pv-x">{date.getDay() === 1 || d === today ? date.toLocaleDateString([], { month: "short", day: "numeric" }) : ""}</span>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+        <div className="pv-grid">
+          <section className="pv-card" id="pv-weeks">
+            <h3>Plan done, week by week</h3>
+            {weeks.map((w, i) => {
+              const r = rate(sum(w, "plannedDone"), sum(w, "planned"));
+              return <Bar key={i} label={i === 3 ? "This week" : `${3 - i} week${3 - i === 1 ? "" : "s"} ago`} r={r} detail={`${sum(w, "plannedDone")}/${sum(w, "planned")}`} />;
+            })}
+          </section>
+          <section className="pv-card" id="pv-effort">
+            <h3>By effort</h3>
+            {([[3, "Deep"], [2, "Medium"], [1, "Light"]] as const).map(([wp, name]) => <Bar key={wp} label={name} r={rate(byWp[wp][0], byWp[wp][1])} detail={`${byWp[wp][0]}/${byWp[wp][1]}`} />)}
+            {byWp[3][1] >= 4 && byWp[1][1] >= 4 && (rate(byWp[3][0], byWp[3][1]) ?? 0) < (rate(byWp[1][0], byWp[1][1]) ?? 0) - 0.25 &&
+              <p className="pv-note">Deep tasks get done much less often. Try "First steps" in Needs a decision to make them easier to start.</p>}
+          </section>
+          <section className="pv-card" id="pv-areas">
+            <h3>By area</h3>
+            {areas.map((a) => { const [d, n] = byArea.get(a.id) || [0, 0]; return <Bar key={a.id} label={a.name} r={rate(d, n)} detail={`${d}/${n}`} color={colorOf(a.color)} />; })}
+          </section>
+        </div>
+      </details>
     </main>
   );
 }

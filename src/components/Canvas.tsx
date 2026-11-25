@@ -8,6 +8,7 @@ import { sunTimes } from "../domain/sun";
 import { dayStats } from "../domain/progress";
 import { bands, capacity, CAPACITY_DAYS, insights, recordDays, span, weakHours } from "../domain/record";
 import { reviewProjects } from "../domain/review";
+import { behindProjects } from "../domain/forecast";
 import { fromYmd, minOfDay, ymd } from "../lib/dates";
 import { colorOf } from "../lib/text";
 import { useActive, useCompleted } from "../data/queries";
@@ -171,7 +172,7 @@ function ConstellationLayer({ lit, labels, onArea }: { lit: boolean; labels: boo
           </g>
         ))}
         {lay.constellations.map((c) => (
-          <g key={c.id} id={`cvc-${c.id}`} className={`cvs-con${c.late ? " late" : ""}${picked === c.id ? " picked" : ""}`} data-standing={c.standing}
+          <g key={c.id} id={`cvc-${c.id}`} className={`cvs-con${c.late || c.pace?.behind ? " late" : ""}${picked === c.id ? " picked" : ""}`} data-standing={c.standing}
              transform={`translate(${c.x} ${c.y})`} style={{ "--c": c.color, opacity: picked === c.id ? 1 : 1 - c.dim } as React.CSSProperties}
              onClick={(e) => { e.stopPropagation(); setPicked(picked === c.id ? null : c.id); }}>
             <rect className="cvs-hit" x={-18} y={-18} width={c.w + 36} height={c.h + 70 * k} />
@@ -188,7 +189,7 @@ function ConstellationLayer({ lit, labels, onArea }: { lit: boolean; labels: boo
             <g transform={`translate(0 ${c.h + 24 * k})`}>
               <text className="cvs-name" fontSize={16 * k}>{c.name}</text>
               <text className="cvs-sub" y={19 * k} fontSize={13 * k}>
-                {c.lit} of {c.total}{c.target ? ` · ${c.late ? "late" : c.daysLeft === 0 ? "due today" : `due ${fmtDate(c.target)}`}` : ""}
+                {c.lit} of {c.total}{c.pace && c.standing !== "stalled" && c.standing !== "resting" ? ` · ${c.pace.when} at this pace` : ""}{c.target ? ` · ${c.late ? "late" : c.daysLeft === 0 ? "due today" : `due ${fmtDate(c.target)}`}` : ""}
                 {c.standing === "resting" ? " · set down" : c.standing === "stalled" || c.standing === "quiet" ? ` · quiet ${c.quiet} days` : ""}
               </text>
             </g>
@@ -221,6 +222,7 @@ function RecordPanel() {
   const cap = capacity(days, cfg);
   const week = ready ? dayStats(config, completed!, 7) : [];
   const stalled = reviewProjects(config?.sky).stalled.length;
+  const behind = behindProjects(config?.sky).slice(0, 2);
   return (
     <section className="cv-panel rec" id="cv-record">
       <div className="rec-head">
@@ -231,6 +233,7 @@ function RecordPanel() {
         {says.length ? <ul className="rec-says">{says.map((s) => <li key={s.id} title={s.detail}>{s.text}</li>)}</ul>
           : <p className="rec-wait">Praxis learns from your days. After {CAPACITY_DAYS} days with a plan it says here what it sees ({Math.min(days.length, CAPACITY_DAYS)} of {CAPACITY_DAYS} so far).</p>}
         {cap && <p className="rec-cap">Today's commitments stop at about <b>{span(cap.min)}</b>.</p>}
+        {behind.map((b) => <p key={b.id} className="rec-warn" title={b.detail}>{b.name} is {b.text}.</p>)}
         {stalled > 0 && <p className="rec-warn">{stalled === 1 ? "One project hasn't" : `${stalled} projects haven't`} had a star lit in three weeks. <button type="button" className="link-btn" onClick={() => openDialog("review")}>Decide</button></p>}
         <div className="rec-week">
           <span className="rec-week-title">Last 7 days</span>

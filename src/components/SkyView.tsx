@@ -108,7 +108,7 @@ export function SkyView({ allAreas = false, selectedArea = null, onArea, actions
           ))}
 
           {lay.constellations.map((c, ci) => (
-            <g key={c.id} id={`con-${c.id}`} className={`sky-con ${picked === c.id ? "picked" : ""} ${c.late ? "late" : ""} ${c.dim ? "faded" : ""}`} data-standing={c.standing} transform={`translate(${c.x} ${c.y})`}
+            <g key={c.id} id={`con-${c.id}`} className={`sky-con ${picked === c.id ? "picked" : ""} ${c.late || c.pace?.behind ? "late" : ""} ${c.dim ? "faded" : ""}`} data-standing={c.standing} transform={`translate(${c.x} ${c.y})`}
                style={{ "--c": c.color, "--fade": 1 - c.dim } as React.CSSProperties} data-lit={c.lit} data-total={c.total}
                onClick={(e) => { e.stopPropagation(); setPicked(picked === c.id ? null : c.id); }}>
               <rect className="sky-hit" x={-18} y={-18} width={c.w + 36} height={c.h + 70 * k} />
@@ -133,7 +133,7 @@ export function SkyView({ allAreas = false, selectedArea = null, onArea, actions
               <g className="sky-label" transform={`translate(0 ${c.h + 22 * k})`}>
                 <text className="name" fontSize={14.5 * k}>{c.name}</text>
                 <text className="sub" y={18 * k} fontSize={12.5 * k}>
-                  {c.lit} of {c.total}{c.target ? ` · ${c.late ? `${dayWord(-(c.daysLeft || 0))} late` : c.daysLeft === 0 ? "due today" : `due ${fmtDate(c.target)}`}` : ""}{c.standing === "resting" ? " · set down" : c.standing === "stalled" || c.standing === "quiet" ? ` · quiet ${dayWord(c.quiet)}` : ""}
+                  {c.lit} of {c.total}{c.pace && c.standing !== "stalled" && c.standing !== "resting" ? ` · ${c.pace.when} at this pace` : ""}{c.target ? ` · ${c.late ? `${dayWord(-(c.daysLeft || 0))} late` : c.daysLeft === 0 ? "due today" : `due ${fmtDate(c.target)}`}` : ""}{c.standing === "resting" ? " · set down" : c.standing === "stalled" || c.standing === "quiet" ? ` · quiet ${dayWord(c.quiet)}` : ""}
                 </text>
                 <rect className="bar" y={26 * k} width={90 * k} height={3 * k} rx={1.5 * k} />
                 <rect className="bar-fill" y={26 * k} width={90 * k * (c.total ? c.lit / c.total : 0)} height={3 * k} rx={1.5 * k} />
@@ -186,6 +186,9 @@ export function Picked({ c, active, right, onClose }: { c: ConstellationView; ac
         {c.lit} of {c.total} stars lit
         {c.finished ? ` · finished ${fmtDate(c.finished)}` : c.target ? ` · ${c.late ? `${dayWord(-(c.daysLeft || 0))} past its deadline` : c.daysLeft === 0 ? "due today" : `due ${fmtDate(c.target)}, in ${dayWord(c.daysLeft || 0)}`}` : ""}
       </p>
+      {!c.finished && c.standing !== "resting" && <p className={`sky-card-pace${c.pace?.behind ? " behind" : ""}`} id="sky-card-pace">{c.pace
+        ? <>At the pace you've been lighting its stars, it finishes around <b>{c.pace.when}</b>{c.pace.behind ? ", well past its deadline." : "."}</>
+        : "A finish date shows here once two of its stars are lit."}</p>}
       {c.legend && <p className="sky-card-legend" id="sky-legend-line">{c.legend}</p>}
       {c.standing === "resting" && <p className="sky-card-quiet" id="sky-card-quiet">Set down in a weekly review. It stays out of your plans until you pick it back up.</p>}
       {(c.standing === "stalled" || c.standing === "quiet") && <p className="sky-card-quiet" id="sky-card-quiet">No star lit in {dayWord(c.quiet)}{c.standing === "stalled" ? ". It has faded; lighting one brings it back." : "."}</p>}

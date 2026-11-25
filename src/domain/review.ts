@@ -2,6 +2,7 @@
 // A project "moves" when one of its stars is lit. Its clock restarts when you light a star, when it's made, or when a review
 // decides to keep going. Pure functions over the sky record; data/review.ts carries the decisions out.
 import type { SkyConstellation, SkyRecord } from "./sky";
+import { forecast, isBehind, lateText, whenText } from "./forecast";
 
 export const QUIET_DAYS = 10;     // no star for this long: starts to dim
 export const STALLED_DAYS = 21;   // no star for three weeks: the review asks what to do
@@ -31,27 +32,34 @@ export function dimOf(c: SkyConstellation, now = Date.now()): number {
   return q < QUIET_DAYS ? 0 : Math.min(.55, .2 + .35 * (q - QUIET_DAYS) / (STALLED_DAYS - QUIET_DAYS));
 }
 
-export interface ReviewProject { id: string; name: string; standing: Standing; quiet: number; litWeek: number; lit: number; total: number; next: { id: string; title: string; min: number } | null; target: string | null }
-export interface WeekReview { moved: ReviewProject[]; quiet: ReviewProject[]; stalled: ReviewProject[]; resting: ReviewProject[]; finished: ReviewProject[] }
+export interface ReviewProject { id: string; name: string; standing: Standing; quiet: number; litWeek: number; lit: number; total: number; next: { id: string; title: string; min: number } | null; target: string | null;
+  /** 4.2: when it finishes at this pace, and how far past its deadline that is (when it's behind). */
+  pace?: { when: string; late: number | null; lateText?: string } }
+/** behind (4.2): moving, but too slowly for its deadline. */
+export interface WeekReview { moved: ReviewProject[]; quiet: ReviewProject[]; stalled: ReviewProject[]; resting: ReviewProject[]; finished: ReviewProject[]; behind: ReviewProject[] }
 
 /** The projects, sorted into what happened over the 7 days ending at `now`. */
 export function reviewProjects(sky: SkyRecord | undefined, now = Date.now()): WeekReview {
-  const out: WeekReview = { moved: [], quiet: [], stalled: [], resting: [], finished: [] };
+  const out: WeekReview = { moved: [], quiet: [], stalled: [], resting: [], finished: [], behind: [] };
   const weekAgo = now - 7 * DAY;
   for (const [id, c] of Object.entries(sky?.cons || {})) {
     if (!c.steps.length) continue;
     const litWeek = c.steps.filter((s) => s.done && Date.parse(s.done) > weekAgo && Date.parse(s.done) <= now).length;
     const next = c.steps.find((s) => !s.done);
+    const f = forecast(c, now);
     const p: ReviewProject = { id, name: c.name, standing: standing(c, now), quiet: quietDays(c, now), litWeek, lit: c.steps.filter((s) => s.done).length, total: c.steps.length,
       next: next ? { id: next.id, title: next.title, min: next.min } : null, target: c.target ?? null };
+    if (f) p.pace = { when: whenText(f), late: f.late, ...(isBehind(f) ? { lateText: lateText(f.late!) } : {}) };
     if (c.finished) { if (Date.parse(c.finished) > weekAgo) out.finished.push(p); continue; }
     if (p.standing === "resting") out.resting.push(p);
+    else if (p.standing !== "stalled" && isBehind(f)) out.behind.push(p);
     else if (litWeek) out.moved.push(p);
     else if (p.standing === "stalled") out.stalled.push(p);
     else out.quiet.push(p);           // nothing this week, but not three weeks yet
   }
   out.moved.sort((a, b) => b.litWeek - a.litWeek);
   out.stalled.sort((a, b) => b.quiet - a.quiet);
+  out.behind.sort((a, b) => (b.pace?.late ?? 0) - (a.pace?.late ?? 0));
   out.quiet.sort((a, b) => b.quiet - a.quiet);
   return out;
 }
