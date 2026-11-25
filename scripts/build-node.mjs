@@ -5,7 +5,7 @@ import crypto from "crypto";
 import fs from "fs";
 import path from "path";
 
-const common = { bundle: true, platform: "node", format: "cjs", target: "node20", sourcemap: true, logLevel: "info", loader: { ".cs": "text" } };
+const common = { bundle: true, platform: "node", format: "cjs", target: "node20", sourcemap: true, logLevel: "info", loader: { ".cs": "text", ".ps1": "text" } };
 await build({ ...common, entryPoints: ["server/standalone.ts"], outfile: "dist/server/standalone.cjs" });
 await build({ ...common, entryPoints: ["electron/main.ts"], outfile: "dist/electron/main.cjs", external: ["electron", "electron-updater"] });
 
