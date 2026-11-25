@@ -449,7 +449,8 @@ function showNudge(n: Nudge, test: boolean) {
     nudgeWin.loadURL(url);
     nudgeWin.once("ready-to-show", () => nudgeWin?.showInactive());
   }
-  if (win && !win.isFocused()) win.flashFrame(true); // the taskbar button glows too
+  // 4.3.1: no glow on the taskbar button. A button asking for attention keeps an auto-hidden taskbar on screen
+  // until it is answered, and the card already sits above everything.
   log("nudge", n.kind, n.key);
 }
 
@@ -463,7 +464,6 @@ function showToast(n: Nudge) {
 function closeNudge() {
   if (nudgeWin && !nudgeWin.isDestroyed()) nudgeWin.close();
   nudgeWin = null; current = null;
-  win?.flashFrame(false);
 }
 
 const emit = (name: string, detail?: string) =>
