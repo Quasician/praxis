@@ -1,8 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type PointerEvent } from "react";
 import { usePending } from "../data/pending";
 import { HealNoteCard } from "./HealNote";
-import { LetterCard } from "./Rewards";
-import { ReviewCard } from "./ReviewDialog";
 import { fmtDayShort, fmtDuration, fmtTime, durationMinutes, parseDue, sameDay } from "../lib/dates";
 import { blockMinutes, sortTasks, splitToday } from "../lib/tasks";
 import { Inline, colorOf, plain } from "../lib/text";
@@ -40,8 +38,6 @@ export function TasksPane() {
     <section className="tasks-pane">
       <NowCard />
       <HealNoteCard />
-      <LetterCard />
-      <ReviewCard />
       <nav className="tabs" role="tablist">
         <button role="tab" data-tab="today" className={`tab ${tab === "today" ? "active" : ""}`} onClick={() => setTab("today")}>
           Today <span className="count" id="count-today">{loading ? "" : overdue.length + todayList.length || ""}</span>

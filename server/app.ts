@@ -308,6 +308,25 @@ export function createPraxisServer(opts: ServerOptions) {
     }
 
     if (route === "GET /api/config") return sendJSON(res, 200, store.readConfig());
+    // 4.3: what someone helping you needs to see, and nothing private: no tokens or keys (they're in .env, never read here),
+    // no calendar links, no task titles, no letters. Settings that are about how Praxis behaves, counts for the rest, and the log's tail.
+    if (route === "GET /api/diagnostics") {
+      const c = store.readConfig() as Record<string, unknown>;
+      const count = (k: string) => { const v = c[k]; return Array.isArray(v) ? v.length : v && typeof v === "object" ? Object.keys(v).length : 0; };
+      const { healNote: _h, ...planner } = (c.planner || {}) as Record<string, unknown>;
+      const { bag: _b, tags: _t, ...wallpaper } = (c.wallpaper || {}) as Record<string, unknown>;
+      const sky = c.sky as { cons?: Record<string, { finished?: string; rest?: string }> } | undefined;
+      let log: string[] = [];
+      try { log = fs.readFileSync(path.join(opts.dataDir, "praxis.log"), "utf8").split(/\r?\n/).filter(Boolean).slice(-200); } catch { /* no log outside the desktop app */ }
+      return sendJSON(res, 200, {
+        platform: `${process.platform} ${process.arch}`, node: process.version, desktop: !!opts.desktop,
+        connected: Boolean(store.getToken()), claude: provider(),
+        settings: { configVersion: c.configVersion ?? null, planner, ui: c.ui ?? null, reminders: c.reminders ?? null, wallpaper, lastOpen: c.lastOpen ?? null, lastSeenVersion: c.lastSeenVersion ?? null },
+        counts: { areas: count("areas"), calendars: count("calendars"), historyDays: count("history"), samples: count("samples"), letters: count("letters"), reviews: count("reviews"), ideas: count("ideas"), tiny: count("tiny"),
+          projects: Object.values(sky?.cons || {}).filter((x) => !x.finished).length, resting: Object.values(sky?.cons || {}).filter((x) => x.rest && !x.finished).length },
+        log,
+      });
+    }
     if (route === "POST /api/config") {
       let cfg: unknown;
       try { cfg = JSON.parse(await readBody(req)); } catch { return sendJSON(res, 400, { error: "Invalid JSON" }); }

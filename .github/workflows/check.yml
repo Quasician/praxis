@@ -19,6 +19,9 @@ jobs:
       - run: npm run typecheck
       - run: npm test
       - run: npm run build
+      # The release checks: the built app against a stand-in Todoist, clicked through in a real browser.
+      - run: npx playwright install --with-deps chromium
+      - run: npm run check:app
 
   # The wallpaper's helper only runs on Windows: build it and check it is a windowed program that answers.
   windows-helper:

@@ -116,6 +116,15 @@ Praxis is built to be easy on the eyes on a big monitor all day:
 - **Readable type**: Atkinson Hyperlegible for text (designed for legibility) and Bricolage Grotesque for headings, bundled so they work offline.
 - **Calm motion**: finishing a task fills the circle and folds the row away; the focus timer is a ring that fills. If Windows has "Show animations" turned off, Praxis stops animating too.
 
+## One place for the rituals, and safer releases (4.3)
+
+**The ritual panel.** The morning commit, the shutdown, the weekly review, the Sunday letter, Needs a decision, the backlog cleanup, the fresh start and the leftovers question now open in one panel docked at the right, one at a time, instead of as pop-ups over everything: your day stays in view beside it (and you can drag blocks while the morning commit is open). Esc or × closes it. **One marker** in the top bar shows what's waiting (the shutdown in the evening, the review on Sunday, your letter, decisions to make), in place of the evening pill and the cards at the top of the list; the panel's top line offers whatever else is waiting.
+
+**Safer releases.**
+- Before any release is published, GitHub runs the app against a stand-in Todoist and clicks through it in a real browser: the day, week, sky and progress views, the morning commit, the weekly review, the shutdown and the canvas (`npm run check:app`).
+- The settings file now carries a version number, and a new release upgrades an older file in tested steps before anything reads it (`server/migrate.ts`). A settings file that can't be read is moved aside, never overwritten.
+- **⋯ → Copy diagnostics** copies Praxis's version, its settings (nothing private: no tokens, calendar links or task titles) and the last 200 lines of its log, to paste into a chat when something's wrong.
+
 ## Forecasts and a clearer Progress (4.2)
 
 **Forecasts.** Once two of a project's stars are lit, Praxis says when it finishes at the pace you've been lighting them: on the constellation ("Dec 9 at this pace"), in its card, and in the weekly review. The pace comes from its recent stars measured up to today, so a quiet spell pushes the date out. A project that would finish more than a week past its deadline is called out in the record and gets its own group in the weekly review ("moving, but too slowly for its deadline"), with the same three choices as a stalled one.
@@ -404,7 +413,8 @@ npm run serve     # build + run the server, then open http://localhost:4321 in a
 npm start         # build + run the desktop app
 npm run dev       # live-reloading UI (run `npm run serve` alongside for the API)
 npm run typecheck
-npm test          # the planner, the record and the weekly review (tests/)
+npm test          # the planner, the record, the weekly review, forecasts, settings upgrades (tests/)
+npm run check:app # after a build: the release checks, clicking through the app (PRAXIS_CHECK_CHANNEL=chrome to use your Chrome)
 npm run dist      # build a Windows installer into release/
 ```
 
@@ -444,6 +454,7 @@ Pushes that don't change the version are only checked, not released.
 - ~~3.6: never rot: offline queue, self-healing days, capture hotkey~~ ✓
 - ~~3.7: rewards: sky events, constellation legends, the Sunday letter, optional sound~~ ✓
 - ~~3.8: finish the theme: sunrise and sunset rituals, ideas as clouds, Areas in the sky, the Horizon clouds over as the day fills~~ ✓
+- ~~4.3: one place for the rituals; release checks, versioned settings, copy diagnostics~~ ✓
 - ~~4.2: forecasts for projects; Progress leads with the findings, charts below, done in green~~ ✓
 - ~~4.1: one canvas (preview): the sky as the backdrop by time of day, Day/Week/Sky as zoom levels, the record beside your day~~ ✓
 - ~~4.0: the feedback loop: the record in hours and by time of day, plans that stop at what you finish, the weekly review, fading constellations~~ ✓

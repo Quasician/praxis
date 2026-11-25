@@ -14,6 +14,7 @@ import { Dialog } from "./common";
 import { RitualSky } from "./Rituals";
 import { unstarToday } from "../data/habits";
 import { useNow } from "./useNow";
+import { useDueRituals } from "../data/rituals";
 
 export function ShutdownDialog() {
   return <Dialog name="shutdown" id="shutdown-dialog" className="shutdown-dialog"><ShutdownBody /></Dialog>;
@@ -26,16 +27,24 @@ export function useShutdownDue() {
   return !!config && minOfDay(now) >= toMin(cfg.shutdownAt) && cfg.lastShutdown !== ymd(now);
 }
 
-/** The evening pill in the top bar (plus one gentle toast when it first appears). */
-export function ShutdownPill() {
-  const due = useShutdownDue();
+/** 4.3 The one marker in the top bar for whatever ritual is waiting (the shutdown, the weekly review, the letter…),
+ *  in place of the evening pill and the cards at the top of the list. Click to open it in the ritual panel. */
+export function RitualMarker() {
+  const due = useDueRituals();
   const openDialog = useUi((s) => s.openDialog);
+  const shutdownDue = due.some((d) => d.name === "shutdown");
   const told = useRef(false);
   useEffect(() => {
-    if (due && !told.current) { told.current = true; toast("Time to shut down the day. Press S when you're ready."); }
-  }, [due]);
-  if (!due) return null;
-  return <button id="shutdown-pill" className="shutdown-pill" title="Close out today (S)" onClick={() => openDialog("shutdown")}>☾ Shut down the day</button>;
+    if (shutdownDue && !told.current) { told.current = true; toast("Time to shut down the day. Press S when you're ready."); }
+  }, [shutdownDue]);
+  if (!due.length) return null;
+  const first = due[0];
+  return (
+    <button id="ritual-marker" className={`ritual-marker${first.name === "shutdown" ? " evening" : ""}`} data-ritual={first.name}
+      title={due.map((d) => d.label).join(" · ")} onClick={() => openDialog(first.name)}>
+      <span aria-hidden="true">{first.name === "shutdown" ? "☾" : "◎"}</span> {first.label}{due.length > 1 ? <span className="rm-more">+{due.length - 1}</span> : null}
+    </button>
+  );
 }
 
 function ShutdownBody() {
