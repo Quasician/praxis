@@ -1,7 +1,7 @@
 {
   "name": "praxis",
   "productName": "Praxis",
-  "version": "3.9.2",
+  "version": "3.9.3",
   "description": "Turn ideas into action: a desktop planner on top of Todoist.",
   "author": "Quasician",
   "private": true,
@@ -64,7 +64,7 @@
         "from": "native-build",
         "to": "native",
         "filter": [
-          "*.dll"
+          "*.exe"
         ]
       }
     ]

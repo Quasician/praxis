@@ -1,3 +1,6 @@
+// The wallpaper's helper: a small windowed program (no console), so running it can never open a terminal window.
+// Praxis starts it with an action and reads one line back:
+//   ping | status | set <file> <position> | slideshow <folder> <options> <tick> <position> | attach <hwnd> <w> <h> | watch [parent pid]
 using System;
 using System.Runtime.InteropServices;
 namespace PraxisWall {
@@ -140,6 +143,47 @@ namespace PraxisWall {
       IShellItem item; SHCreateItemFromParsingName(folder, IntPtr.Zero, ref iidItem, out item);
       IShellItemArray arr; SHCreateShellItemArrayFromShellItem(item, ref iidArr, out arr);
       var d = D(); d.SetPosition(position); d.SetSlideshow(arr); d.SetSlideshowOptions(options, tick);
+    }
+  }
+
+  public static class Program {
+    static string Json(string s) {
+      var sb = new System.Text.StringBuilder("\"");
+      foreach (char c in s ?? "") {
+        if (c == '"' || c == '\\') { sb.Append('\\'); sb.Append(c); }
+        else if (c < ' ') sb.Append("\\u" + ((int)c).ToString("x4"));
+        else sb.Append(c);
+      }
+      return sb.Append('"').ToString();
+    }
+    static string Num(string s) { long n; return long.TryParse(s, out n) ? n.ToString() : "0"; }
+    static bool Alive(int pid) {
+      try { return !System.Diagnostics.Process.GetProcessById(pid).HasExited; } catch { return false; }
+    }
+    [STAThread]
+    public static int Main(string[] a) {
+      try {
+        string act = a.Length > 0 ? a[0] : "";
+        if (act == "ping") Console.Out.WriteLine("PraxisWall.W");
+        else if (act == "status") {
+          string[] s = W.Status();
+          Console.Out.WriteLine("{\"status\":" + Num(s[0]) + ",\"wallpaper\":" + Json(s[1]) + ",\"folder\":" + Json(s[2]) + ",\"options\":" + Num(s[3]) + ",\"tick\":" + Num(s[4]) + ",\"position\":" + Num(s[5]) + "}");
+        }
+        else if (act == "set" && a.Length >= 3) { W.Set(a[1], int.Parse(a[2])); Console.Out.WriteLine("ok"); }
+        else if (act == "slideshow" && a.Length >= 5) { W.Slideshow(a[1], int.Parse(a[2]), uint.Parse(a[3]), int.Parse(a[4])); Console.Out.WriteLine("ok"); }
+        else if (act == "attach" && a.Length >= 4) Console.Out.WriteLine(W.Attach(long.Parse(a[1]), int.Parse(a[2]), int.Parse(a[3])));
+        else if (act == "watch") {
+          // Says every two seconds whether a full-screen app is in front; stops when Praxis is gone.
+          int parent = 0; if (a.Length >= 2) int.TryParse(a[1], out parent);
+          while (parent == 0 || Alive(parent)) { Console.Out.WriteLine(W.Foreground()); Console.Out.Flush(); System.Threading.Thread.Sleep(2000); }
+        }
+        else { Console.Error.WriteLine("Unknown action: " + act); return 2; }
+        Console.Out.Flush();
+        return 0;
+      } catch (Exception e) {
+        try { Console.Error.WriteLine(e.Message); Console.Error.Flush(); } catch {}
+        return 1;
+      }
     }
   }
 }

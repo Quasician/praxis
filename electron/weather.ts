@@ -34,6 +34,8 @@ export async function currentWeather(lat: number, lng: number, base = process.en
       const o = await get(`${base}/stations/${station.id}/observations/latest`);
       const ageMin = (Date.now() - Date.parse(o.properties?.timestamp || "")) / 60_000;
       const w = ageMin < 180 ? fromObservation(o.properties) : null;
+      // Stations often report the sky but leave the temperature blank for a reading: take this hour's from the forecast then.
+      if (w && w.tempC === null) w.tempC = fromForecast(hourly?.[0] as Record<string, unknown>)?.tempC ?? null;
       if (w) return { ...w, station: station.id, ...range };
     }
   } catch { /* the forecast below still works */ }

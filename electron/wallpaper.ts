@@ -15,7 +15,6 @@ import { dayIcon, type SkyIcon, type ValleyWeather } from "../src/valley/weather
 import { DEFAULT_LAT, DEFAULT_LNG } from "../src/domain/sun";
 import { CITY_FILES } from "../src/city/model";
 import NATIVE_CS from "./wallpaper-native.cs";
-import PS1 from "./wallpaper-helper.ps1";
 
 type Cfg = Record<string, unknown>;
 export interface WallpaperDeps {
@@ -39,30 +38,43 @@ export interface WallpaperState extends WallpaperCfg { windows: boolean; mottos:
 
 const isWin = process.platform === "win32";
 
-/** The name of the helper DLL for this version of the C# source (a new source gets a new file). */
-export const NATIVE_DLL = `praxis-wall-${crypto.createHash("sha1").update(NATIVE_CS).digest("hex").slice(0, 12)}.dll`;
+/** The helper program's file name for this version of its C# source (a new source gets a new file). */
+export const NATIVE_EXE = `praxis-wall-${crypto.createHash("sha1").update(NATIVE_CS).digest("hex").slice(0, 12)}.exe`;
 
-/** The script, the C# source beside it, and the DLL to load: the one shipped with the app, else one built once into Praxis's own folder. */
-function helperFiles() {
-  const dir = app.getPath("userData");
-  const file = path.join(dir, "praxis-wallpaper.ps1"), src = path.join(dir, "praxis-wallpaper.cs");
-  if (!fs.existsSync(file) || fs.readFileSync(file, "utf8") !== PS1) fs.writeFileSync(file, PS1, "utf8");
-  if (!fs.existsSync(src) || fs.readFileSync(src, "utf8") !== NATIVE_CS) fs.writeFileSync(src, NATIVE_CS, "utf8");
-  const shipped = path.join(process.resourcesPath || "", "native", NATIVE_DLL);
-  const dll = fs.existsSync(shipped) ? shipped : path.join(dir, NATIVE_DLL);
-  return { file, tail: ["-Dll", dll, "-Src", src] };
+/** The helper program: the one shipped with the app, else one built once into Praxis's own folder.
+ *  It is a windowed program, not a console one, so starting it never opens a terminal window (PowerShell, used before 3.9.3, could). */
+let building: Promise<string> | null = null;
+function helperExe(log: WallpaperDeps["log"]): Promise<string> {
+  const shipped = path.join(process.resourcesPath || "", "native", NATIVE_EXE);
+  if (fs.existsSync(shipped)) return Promise.resolve(shipped);
+  const dir = app.getPath("userData"), own = path.join(dir, NATIVE_EXE);
+  if (fs.existsSync(own)) return Promise.resolve(own);
+  // Only when the app was built without it (a development copy): compile it once. This one time may flash a window.
+  building ||= new Promise<string>((resolve, reject) => {
+    const src = path.join(dir, "praxis-wallpaper.cs"), tmp = path.join(dir, `praxis-wall-${process.pid}.tmp.exe`);
+    const q = (x: string) => `'${x.replace(/'/g, "''")}'`;
+    try { fs.writeFileSync(src, NATIVE_CS, "utf8"); } catch (e) { return reject(e); }
+    log("wallpaper helper: not shipped with this copy, building it once");
+    execFile("powershell.exe", ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command",
+      `$ErrorActionPreference='Stop'; Add-Type -TypeDefinition (Get-Content -LiteralPath ${q(src)} -Raw -Encoding UTF8) -OutputAssembly ${q(tmp)} -OutputType WindowsApplication; Move-Item -LiteralPath ${q(tmp)} -Destination ${q(own)} -Force`],
+      { windowsHide: true, timeout: 90_000 }, (err, _out, stderr) => {
+        if (err || !fs.existsSync(own)) return reject(new Error(`Couldn't build the wallpaper helper: ${(stderr || err?.message || "").toString().split("\n")[0].trim()}`));
+        resolve(own);
+      });
+  });
+  building.catch(() => { building = null; });
+  return building;
 }
 
-function powershell(args: string[], log: WallpaperDeps["log"]): Promise<string> {
+/** Runs the helper with an action and gives back the line it printed. */
+async function helper(args: string[], log: WallpaperDeps["log"]): Promise<string> {
+  if (!isWin) { log("wallpaper (not Windows): would run", args.join(" ")); return args[0] === "status" ? "{}" : "ok"; }
+  const exe = await helperExe(log);
   return new Promise((resolve, reject) => {
-    if (!isWin) { log("wallpaper (not Windows): would run", args.join(" ")); return resolve(args[1] === "status" ? "{}" : "ok"); }
-    let h: ReturnType<typeof helperFiles>;
-    try { h = helperFiles(); } catch (e) { return reject(e); }
-    execFile("powershell.exe", ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", h.file, ...args, ...h.tail],
-      { windowsHide: true, timeout: 45_000 }, (err, stdout, stderr) => {
-        if (err) return reject(new Error((stderr || err.message).toString().split("\n").slice(0, 3).join(" ").trim()));
-        resolve(stdout.toString().trim());
-      });
+    execFile(exe, args, { windowsHide: true, timeout: 45_000 }, (err, stdout, stderr) => {
+      if (err) return reject(new Error((stderr || err.message).toString().split("\n").slice(0, 3).join(" ").trim()));
+      resolve(stdout.toString().trim());
+    });
   });
 }
 
@@ -166,6 +178,8 @@ export function createWallpaper(deps: WallpaperDeps) {
       if (now.icon) tally[now.icon] = (tally[now.icon] || 0) + .25;
       const tempDay = now.tempC === null ? (seen ? { ...seen, seen: tally } : null)
         : { date: today, hi: Math.max(now.tempC, seen?.hi ?? -99), lo: Math.min(now.tempC, seen?.lo ?? 99), seen: tally };
+      // "at" is when Praxis read it (the station's own reading can already be a couple of hours old, and would expire minutes later).
+      now.at = new Date().toISOString();
       save({ weather: now, tempDay });
       if (!prev || prev.kind !== now.kind || Math.abs((prev.wind || 0) - now.wind) > .2) { lastKey = ""; deps.log("weather", now.kind, now.text); }
     } catch (e) { deps.log("weather failed", (e as Error).message); }
@@ -183,12 +197,17 @@ export function createWallpaper(deps: WallpaperDeps) {
 
   // ---------- the live (moving) wallpaper ----------
   let live: BrowserWindow | null = null, watcher: ChildProcess | null = null, onBattery = false, fullApp = false;
+  /** Set when the moving wallpaper couldn't get behind the icons: don't try again at every redraw (until restart, or it's switched on again). */
+  let liveFailed = false;
   const livePaused = () => locked || onBattery || fullApp;
   function syncPause() { if (live && !live.isDestroyed()) live.webContents.executeJavaScript(`window.__valley && window.__valley.pause(${livePaused()})`).catch(() => undefined); }
   async function startLive() {
     if (live && !live.isDestroyed()) return;
     const d = screen.getPrimaryDisplay(), b = d.bounds;
-    live = new BrowserWindow({ x: b.x, y: b.y, width: b.width, height: b.height, frame: false, resizable: false, movable: false, minimizable: false, maximizable: false,
+    // Until it is behind the desktop icons the window stays far off-screen: a full-screen black window in front of
+    // everything, even for a second, looks like a terminal taking over the screen. The helper moves it into place.
+    const off = isWin ? { x: -32000, y: -32000 } : { x: b.x, y: b.y };
+    live = new BrowserWindow({ ...off, width: b.width, height: b.height, frame: false, resizable: false, movable: false, minimizable: false, maximizable: false,
       fullscreenable: false, skipTaskbar: true, focusable: false, show: false, backgroundColor: "#000000", title: "Praxis live wallpaper", hasShadow: false,
       webPreferences: { contextIsolation: true, sandbox: true, backgroundThrottling: false } });
     live.on("page-title-updated", (e) => e.preventDefault());
@@ -197,7 +216,7 @@ export function createWallpaper(deps: WallpaperDeps) {
     live.on("closed", () => {
       live = null;
       // Explorer restarting takes the window with it: come back if the live wallpaper is still on.
-      if (cfgOf().enabled && cfgOf().live) setTimeout(() => startLive().catch(() => undefined), 5000);
+      if (cfgOf().enabled && cfgOf().live && !liveFailed) setTimeout(() => startLive().catch(() => undefined), 5000);
     });
     await live.loadURL(`${deps.baseUrl()}/?valley=1&live=1`);
     await waitReady(live);
@@ -205,16 +224,16 @@ export function createWallpaper(deps: WallpaperDeps) {
     const hwnd = live.getNativeWindowHandle();
     const id = hwnd.length >= 8 ? hwnd.readBigUInt64LE(0).toString() : String(hwnd.readUInt32LE(0));
     try {
-      const how = await powershell(["-Action", "attach", "-Path", id, "-Tick", String(Math.round(b.width * d.scaleFactor)), "-Options", String(Math.round(b.height * d.scaleFactor))], deps.log);
+      const how = await helper(["attach", id, String(Math.round(b.width * d.scaleFactor)), String(Math.round(b.height * d.scaleFactor))], deps.log);
+      if (how.startsWith("no-desktop")) throw new Error("the desktop window wasn't found");
       save({ liveHow: how });
       deps.log("live wallpaper attached", how);
       if (!isWin) live.hide();
-    } catch (e) { deps.log("live wallpaper couldn't attach", (e as Error).message); save({ error: "The moving wallpaper couldn't get behind your desktop icons; showing the still picture instead." }); stopLive(); return; }
+    } catch (e) { deps.log("live wallpaper couldn't attach", (e as Error).message); save({ error: "The moving wallpaper couldn't get behind your desktop icons; showing the still picture instead." }); liveFailed = true; stopLive(); return; }
     await feedLive();
     if (isWin && !watcher) {
       // One small helper keeps an eye on whether a full-screen app is in front (then the valley holds still).
-      const h = helperFiles();
-      watcher = spawn("powershell.exe", ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", h.file, "-Action", "watch", ...h.tail], { windowsHide: true });
+      watcher = spawn(await helperExe(deps.log), ["watch", String(process.pid)], { windowsHide: true, stdio: ["ignore", "pipe", "ignore"] });
       watcher.stdout?.on("data", (b: Buffer) => { const last = b.toString().trim().split(/\s+/).pop(); const full = last === "full"; if (full !== fullApp) { fullApp = full; syncPause(); } });
       watcher.on("exit", () => { watcher = null; });
     }
@@ -250,11 +269,11 @@ export function createWallpaper(deps: WallpaperDeps) {
       const v = await ensureWindow();
       const job = { when: now.toISOString(), weather: wx?.kind || "clear", motto, projects, events, scene: sceneOf(w), temp, ...size() };
       const out = await v.webContents.executeJavaScript(`window.__valley.wallpaper(${JSON.stringify(job)})`) as { file: string; ms: number };
-      await powershell(["-Action", "set", "-Path", out.file, "-Position", "4"], deps.log);
+      await helper(["set", out.file, "4"], deps.log);
       lastKey = key;
       save({ last: { at: now.toISOString(), file: out.file, motto: motto || "", ms: out.ms }, error: null });
-      if (cfgOf().live) { if (!live) startLive().catch((e) => deps.log("live wallpaper failed", e?.message || e)); else await feedLive(); }
-      deps.log("wallpaper", motto, out.ms + "ms");
+      if (cfgOf().live) { if (!live) { if (!liveFailed) startLive().catch((e) => deps.log("live wallpaper failed", e?.message || e)); } else await feedLive(); }
+      deps.log("wallpaper", sceneOf(w), motto, out.ms + "ms", temp ? `${temp.now}F` : wx ? "no temperature" : "no weather");
     } catch (e) {
       const msg = (e as Error)?.message || String(e);
       deps.log("wallpaper failed", msg);
@@ -276,7 +295,7 @@ export function createWallpaper(deps: WallpaperDeps) {
   async function enable(folder?: string) {
     let saved: Saved | null = cfgOf().saved || null;
     if (!cfgOf().enabled) {
-      try { const s = JSON.parse(await powershell(["-Action", "status"], deps.log) || "{}"); if (s && typeof s === "object" && "status" in s) saved = s as Saved; }
+      try { const s = JSON.parse(await helper(["status"], deps.log) || "{}"); if (s && typeof s === "object" && "status" in s) saved = s as Saved; }
       catch (e) { deps.log("couldn't read the current wallpaper", (e as Error).message); }
     }
     // Your slideshow folder is where your mottos already are; otherwise Pictures\Mottos.
@@ -305,8 +324,8 @@ export function createWallpaper(deps: WallpaperDeps) {
     const s = cfgOf().saved;
     let error: string | null = null;
     try {
-      if (s && (s.status & 2) && s.folder) await powershell(["-Action", "slideshow", "-Folder", s.folder, "-Tick", String(s.tick || 3_600_000), "-Options", String(s.options ?? 1), "-Position", String(s.position ?? 4)], deps.log);
-      else if (s?.wallpaper && fs.existsSync(s.wallpaper)) await powershell(["-Action", "set", "-Path", s.wallpaper, "-Position", String(s.position ?? 4)], deps.log);
+      if (s && (s.status & 2) && s.folder) await helper(["slideshow", s.folder, String(s.options ?? 1), String(s.tick || 3_600_000), String(s.position ?? 4)], deps.log);
+      else if (s?.wallpaper && fs.existsSync(s.wallpaper)) await helper(["set", s.wallpaper, String(s.position ?? 4)], deps.log);
     } catch (e) { error = `Couldn't put your old wallpaper back: ${(e as Error).message}`; deps.log(error); }
     save({ enabled: false, error });
     if (win && !win.isDestroyed()) win.destroy();
@@ -326,7 +345,7 @@ export function createWallpaper(deps: WallpaperDeps) {
     stop() { stopLive(); },
     enable, disable, state,
     refresh: async () => { lastKey = ""; await refreshWeather(true); await render(true); return state(); },
-    setLive: async (on: boolean) => { save({ live: on, error: null }); if (on && cfgOf().enabled) await startLive(); if (!on) { stopLive(); save({ liveHow: null }); } return state(); },
+    setLive: async (on: boolean) => { liveFailed = false; save({ live: on, error: null }); if (on && cfgOf().enabled) await startLive(); if (!on) { stopLive(); save({ liveHow: null }); } return state(); },
     setWeather: async (on: boolean) => { save({ useWeather: on }); lastKey = ""; if (on) await refreshWeather(true); await render(true); return state(); },
     setScene: async (scene: "valley" | "city") => { save({ scene, error: null }); lastKey = ""; if (cfgOf().enabled) { await render(true); if (live && !live.isDestroyed()) await feedLive(); } return state(); },
     setCityFolder: async (cityFolder: string) => { save({ cityFolder }); lastKey = ""; if (cfgOf().enabled && sceneOf(cfgOf()) === "city") await render(true); return state(); },
