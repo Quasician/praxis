@@ -3,6 +3,7 @@
 import { hash01, imageTexture, instances, program, rng, target, texture, type GL, type Prog, type Target } from "./gl";
 import { leafState, sceneAt, DESIGN_H, DESIGN_W, KEEP, type RGB, type Scene, type Weather } from "./model";
 import { shapeOf } from "../domain/sky";
+import type { CityPlan } from "../city/model";
 
 export interface ValleyData {
   version: number; keep: number[]; horizon: number; lakeY: number;
@@ -27,7 +28,10 @@ export interface RenderOpts {
   time?: number;            // seconds, for the moving (live) version
   wind?: number;            // 0..1
   events?: SkyEvents;       // 3.7: rewards that show in the sky
+  city?: CityInput | null;  // 3.9: draw the city paintings instead of the valley
 }
+/** 3.9: the city: what to show at this moment, and the paintings it needs (by file name, as loaded from the city kit folder). */
+export interface CityInput { plan: CityPlan; images: Record<string, ImageBitmap> }
 /** 3.7: a shooting star after you finish "the one" (its age in seconds), and the aurora after a week of kept commitments. */
 export interface SkyEvents { meteorAge?: number | null; aurora?: number }
 export interface RenderInfo { scene: Scene; box: [number, number, number, number] | null; constellations: number; ms: number }
@@ -398,14 +402,14 @@ void main() {
 }`;
 const COMPOSE_FS = COMMON + `
 uniform sampler2D uScene, uInk, uInk4;
-uniform float uHasInk;
+uniform float uHasInk, uVig;
 void main() {
   vec2 uv = gl_FragCoord.xy / uRes;
   vec3 s = texture(uScene, uv).rgb * 255.0;
   if (uMask > 0.5) { outColor = vec4(s / 255.0, 1.0); return; }
   vec2 p = dpos();
   vec2 cn = vec2((p.x - 2560.0) / (5120.0 * 0.3), (p.y - 2160.0 * 0.42) / (2160.0 * 0.3));
-  s *= 1.0 - 0.3 * exp(-dot(cn, cn));
+  s *= 1.0 - 0.3 * uVig * exp(-dot(cn, cn));
   s += (hash(gl_FragCoord.xy * 0.731) - 0.5) * 3.8;
   s = clamp(s, 0.0, 255.0);
   if (uHasInk > 0.5) {
@@ -422,6 +426,97 @@ void main() {
     s = mix(s, vec3(244.0, 241.0, 233.0), a);
   }
   outColor = vec4(s / 255.0, 1.0);
+}`;
+
+
+// 3.9: the city. Two paintings blended for the time of day, the grey-day painting's light laid over them for weather,
+// windows that switch on one by one, and the sun, moon, stars and your constellations where the mask says there is sky.
+const CITY_FS = COMMON + `
+uniform sampler2D uFA, uFB, uFO, uCM, uStarL, uConL;
+uniform float uMix, uOver, uRain, uMist, uNight, uLOn, uLGate, uMoonPhase, uAurora, uStarsVis, uTime;
+uniform vec4 uSunB, uMoonB;
+uniform vec3 uSunC;
+vec3 soft(sampler2D t, vec2 q) { return textureLod(t, clamp(q, vec2(0.002), vec2(0.998)), 4.5).rgb; }
+void main() {
+  vec2 p = dpos();
+  vec2 tu = vec2(gl_FragCoord.x / uRes.x, 1.0 - gl_FragCoord.y / uRes.y);
+  vec3 m = texture(uCM, tu).rgb;
+  if (uMask > 0.5) { outColor = vec4(vec3(1.0 - m.r), 1.0); return; }
+  float sky = m.r, cloud = m.g;
+  vec3 base = mix(texture(uFA, tu).rgb, texture(uFB, tu).rgb, uMix);
+  vec3 was = mix(soft(uFA, tu), soft(uFB, tu), uMix);
+  vec3 col = base;
+  // Weather: the grey day's light and colour, from blurred copies, so no two paintings' edges ever double up.
+  // Half from a wide average (so a dark tower beside bright sky throws no halo), half local (so small clouds grey too).
+  if (uOver > 0.0) {
+    vec3 wa = vec3(0.0), wo = vec3(0.0);
+    for (int i = -2; i <= 2; i++) for (int j = -1; j <= 1; j++) {
+      vec2 o = vec2(float(i) * 0.035, float(j) * 0.05);
+      wa += mix(soft(uFA, tu + o), soft(uFB, tu + o), uMix); wo += soft(uFO, tu + o);
+    }
+    vec3 wide = clamp(wo / max(wa, vec3(0.03)), 0.35, 1.8);
+    vec3 near = clamp(soft(uFO, tu) / max(was, vec3(0.03)), 0.4, 2.2);
+    vec3 g = sqrt(wide * near);
+    vec3 b2 = mix(base, vec3(dot(base, vec3(0.3, 0.55, 0.15))), 0.22 * uOver);
+    col = mix(base, b2 * g, uOver);
+  }
+  // Window lights: each window has its own time to switch on through dusk; some go out late at night.
+  float L = m.b * uLGate;
+  if (L > 0.002) {
+    vec2 wc = floor(p / vec2(17.5, 23.3));
+    float th = 0.03 + 0.94 * hash(wc + 91.7);
+    float on = smoothstep(th - 0.03, th + 0.03, uLOn);
+    vec3 wall = mix(was, soft(uFO, tu), uOver) * vec3(0.82, 0.84, 0.90);
+    float lift = clamp(dot(col - wall, vec3(0.3, 0.5, 0.2)) / 0.10, 0.0, 1.0);
+    col = mix(col, min(col, wall), L * lift * (1.0 - on));
+    col += vec3(1.0, 0.70, 0.36) * L * on * (0.06 + 0.06 * hash(wc + 5.3));
+  }
+  // Rain: cooler, flatter light and a band of haze along the horizon. Mist: just the haze.
+  float wet = max(uRain, 0.0);
+  if (wet > 0.0) {
+    vec3 grey = vec3(dot(col, vec3(0.3, 0.55, 0.15)));
+    col = mix(col, mix(grey, col, 0.5) * vec3(0.93, 0.97, 1.05), 0.6 * wet);
+    col *= 1.0 - 0.12 * wet;
+  }
+  float hz = exp(-pow((tu.y - 0.64) / 0.10, 2.0));
+  col = mix(col, vec3(0.50, 0.54, 0.60) * (0.30 + 0.70 * (1.0 - uNight)), hz * (0.30 * wet + 0.35 * uMist));
+  float behind = sky * (1.0 - 0.92 * cloud) * (1.0 - uRain);   // how much of something in the sky shows through here
+  // Stars: only in open sky. Your constellations: through thin cloud too, quieter.
+  vec2 fu = gl_FragCoord.xy / uRes;
+  col += texture(uStarL, fu).rgb * sky * smoothstep(0.30, 0.04, cloud) * (1.0 - uOver) * (1.0 - uRain);
+  col += texture(uConL, fu).rgb * sky * (1.0 - 0.6 * cloud) * (1.0 - 0.7 * uRain);
+  // The aurora (3.7), low over the hills behind the clouds.
+  if (uAurora > 0.0 && uStarsVis > 0.12) {
+    float lower = 1060.0 + 260.0 * (vnoise(vec2(p.x / 1100.0 + uTime * 0.008, 1.7)) - 0.5) + 110.0 * (vnoise(vec2(p.x / 280.0 - uTime * 0.02, 5.3)) - 0.5);
+    float v = smoothstep(lower + 60.0, lower - 40.0, p.y) * exp(-max(0.0, lower - p.y) / 260.0);
+    float curtain = smoothstep(0.32, 0.85, vnoise(vec2(p.x / 300.0 + uTime * 0.02, 4.1)) * 0.65 + vnoise(vec2(p.x / 90.0 - uTime * 0.05, 9.3)) * 0.35);
+    float rays = 0.55 + 0.45 * vnoise(vec2(p.x / 14.0 + uTime * 0.25, 2.3));
+    float a = uAurora * curtain * rays * v * min(1.0, uStarsVis * 1.5) * sky * (1.0 - 0.8 * cloud) * 0.6;
+    vec3 ac = mix(vec3(0.38, 0.94, 0.66), vec3(0.61, 0.41, 0.96), smoothstep(lower - 90.0, lower - 480.0, p.y));
+    col += ac * a * (1.0 - col);
+  }
+  // The sun: a solid disc with a soft bloom and a wide glow, hidden by the buildings and hills, dimmed by cloud.
+  vec2 d = p - uSunB.xy; float r = length(d), R = uSunB.z;
+  float sv = uSunB.w;
+  if (sv > 0.0) {
+    float disc = smoothstep(R, R * 0.82, r);
+    float glow = exp(-r * r / (R * R * 14.0)) * 0.30 + exp(-r / (R * 7.0)) * 0.10;
+    col += uSunC * sv * glow * (0.35 + 0.65 * sky) * (1.0 - 0.5 * cloud) * 1.4 * (1.0 - 0.8 * uRain);
+    col = mix(col, min(uSunC * 1.12, vec3(1.0)), clamp(disc * behind * sv, 0.0, 1.0));
+    col += uSunC * sv * exp(-max(r - R, 0.0) / (R * 0.6)) * 0.25 * behind;
+  }
+  // The moon, in its real phase: lit on the right while it waxes, on the left as it wanes.
+  if (uMoonB.w > 0.0) {
+    vec2 q = p - uMoonB.xy; float rm = length(q), Rm = uMoonB.z;
+    float md = smoothstep(Rm, Rm * 0.9, rm);
+    vec2 n = q / Rm;
+    float edge = sqrt(max(0.0, 1.0 - n.y * n.y)), th = 6.2831853 * uMoonPhase;
+    float lit = uMoonPhase < 0.5 ? smoothstep(-0.04, 0.04, n.x - cos(th) * edge) : smoothstep(-0.04, 0.04, -cos(th) * edge - n.x);
+    float full = (1.0 - cos(th)) * 0.5;
+    float halo = exp(-rm / (Rm * 5.0)) * 0.22 * (0.3 + 0.7 * full);
+    col += vec3(0.93, 0.95, 1.0) * uMoonB.w * (md * (0.1 + 0.9 * lit) * behind + halo * sky * (1.0 - 0.6 * cloud) * (1.0 - uRain)) * (1.0 - 0.85 * uOver);
+  }
+  outColor = vec4(clamp(col, 0.0, 1.0), 1.0);
 }`;
 
 // ---------------------------------------------------------------------------------------------------------------------
@@ -449,6 +544,7 @@ export class ValleyRenderer {
       lake: program(gl, FULL_VS, LAKE_FS), meadow: program(gl, FULL_VS, MEADOW_FS), compose: program(gl, FULL_VS, COMPOSE_FS),
       ink: program(gl, FULL_VS, INK_FS), down: program(gl, FULL_VS, DOWN_FS), blur: program(gl, FULL_VS, BLUR_FS),
       seg: program(gl, SEG_VS, SEG_FS), dot: program(gl, DOT_VS, DOT_FS), tree: program(gl, TREE_VS, TREE_FS), tri: program(gl, TRI_VS, TRI_FS),
+      city: program(gl, FULL_VS, CITY_FS),
     };
     const d = assets.data;
     const nearData = new Float32Array(5120);
@@ -537,9 +633,10 @@ export class ValleyRenderer {
   }
 
   /** A path for the shooting star: high in the sky, clear of the words and the sun. */
-  private meteorPath(sc: Scene, grid: { w: number; h: number; d: Uint8Array } | null): [number, number, number, number] | null {
+  private meteorPath(sc: Scene, grid: { w: number; h: number; d: Uint8Array } | null, skyOk?: ((x: number, y: number) => boolean) | null): [number, number, number, number] | null {
     const ok = (x: number, y: number) => {
       if (Math.hypot(x - sc.sunX, y - sc.sunY) < 220) return false;
+      if (skyOk && !skyOk(x, y)) return false;
       if (!grid) return true;
       const i = Math.floor(x / DESIGN_W * grid.w), j = Math.floor(y / DESIGN_H * grid.h);
       for (let dj = -10; dj <= 10; dj += 2) for (let di = -10; di <= 10; di += 2) { const ii = i + di, jj = j + dj; if (ii >= 0 && jj >= 0 && ii < grid.w && jj < grid.h && grid.d[jj * grid.w + ii]) return false; }
@@ -555,7 +652,7 @@ export class ValleyRenderer {
   }
 
   /** Your projects as constellations, placed where the sky is clear of the words and the sun. */
-  placeConstellations(projects: SkyProject[], sc: Scene, grid: { w: number; h: number; d: Uint8Array } | null) {
+  placeConstellations(projects: SkyProject[], sc: Scene, grid: { w: number; h: number; d: Uint8Array } | null, skyOk?: ((x: number, y: number) => boolean) | null) {
     const out: { pts: [number, number][]; links: [number, number][]; lit: boolean[]; r: number[]; color: RGB }[] = [];
     // The words, grown by about 50 design units, so no star or line comes close to a letter.
     let grown: Uint8Array | null = null;
@@ -571,7 +668,8 @@ export class ValleyRenderer {
       return i >= 0 && j >= 0 && i < grid.w && j < grid.h ? grown[j * grid.w + i] : 0;
     };
     const clear = (x: number, y: number) => {
-      if (!(x > 120 && x < 5000 && y > 110 && y < ((x < 840 || x > 4280) ? 980 : 1470))) return false;
+      if (skyOk) { if (!(x > 120 && x < 5000 && y > 110) || !skyOk(x, y)) return false; }
+      else if (!(x > 120 && x < 5000 && y > 110 && y < ((x < 840 || x > 4280) ? 980 : 1470))) return false;
       if (Math.hypot(x - sc.sunX, y - sc.sunY) < 190) return false;
       return inkAt(x, y) === 0;
     };
@@ -602,6 +700,10 @@ export class ValleyRenderer {
     const gl = this.gl, P = this.progs, d = this.assets.data, mask = !!o.mask, time = o.time || 0, wind = o.wind ?? 0;
     const ink = this.inkFor(mask ? null : o.motto);
     const sc = sceneAt({ when: o.when, weather: o.weather, width: this.W, height: this.H, box: ink.box });
+    const city = o.city || null, plan = city?.plan || null;
+    const cityTex = city ? this.cityTextures(city) : null;
+    const skyOk = city ? this.skyTest(city) : null;
+    if (plan) { sc.sunX = plan.sun.x; sc.sunY = plan.sun.strength > 0 ? plan.sun.y : -9999; }
     const se = sc.season, L = sc.light, gs = se.groundSnow, winter = gs > 0.5;
     const pxD = DESIGN_W / this.W;                // design units per pixel
 
@@ -612,8 +714,8 @@ export class ValleyRenderer {
     gl.bindTexture(gl.TEXTURE_2D, this.tex.grad); gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, 1, 256, 0, gl.RGBA, gl.UNSIGNED_BYTE, g8);
     gl.bindTexture(gl.TEXTURE_2D, this.tex.haze); gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, 1024, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, h8);
 
-    // 1. Sky, sun or moon.
-    this.full(P.sky, this.A, () => {
+    // 1. Sky, sun or moon (the city's are in its paintings and its own pass).
+    if (!plan) this.full(P.sky, this.A, () => {
       const p = P.sky; this.common(p, sc, mask); this.bind(p, "uGrad", this.tex.grad, 2);
       gl.uniform3fv(p.u("uGlowC0"), sc.glows[0].color); gl.uniform3f(p.u("uGlow0"), sc.glows[0].amount, sc.glows[0].sx, sc.glows[0].sy);
       gl.uniform3fv(p.u("uGlowC1"), sc.glows[1].color); gl.uniform3f(p.u("uGlow1"), sc.glows[1].amount, sc.glows[1].sx, sc.glows[1].sy);
@@ -624,15 +726,15 @@ export class ValleyRenderer {
     });
 
     // 2. Stars and your constellations, added as light.
-    const dots: number[] = [], segs: number[] = [];
+    const dots: number[] = [], segs: number[] = [], starDots: number[] = [];
     const rs = rng(11);
     const nStars = Math.round(980 * sc.stars);
     for (let i = 0; i < 980; i++) {
       const x = rs() * 5120, y = Math.pow(rs(), 1.4) * 1778 * 0.92, r = [1.1, 1.3, 1.6, 2.1, 2.8][Math.floor(rs() * 5)], b = (90 + rs() * 150) * Math.min(1, 0.45 + sc.stars);
       const tw = 0.82 + 0.18 * Math.sin(time * (1.3 + (i % 7) * 0.31) + i);
-      if (i < nStars) dots.push(x, y, r, r, b * tw, b * tw, Math.min(255, b * 1.1) * tw, 1, 0, 0, 0, 0);
+      if (i < nStars) starDots.push(x, y, r, r, b * tw, b * tw, Math.min(255, b * 1.1) * tw, 1, 0, 0, 0, 0);
     }
-    const cons = this.placeConstellations(o.projects || [], sc, ink.grid);
+    const cons = this.placeConstellations(o.projects || [], sc, ink.grid, skyOk);
     const vis = Math.max(0.35, Math.min(1, sc.stars * 1.4 + 0.35));   // constellations stay visible by day, quieter
     for (const c of cons) {
       for (const [a, b] of c.links) {
@@ -654,7 +756,7 @@ export class ValleyRenderer {
     }
     const age = o.events?.meteorAge;
     if (age !== null && age !== undefined && age >= 0 && age < 3 * 3600) {
-      const path = this.meteorPath(sc, ink.grid);
+      const path = this.meteorPath(sc, ink.grid, skyOk);
       if (path) {
         // Still picture: the streak as it passes. Moving wallpaper: it crosses again every 90 seconds for the first hour.
         const live = !!o.time, cyc = 90, t = live ? ((time % cyc) / 1.1) : 0.75;
@@ -670,13 +772,39 @@ export class ValleyRenderer {
         }
       }
     }
-    gl.bindFramebuffer(gl.FRAMEBUFFER, this.A.fb); gl.viewport(0, 0, this.W, this.H);
-    gl.enable(gl.BLEND); gl.blendFunc(gl.ONE_MINUS_DST_COLOR, gl.ONE);
-    if (!mask) {
-      this.drawSegs(segs, sc, true, time, 0, 0.4);
-      this.drawDots(dots, sc, true, 1);
+    if (plan && cityTex) {
+      // The city: stars and constellations go on layers of their own, which its pass lets through only where there is sky.
+      for (const t of [this.B, this.OUT]) { gl.bindFramebuffer(gl.FRAMEBUFFER, t.fb); gl.viewport(0, 0, this.W, this.H); gl.clearColor(0, 0, 0, 1); gl.clear(gl.COLOR_BUFFER_BIT); }
+      gl.enable(gl.BLEND); gl.blendFunc(gl.ONE_MINUS_DST_COLOR, gl.ONE);
+      if (!mask) {
+        gl.bindFramebuffer(gl.FRAMEBUFFER, this.B.fb); this.drawDots(starDots, sc, true, 1);
+        gl.bindFramebuffer(gl.FRAMEBUFFER, this.OUT.fb); this.drawSegs(segs, sc, true, time, 0, 0.4); this.drawDots(dots, sc, true, 1);
+      }
+      const at = (n: string, or?: string) => cityTex[`${plan.season}-${n}`] || (or ? cityTex[`${plan.season}-${or}`] : undefined);
+      const fa = at(plan.a), fb = at(plan.b, plan.a), fo = at("overcast", plan.a), cm = cityTex[`${plan.season}-mask`];
+      if (!fa || !fb || !fo || !cm) throw new Error(`The city kit is missing a painting for ${plan.season} ${plan.a}.`);
+      this.full(P.city, this.A, () => {
+        const p = P.city; this.common(p, sc, mask);
+        this.bind(p, "uFA", fa, 2); this.bind(p, "uFB", fb, 3); this.bind(p, "uFO", fo, 4); this.bind(p, "uCM", cm, 5);
+        this.bind(p, "uStarL", this.B.tex, 6); this.bind(p, "uConL", this.OUT.tex, 7);
+        gl.uniform1f(p.u("uMix"), plan.k); gl.uniform1f(p.u("uOver"), plan.over); gl.uniform1f(p.u("uRain"), plan.rain); gl.uniform1f(p.u("uMist"), plan.mist);
+        gl.uniform1f(p.u("uNight"), plan.night); gl.uniform1f(p.u("uLOn"), plan.lights.on); gl.uniform1f(p.u("uLGate"), plan.lights.gate);
+        gl.uniform1f(p.u("uMoonPhase"), plan.moon.phase); gl.uniform1f(p.u("uAurora"), mask ? 0 : o.events?.aurora || 0);
+        gl.uniform1f(p.u("uStarsVis"), sc.stars); gl.uniform1f(p.u("uTime"), time);
+        gl.uniform4f(p.u("uSunB"), plan.sun.x, plan.sun.y, plan.sun.r, plan.sun.strength * (1 - .85 * plan.over));
+        gl.uniform3f(p.u("uSunC"), plan.sun.color[0] / 255, plan.sun.color[1] / 255, plan.sun.color[2] / 255);
+        gl.uniform4f(p.u("uMoonB"), plan.moon.x, plan.moon.y, plan.moon.r, plan.moon.strength);
+      });
+    } else {
+      gl.bindFramebuffer(gl.FRAMEBUFFER, this.A.fb); gl.viewport(0, 0, this.W, this.H);
+      gl.enable(gl.BLEND); gl.blendFunc(gl.ONE_MINUS_DST_COLOR, gl.ONE);
+      if (!mask) {
+        this.drawSegs(segs, sc, true, time, 0, 0.4);
+        this.drawDots(starDots.concat(dots), sc, true, 1);
+      }
     }
 
+    if (!plan) {
     // 3. The land.
     const landP = P.land;
     this.full(landP, this.A, () => {
@@ -821,7 +949,11 @@ export class ValleyRenderer {
     this.drawSegs(fg, sc, false, time, wind, 0, mask);
     this.drawDots(fd, sc, false, 0, mask);
 
+    }
+
     // 10. Rain or snow in the air, clearing round the words.
+    gl.bindFramebuffer(gl.FRAMEBUFFER, this.A.fb); gl.viewport(0, 0, this.W, this.H);
+    gl.enable(gl.BLEND); gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
     if (sc.wet) {
       const r6 = rng(16), pr: number[] = [], ps: number[] = [];
       const c = [214, 222, 238].map((v) => v * (.5 + .4 * L));
@@ -842,9 +974,46 @@ export class ValleyRenderer {
       const p = P.compose; this.common(p, sc, mask);
       this.bind(p, "uScene", this.A.tex, 2); this.bind(p, "uInk", this.INK.tex, 3); this.bind(p, "uInk4", this.INK4.tex, 4);
       gl.uniform1f(p.u("uHasInk"), o.motto && !mask ? 1 : 0);
+      gl.uniform1f(p.u("uVig"), plan ? 0 : 1);       // the city's paintings bring their own light; no extra darkening in the middle
     });
     gl.finish();
     return { scene: sc, box: ink.box, constellations: cons.length, ms: performance.now() - t0 };
+  }
+
+  // ---------- 3.9: the city's paintings as textures ----------
+  private cityCache = new Map<string, { img: ImageBitmap; tex: WebGLTexture }>();
+  /** Textures for the paintings this moment needs (with mipmaps, for the soft copies the weather uses); others are let go. */
+  private cityTextures(city: CityInput) {
+    const gl = this.gl, out: Record<string, WebGLTexture> = {};
+    for (const name of city.plan.files) {
+      const img = city.images[name];
+      if (!img) continue;
+      let e = this.cityCache.get(name);
+      if (!e || e.img !== img) {
+        if (e) gl.deleteTexture(e.tex);
+        e = { img, tex: imageTexture(gl, img, { mip: !name.endsWith("-mask") }) };
+        this.cityCache.set(name, e);
+      }
+      out[name] = e.tex;
+    }
+    for (const [name, e] of this.cityCache) if (!city.plan.files.includes(name)) { gl.deleteTexture(e.tex); this.cityCache.delete(name); }
+    return out;
+  }
+  private skyCache: { img: ImageBitmap; w: number; h: number; d: Uint8ClampedArray } | null = null;
+  /** Whether a point (design units) is sky in the city, from the season's mask: where stars and constellations may go. */
+  private skyTest(city: CityInput) {
+    const img = city.images[`${city.plan.season}-mask`];
+    if (!img) return () => false;
+    if (!this.skyCache || this.skyCache.img !== img) {
+      const w = 640, h = 270, c = new OffscreenCanvas(w, h), g = c.getContext("2d")!;
+      g.drawImage(img, 0, 0, w, h);
+      this.skyCache = { img, w, h, d: g.getImageData(0, 0, w, h).data };
+    }
+    const s = this.skyCache;
+    return (x: number, y: number) => {
+      const i = Math.floor(x / DESIGN_W * s.w), j = Math.floor(y / DESIGN_H * s.h);
+      return i >= 0 && j >= 0 && i < s.w && j < s.h && s.d[(j * s.w + i) * 4] > 220;
+    };
   }
 
   private treeInstances(list: number[][], sc: Scene, winter: boolean) {
@@ -953,6 +1122,8 @@ export class ValleyRenderer {
   dispose() {
     const gl = this.gl;
     for (const t of Object.values(this.tex)) gl.deleteTexture(t);
+    for (const e of this.cityCache.values()) gl.deleteTexture(e.tex);
+    this.cityCache.clear();
     for (const t of [this.A, this.B, this.OUT, this.INK, this.INK4, this.INK4b]) { gl.deleteFramebuffer(t.fb); gl.deleteTexture(t.tex); }
     gl.getExtension("WEBGL_lose_context")?.loseContext();
   }

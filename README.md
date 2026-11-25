@@ -116,6 +116,18 @@ Praxis is built to be easy on the eyes on a big monitor all day:
 - **Readable type**: Atkinson Hyperlegible for text (designed for legibility) and Bricolage Grotesque for headings, bundled so they work offline.
 - **Calm motion**: finishing a task fills the circle and folds the row away; the focus timer is a ring that fills. If Windows has "Show animations" turned off, Praxis stops animating too.
 
+## The city (3.9)
+
+**A second scene for the wallpaper.** Under ⋯ → **Wallpaper…**, choose **Valley** or **City**. The city is a lofi anime cityscape painted as 32 keyframes (4 seasons × dawn, sunrise, noon, golden hour, sunset, dusk, night and a grey day) at 5120 × 2160. Praxis blends the two paintings for the minute you're in, timed from the real sunrise and sunset here, and draws the rest live on top:
+
+- **The season** changes on the calendar dates (spring 20 March, summer 21 June, autumn 22 September, winter 21 December).
+- **The sun** rises and sets at the centre of the horizon and arcs up over you in between; **the moon** crosses the night in its real phase. Both hide behind the towers and the hills and dim behind cloud.
+- **Window lights** come on one by one through dusk, about half go out after 11:30 PM, and the rest go out around sunrise.
+- **Weather**: cloudy days take their light from the grey-day painting, rain flattens and cools the light with haze along the horizon, and rain or snow falls. Stars and your constellations show only where there's sky.
+- **Today's temperature** sits in the top-left corner: now, and today's high and low (°F). It's there in both scenes whenever "Match the real weather" is on.
+
+The paintings aren't part of the app: Praxis reads them (never changes them) from `Pictures\Praxis city kit\keyframes-5k`, or another folder you choose in the dialog. It needs `spring-dawn.png` … `winter-overcast.png` and one mask per season (`spring-mask.png` …), which `scripts/city/build_masks.py` and `scripts/city/pack_masks.py` make from the paintings.
+
 ## The whole sky (3.8)
 
 **Dawn and dusk.** The morning commit opens on a sunrise: the sun climbs as you choose your commitments and pick the one, and committing ends in a warm glow over the whole window. The shutdown is a sunset: the sun sinks as each leftover gets a home, and closing the day brings out the stars.

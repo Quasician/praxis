@@ -8,6 +8,7 @@ import { createStore } from "./store";
 import { eventsForRange, testCalendar } from "./calendar";
 import { ClaudeError, firstSteps, looksLikeKey, reviewBacklog, sortDump, tinyVersions, drawConstellation, nextMove, tagMottos, writeLegend, writeLetter, verifyKey, type Auth, type BacklogTask, type SortContext, type StuckTask } from "./claude";
 import { cachedCliStatus, cliStatus } from "./claudecode";
+import { CITY_FILES } from "../src/city/model";
 
 export interface ServerOptions {
   dataDir: string;
@@ -15,6 +16,8 @@ export interface ServerOptions {
   todoistBase?: string;
   /** Where your mottos live (the desktop app passes your Pictures/Mottos folder). */
   mottosDir?: string;
+  /** 3.9: where the city wallpaper's 5K paintings live (the desktop app passes Pictures/Praxis city kit/keyframes-5k). */
+  cityDir?: string;
   /** Only in the desktop app: reminders that float above other windows. */
   desktop?: { nudge(action: string, key: string): void; test(): void; miniFit?(height: number): void; trayDial?(img16: string, img32: string, tip: string): void; taskbarDark?(): boolean;
     wallpaper?(action: string, arg?: string): Promise<unknown> };
@@ -151,6 +154,24 @@ export function createPraxisServer(opts: ServerOptions) {
       res.writeHead(200, { "Content-Type": IMAGE_TYPES[path.extname(name).toLowerCase()], "Cache-Control": "no-store" });
       return void fs.createReadStream(file).pipe(res);
     }
+    // ---------- 3.9: the city wallpaper's paintings, read (never written) from the city kit folder ----------
+    const cityDir = () => {
+      const w = (store.readConfig() as { wallpaper?: { cityFolder?: string } }).wallpaper;
+      return path.resolve(w?.cityFolder || opts.cityDir || path.join(opts.dataDir, "city"));
+    };
+    if (route === "GET /api/city/frame") {
+      const name = url.searchParams.get("name") || "";
+      if (!CITY_FILES.includes(name)) return sendJSON(res, 400, { error: "Not a city painting." });
+      const dir = cityDir(), file = path.join(dir, `${name}.png`);
+      if (!fs.existsSync(file)) return sendJSON(res, 404, { error: `No ${name}.png in the city folder.` });
+      res.writeHead(200, { "Content-Type": "image/png", "Cache-Control": "no-store" });
+      return void fs.createReadStream(file).pipe(res);
+    }
+    if (route === "GET /api/city/status") {
+      const dir = cityDir();
+      const missing = CITY_FILES.filter((n) => !fs.existsSync(path.join(dir, `${n}.png`)));
+      return sendJSON(res, 200, { folder: dir, found: CITY_FILES.length - missing.length, total: CITY_FILES.length, missing: missing.slice(0, 12) });
+    }
     if (route === "POST /api/valley/frame") {
       let buf: Buffer;
       try { buf = await readBinary(req, 80e6); } catch { return sendJSON(res, 413, { error: "Picture too large." }); }
@@ -170,7 +191,7 @@ export function createPraxisServer(opts: ServerOptions) {
       let body: { action?: unknown; folder?: unknown } = {};
       if (req.method === "POST") { try { body = JSON.parse((await readBody(req)) || "{}"); } catch { return sendJSON(res, 400, { error: "Invalid JSON" }); } }
       const action = req.method === "GET" ? "state" : String(body.action || "");
-      if (!["state", "enable", "disable", "refresh", "folder", "pick-folder", "live-on", "live-off", "weather-on", "weather-off"].includes(action)) return sendJSON(res, 400, { error: "Unknown action." });
+      if (!["state", "enable", "disable", "refresh", "folder", "pick-folder", "live-on", "live-off", "weather-on", "weather-off", "scene-valley", "scene-city", "pick-city-folder"].includes(action)) return sendJSON(res, 400, { error: "Unknown action." });
       try { return sendJSON(res, 200, await opts.desktop.wallpaper(action, typeof body.folder === "string" ? body.folder.slice(0, 500) : undefined)); }
       catch (e) { return sendJSON(res, 500, { error: (e as Error).message }); }
     }

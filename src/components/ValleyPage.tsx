@@ -1,18 +1,22 @@
 // The wallpaper's own page (?valley=1). The desktop app keeps it in a hidden window and asks it for pictures;
 // tests and the year sheet drive it the same way, through window.__valley.
 import { useEffect, useRef, useState } from "react";
-import { loadAssets, ValleyRenderer, type RenderOpts, type SkyProject, type ValleyAssets } from "../valley/render";
+import { loadAssets, ValleyRenderer, type CityInput, type RenderOpts, type SkyProject, type ValleyAssets } from "../valley/render";
 import type { Weather } from "../valley/model";
+import { cityPlan } from "../city/model";
 
 /** 3.7: the rewards in the sky. meteorAt: when you finished "the one"; aurora: 1 while it's out. */
 export interface JobEvents { meteorAt?: string | null; aurora?: number }
-export interface WallpaperJob { when: string; weather?: Weather; motto?: string | null; projects?: SkyProject[]; width?: number; height?: number; save?: boolean; events?: JobEvents }
+/** scene: 3.9, the valley (drawn) or the city (paintings from your city kit folder). */
+/** temp: 3.9, now / today's high / today's low in °F, shown in the top-left corner (null: not shown). */
+export interface JobTemp { now: number; hi: number; lo: number }
+export interface WallpaperJob { when: string; weather?: Weather; motto?: string | null; projects?: SkyProject[]; width?: number; height?: number; save?: boolean; events?: JobEvents; scene?: "valley" | "city"; temp?: JobTemp | null }
 const eventsAt = (e: JobEvents | undefined, at: number) => (e ? { aurora: e.aurora || 0, meteorAge: e.meteorAt ? (at - Date.parse(e.meteorAt)) / 1000 : null } : undefined);
 declare global {
   interface Window {
     __valley?: {
       ready: boolean;
-      render(o: Omit<RenderOpts, "when" | "motto" | "events"> & { when: string; motto?: string | null; width?: number; height?: number; events?: JobEvents }): Promise<{ ms: number; box: number[] | null; constellations: number; phase: string; doy: number }>;
+      render(o: Omit<RenderOpts, "when" | "motto" | "events" | "city"> & { when: string; motto?: string | null; width?: number; height?: number; events?: JobEvents; scene?: "valley" | "city"; temp?: JobTemp | null }): Promise<{ ms: number; box: number[] | null; constellations: number; phase: string; doy: number; city?: string }>;
       dataURL(type?: string, quality?: number, scale?: number): string;
       maskCount(box: [number, number, number, number]): number;
       wallpaper(job: WallpaperJob): Promise<{ file: string; ms: number }>;
@@ -26,17 +30,59 @@ declare global {
 
 let assets: Promise<ValleyAssets> | null = null;
 const mottoCache = new Map<string, ImageBitmap>();
-async function mottoBitmap(name: string | null | undefined, w: number, h: number) {
-  if (!name) return null;
-  const key = `${name}|${w}x${h}`;
+async function mottoBitmap(name: string | null | undefined, w: number, h: number, temp?: JobTemp | null) {
+  if (!name && !temp) return null;
+  const key = `${name || ""}|${w}x${h}|${temp ? `${temp.now}/${temp.hi}/${temp.lo}` : ""}`;
   if (mottoCache.has(key)) return mottoCache.get(key)!;
-  const url = /^(blob:|data:|https?:|\/)/.test(name) ? name : `/api/valley/motto?name=${encodeURIComponent(name)}`;
-  const r = await fetch(url, { headers: { "x-planner": "1" } });
-  if (!r.ok) throw new Error(`Couldn't open the motto (${r.status}).`);
-  const bmp = await createImageBitmap(await r.blob(), { resizeWidth: w, resizeHeight: h, resizeQuality: "high", premultiplyAlpha: "none", colorSpaceConversion: "none" });
+  let bmp: ImageBitmap | null = null;
+  if (name) {
+    const url = /^(blob:|data:|https?:|\/)/.test(name) ? name : `/api/valley/motto?name=${encodeURIComponent(name)}`;
+    const r = await fetch(url, { headers: { "x-planner": "1" } });
+    if (!r.ok) throw new Error(`Couldn't open the motto (${r.status}).`);
+    bmp = await createImageBitmap(await r.blob(), { resizeWidth: w, resizeHeight: h, resizeQuality: "high", premultiplyAlpha: "none", colorSpaceConversion: "none" });
+  }
+  // 3.9: today's temperatures in the top-left corner, drawn as more lettering, so they get the motto's shadow and contrast guard.
+  if (temp) {
+    const c = new OffscreenCanvas(w, h), g = c.getContext("2d")!, k = w / 5120;
+    g.fillStyle = "#000"; g.fillRect(0, 0, w, h);
+    if (bmp) { g.drawImage(bmp, 0, 0, w, h); bmp.close(); }
+    g.fillStyle = "#fff"; g.textBaseline = "alphabetic";
+    const face = '"Segoe UI Variable Display", "Segoe UI", system-ui, sans-serif';
+    g.font = `300 ${Math.round(150 * k)}px ${face}`;
+    g.fillText(`${temp.now}°`, 150 * k, 290 * k);
+    g.font = `400 ${Math.round(56 * k)}px ${face}`;
+    g.fillText(`H ${temp.hi}°   L ${temp.lo}°`, 158 * k, 380 * k);
+    bmp = c.transferToImageBitmap();
+  }
+  if (!bmp) return null;
   if (mottoCache.size > 3) { for (const b of mottoCache.values()) b.close(); mottoCache.clear(); }
   mottoCache.set(key, bmp);
   return bmp;
+}
+
+// 3.9: the city's paintings, fetched from your city kit folder as they're needed (the two on screen, the grey day, the mask).
+const cityImages = new Map<string, { w: number; img: Promise<ImageBitmap> }>();
+async function cityInput(when: Date, weather: Weather | undefined, width: number): Promise<CityInput> {
+  const plan = cityPlan(when, weather);
+  for (const [name, e] of cityImages) if (!plan.files.includes(name)) { cityImages.delete(name); e.img.then((b) => b.close()).catch(() => undefined); }
+  const images: Record<string, ImageBitmap> = {};
+  await Promise.all(plan.files.map(async (name) => {
+    const isMask = name.endsWith("-mask"), w = isMask ? 0 : Math.min(5120, width);
+    let e = cityImages.get(name);
+    if (!e || e.w !== w) {
+      const img = (async () => {
+        const r = await fetch(`/api/city/frame?name=${encodeURIComponent(name)}`, { headers: { "x-planner": "1" } });
+        if (!r.ok) throw new Error(r.status === 404 ? `The city kit folder has no ${name}.png.` : `Couldn't open ${name}.png (${r.status}).`);
+        const blob = await r.blob();
+        return createImageBitmap(blob, { premultiplyAlpha: "none", colorSpaceConversion: "none", ...(w && w < 5120 ? { resizeWidth: w, resizeHeight: Math.round(w * 2160 / 5120), resizeQuality: "high" as const } : {}) });
+      })();
+      e = { w, img };
+      cityImages.set(name, e);
+      img.catch(() => { if (cityImages.get(name) === e) cityImages.delete(name); });
+    }
+    images[name] = await e.img;
+  }));
+  return { plan, images };
 }
 
 export function ValleyPage() {
@@ -64,11 +110,13 @@ export function ValleyPage() {
       async render(o) {
         const w = o.width || 5120, h = o.height || Math.round(w * 2160 / 5120);
         const r = await ensure(w, h);
-        const motto = await mottoBitmap(o.motto, w, h);
-        const info = r.render({ ...o, when: new Date(o.when), motto, events: eventsAt(o.events, Date.parse(o.when)) });
+        const motto = await mottoBitmap(o.motto, w, h, o.temp);
+        const city = o.scene === "city" ? await cityInput(new Date(o.when), o.weather, w) : null;
+        const info = r.render({ ...o, when: new Date(o.when), motto, events: eventsAt(o.events, Date.parse(o.when)), city });
         r.present();
         const phase = info.scene.light > .8 ? "day" : info.scene.up ? "low sun" : "night";
-        return { ms: Math.round(info.ms), box: info.box, constellations: info.constellations, phase, doy: info.scene.season.doy };
+        return { ms: Math.round(info.ms), box: info.box, constellations: info.constellations, phase, doy: info.scene.season.doy,
+          city: city ? `${city.plan.season} ${city.plan.a}${city.plan.a !== city.plan.b ? ` → ${city.plan.b} ${Math.round(city.plan.k * 100)}%` : ""}` : undefined };
       },
       dataURL(type = "image/jpeg", quality = .92, scale = 1) {
         if (!renderer) return "";
@@ -99,7 +147,7 @@ export function ValleyPage() {
       /** Draws one wallpaper and hands it to the desktop app, which saves it and sets it. */
       async wallpaper(job) {
         const t0 = performance.now();
-        await window.__valley!.render({ when: job.when, weather: job.weather, motto: job.motto, projects: job.projects, width: job.width, height: job.height, events: job.events });
+        await window.__valley!.render({ when: job.when, weather: job.weather, motto: job.motto, projects: job.projects, width: job.width, height: job.height, events: job.events, scene: job.scene, temp: job.temp });
         const px = renderer!.pixels();
         const c = new OffscreenCanvas(renderer!.W, renderer!.H);
         c.getContext("2d")!.putImageData(new ImageData(px, renderer!.W, renderer!.H), 0, 0);
@@ -118,8 +166,10 @@ export function ValleyPage() {
       if (!liveJob || paused || !renderer) return;
       const t0 = performance.now();
       try {
-        const motto = await mottoBitmap(liveJob.motto, renderer.W, renderer.H);
-        renderer.render({ when: new Date(), weather: liveJob.weather, motto, projects: liveJob.projects, time: t0 / 1000, wind: liveJob.wind ?? 0.2, events: eventsAt(liveJob.events, Date.now()) });
+        const motto = await mottoBitmap(liveJob.motto, renderer.W, renderer.H, liveJob.temp);
+        const now = new Date();
+        const city = liveJob.scene === "city" ? await cityInput(now, liveJob.weather, renderer.W) : null;
+        renderer.render({ when: now, weather: liveJob.weather, motto, projects: liveJob.projects, time: t0 / 1000, wind: liveJob.wind ?? 0.2, events: eventsAt(liveJob.events, Date.now()), city });
         renderer.present();
         frames++;
       } catch (e) { window.__valley!.error = String((e as Error)?.message || e); return; }
