@@ -59,6 +59,20 @@ function MorningBody() {
   const theOne = one && committed.some((it) => it.task.id === one) ? one : committed[0]?.task.id || null;
   const toggle = (id: string) => setPlan({ items: items.map((it) => (it.task.id === id ? { ...it, committed: !it.committed } : it)) });
   const hour = new Date().getHours();
+  // 4.0: your commitments against what you usually finish on a day like today.
+  const cap = plan.capacityMin ?? null, committedMin = committed.reduce((s, it) => s + it.dur, 0);
+  const over = cap !== null && committed.length > 1 && committedMin > cap;
+  const lateCommitted = committed.filter((it) => it.late).length;
+  /** Turns the last commitments into bonus until what's left fits (the one that matters is kept). */
+  const trim = () => {
+    let total = committedMin; const drop = new Set<string>();
+    for (const it of [...committed].reverse()) {
+      if (total <= cap! || committed.length - drop.size <= 1) break;
+      if (it.task.id === theOne) continue;
+      drop.add(it.task.id); total -= it.dur;
+    }
+    setPlan({ items: items.map((it) => (drop.has(it.task.id) ? { ...it, committed: false } : it)) });
+  };
 
   // Slammed: everything due today that isn't the one thing moves out of the way, spread over the week.
   const rest = energy === "slammed" ? today.filter((t) => { const d = parseDue(t.due); return d && ymd(d.d) <= ymd(new Date()) && !t.due?.is_recurring && !items.some((it) => it.task.id === t.id); }) : [];
@@ -94,7 +108,7 @@ function MorningBody() {
         <button type="button" className="mc-toggle" title={it.committed ? "Make it a bonus" : "Commit to it"} onClick={() => toggle(it.task.id)}>{it.committed ? "★" : "☆"}</button>
         <div className="mc-main">
           <div className="mc-title">{plain(it.task.content)}</div>
-          <div className="mc-meta">{fmtMin(it.start)} · {fmtSpan(it.dur)}{wp === 3 ? " · Deep" : wp === 1 ? " · Light" : ""}{it.source === "milestone" && it.milestone ? ` · ◆ ${plain(it.milestone.content).slice(0, 30)}` : ""}</div>
+          <div className="mc-meta">{fmtMin(it.start)} · {fmtSpan(it.dur)}{wp === 3 ? " · Deep" : wp === 1 ? " · Light" : ""}{it.source === "milestone" && it.milestone ? ` · ◆ ${plain(it.milestone.content).slice(0, 30)}` : ""}{it.late ? <span className="mc-late" title={`Blocks that start after ${fmtMin(plan.weakFrom ?? 0)} rarely get done, going by your record`}> · late slot</span> : null}</div>
           {it.tiny && <label className="mc-tiny"><span>Tiny version</span><input key={it.tiny} defaultValue={it.tiny} aria-label="Tiny version" onBlur={(e) => { const v = e.target.value.trim(); if (v && v !== it.tiny) { setTiny(it.task.id, v); setPlan({ items: useUi.getState().plan.items.map((x) => (x.task.id === it.task.id ? { ...x, tiny: v } : x)) }); } }} /></label>}
         </div>
         {it.committed && <label className="mc-one" title="The one task that would make today a good day">
@@ -122,6 +136,17 @@ function MorningBody() {
         <button type="button" id="mc-make-tiny" className="ghost-btn mc-tiny-btn" disabled={tinyBusy} onClick={makeTiny}>{tinyBusy ? "Thinking…" : "✦ Have Claude write tiny versions"}</button>
       )}
       {committed.length > cfg.commitCount && <p className="mc-warn">That's {committed.length} commitments. Fewer is easier to finish; {cfg.commitCount} is your setting.</p>}
+      {cap !== null && (
+        <div className={`mc-capacity${over ? " over" : ""}`} id="mc-capacity">
+          <span className="mc-cap-bar" aria-hidden="true"><i style={{ width: `${Math.min(100, (committedMin / Math.max(cap, committedMin)) * 100)}%` }} /><b style={{ left: `${Math.min(100, (cap / Math.max(cap, committedMin)) * 100)}%` }} /></span>
+          <span className="mc-cap-text">{over
+            ? <>Your commitments add up to <b>{fmtSpan(committedMin)}</b>. On a day like this you usually finish about <b>{fmtSpan(cap)}</b>.</>
+            : <>Commitments: <b>{fmtSpan(committedMin)}</b> of the roughly <b>{fmtSpan(cap)}</b> you usually finish on a day like this.</>}</span>
+          {over && <button type="button" id="mc-trim" className="ghost-btn" onClick={trim}>Trim to fit</button>}
+        </div>
+      )}
+      {lateCommitted > 0 && plan.weakFrom != null && <p className="mc-warn" id="mc-late-warn">{lateCommitted === 1 ? "One commitment starts" : `${lateCommitted} commitments start`} after {fmtMin(plan.weakFrom)}, when your blocks rarely get done. Move {lateCommitted === 1 ? "it" : "them"} earlier on the timeline, or make {lateCommitted === 1 ? "it" : "them"} a bonus.</p>}
+      {plan.weakAll && plan.weakFrom != null && <p className="mc-later" id="mc-weak-all">All of today's free time is after {fmtMin(plan.weakFrom)}, when your blocks rarely get done. Keep today small.</p>}
       <section><h3>Committed <span className="n">{committed.length}</span></h3><ul className="mc-list" id="mc-committed">{committed.map(row)}</ul></section>
       {bonus.length > 0 && <section><h3>Bonus <span className="n">{bonus.length}</span></h3><ul className="mc-list bonus" id="mc-bonus">{bonus.map(row)}</ul></section>}
       {rest.length > 0 && <label className="mc-spread"><input type="checkbox" id="mc-spread" checked={spreadRest} onChange={(e) => setSpreadRest(e.target.checked)} /> Move the other {rest.length} task{rest.length === 1 ? "" : "s"} due today to the rest of the week</label>}

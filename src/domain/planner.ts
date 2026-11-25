@@ -63,8 +63,10 @@ export function freeIntervals(cfg: PlannerSettings, todayTasks: Task[], events: 
 }
 
 export interface Candidate { task: Task; source: "today" | "milestone"; overdueDays: number; milestone?: Task; target?: string }
-export interface PlanItem extends Candidate { start: number; dur: number; committed?: boolean; star?: boolean; tiny?: string }
-export interface Plan { items: PlanItem[]; unplaced: Candidate[]; freeMin: number }
+/** late (4.0): it only fitted in the hours where your blocks rarely get done. */
+export interface PlanItem extends Candidate { start: number; dur: number; committed?: boolean; star?: boolean; tiny?: string; late?: boolean }
+/** weakAll (4.0): all of today's free time is in your weak hours, so nothing could be moved out of them. */
+export interface Plan { items: PlanItem[]; unplaced: Candidate[]; freeMin: number; weakAll?: boolean }
 
 export interface PlanInput {
   cfg: PlannerSettings;
@@ -78,9 +80,13 @@ export interface PlanInput {
   learned?: Learned | null;   // best Deep hours + real durations
   energy?: Energy;            // low: light work + tiny versions; slammed: one tiny thing
   tiny?: Record<string, string>;
+  // 4.0, from the record (domain/record.ts); all three are skipped when "learn" is off.
+  capacityMin?: number | null; // what you usually finish on a day like today: commitments stop there, the rest is bonus
+  weakFrom?: number | null;    // minutes of the day after which your blocks rarely get done: work goes before it when it can
+  resting?: Set<string>;       // projects set down in a weekly review: their steps aren't pulled into the plan
 }
 
-export function candidates({ cfg, today, active, tray }: PlanInput): Candidate[] {
+export function candidates({ cfg, today, active, tray, resting }: PlanInput): Candidate[] {
   const now = new Date(), t0 = startOfToday();
   const list: Candidate[] = [];
   for (const t of today) {
@@ -90,7 +96,7 @@ export function candidates({ cfg, today, active, tray }: PlanInput): Candidate[]
     list.push({ task: t, source: "today", overdueDays: d.d < t0 ? Math.round((+t0 - +d.d) / 864e5) : 0 });
   }
   if (cfg.milestoneSteps > 0) {
-    const milestones = active.filter(isMilestone).map((m) => ({
+    const milestones = active.filter((m) => isMilestone(m) && !resting?.has(m.id)).map((m) => ({
       m,
       target: (m.deadline && m.deadline.date) || (m.due && m.due.date) || "9999",
       next: active.filter((t) => t.parent_id === m.id).sort((a, b) => (a.child_order ?? 0) - (b.child_order ?? 0))[0],
@@ -138,7 +144,12 @@ export function buildPlan(input: PlanInput): Plan {
   const freeMin = free.reduce((s, [a, z]) => s + (z - a), 0);
   const budget = Math.floor(freeMin * ((input.fill ?? cfg.fill) / 100));
   const learned = cfg.learn ? input.learned : null;
-  let used = 0;
+  let weakFrom = cfg.learn && energy === "full" && input.weakFrom != null ? input.weakFrom : null;
+  // With no free time before the weak hours there is nothing to choose between: say so once instead of marking every block.
+  const weakAll = weakFrom !== null && free.length > 0 && free.every(([a]) => a >= weakFrom!);
+  if (weakAll) weakFrom = null;
+  const capacity = cfg.learn && energy === "full" && input.capacityMin != null ? input.capacityMin : null;
+  let used = 0, committedMin = 0;
   const items: PlanItem[] = [], unplaced: Candidate[] = [];
   let committed = 0, deepCommitted = 0;
   for (const c of cands) {
@@ -151,7 +162,9 @@ export function buildPlan(input: PlanInput): Plan {
     const pref = deep && learned?.deepHour != null ? learned.deepHour : null;
     let slot = -1, start = 0;
     if (pref === null) {
-      slot = free.findIndex(([a, z]) => z - a >= dur);
+      // The earliest slot that starts before your weak hours, if there is one; otherwise the earliest slot.
+      if (weakFrom !== null) slot = free.findIndex(([a, z]) => a < weakFrom && z - a >= dur);
+      if (slot === -1) slot = free.findIndex(([a, z]) => z - a >= dur);
       if (slot !== -1) start = free[slot][0];
     } else {
       let bestDist = Infinity;
@@ -165,9 +178,12 @@ export function buildPlan(input: PlanInput): Plan {
     if (slot === -1) { unplaced.push(c); continue; }
     const [a, z] = free[slot];
     // The first few you place are your commitments (at most one Deep); the rest are bonus.
-    const commit = committed < cfg.commitCount && (!deep || deepCommitted === 0);
-    if (commit) { committed++; if (deep) deepCommitted++; }
-    items.push({ ...c, start, dur, committed: commit, ...(tiny ? { tiny } : {}) });
+    // 4.0: a commitment has to fit in what you usually finish, and not sit in your weak hours (the first one always counts).
+    const late = weakFrom !== null && start >= weakFrom;
+    const fits = committed === 0 || ((capacity === null || committedMin + dur <= capacity) && !late);
+    const commit = committed < cfg.commitCount && (!deep || deepCommitted === 0) && fits;
+    if (commit) { committed++; committedMin += dur; if (deep) deepCommitted++; }
+    items.push({ ...c, start, dur, committed: commit, ...(tiny ? { tiny } : {}), ...(late ? { late } : {}) });
     used += dur;
     const pieces: [number, number][] = [];
     if (start - cfg.gap - a >= 15) pieces.push([a, start - cfg.gap]);
@@ -175,5 +191,5 @@ export function buildPlan(input: PlanInput): Plan {
     free.splice(slot, 1, ...pieces);
   }
   items.sort((x, y) => x.start - y.start);
-  return { items, unplaced, freeMin };
+  return { items, unplaced, freeMin, ...(weakAll ? { weakAll } : {}) };
 }

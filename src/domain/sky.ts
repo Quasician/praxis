@@ -7,9 +7,11 @@
 // Todoist only serves ~3 months of completed tasks, so the sky keeps its own record of every star (in the config).
 import { isMilestone } from "../lib/tasks";
 import type { Area, Task } from "../lib/types";
+import { dimOf, quietDays, standing, type Standing } from "./review";
 
 export interface SkyStep { id: string; title: string; min: number; done?: string }
-export interface SkyConstellation { name: string; area?: string; steps: SkyStep[]; since: string; finished?: string; target?: string | null; seed?: string; legend?: string }
+/** rest (4.0): set down in a weekly review (when). kept (4.0): the last time a review chose to keep going, which restarts its clock. */
+export interface SkyConstellation { name: string; area?: string; steps: SkyStep[]; since: string; finished?: string; target?: string | null; seed?: string; legend?: string; rest?: string; kept?: string }
 export interface SkyRecord { cons: Record<string, SkyConstellation>; dust: Record<string, number> }
 
 export const EMPTY_SKY: SkyRecord = { cons: {}, dust: {} };
@@ -68,6 +70,8 @@ export function mergeSky(prev: SkyRecord | undefined, active: Task[], completed:
       target: src ? targetOf(src) : was?.target ?? null,
       ...(was?.seed ? { seed: was.seed } : {}),
       ...(was?.legend ? { legend: was.legend } : {}),
+      ...(was?.rest && !finishedAt ? { rest: was.rest } : {}),
+      ...(was?.kept ? { kept: was.kept } : {}),
     };
   };
 
@@ -149,6 +153,7 @@ export interface ConstellationView {
   x: number; y: number; w: number; h: number;          // bounds, for the label and clicking
   stars: StarView[]; links: { a: number; b: number; lit: boolean }[];
   lit: number; total: number; daysLeft: number | null; late: boolean; finished?: string; target: string | null; legend?: string;
+  dim: number; standing: Standing; quiet: number;      // 4.0: how faded it is (0 = bright), and how many days since a star was lit
   nextStep: StarView | null;
 }
 export interface DustView { x: number; y: number; r: number; o: number; fresh: boolean }
@@ -209,6 +214,7 @@ export function layoutSky(sky: SkyRecord, o: LayoutOpts): SkyLayout {
       id, name: c.name, color, areaName: o.areas.find((a) => a.id === c.area)?.name || "",
       x: 0, y: 0, w, h, stars, links: links.map(([a, b]) => ({ a, b, lit: stars[a].lit && stars[b].lit })),
       lit: stars.filter((s) => s.lit).length, total: stars.length, daysLeft: d, late: d !== null && d < 0,
+      dim: dimOf(c, now.getTime()), standing: standing(c, now.getTime()), quiet: quietDays(c, now.getTime()),
       finished: c.finished, legend: c.legend, target: c.target ?? null, nextStep: stars.find((s) => s.next) || stars.find((s) => !s.lit) || null,
     };
   };

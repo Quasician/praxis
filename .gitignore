@@ -17,3 +17,4 @@ dist/
 native-build/
 release/
 .praxis-data/
+dist-tests/

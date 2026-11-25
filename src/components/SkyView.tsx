@@ -9,6 +9,7 @@ import { useActive, useCompleted } from "../data/queries";
 import { useData } from "../data/useData";
 import { useUi } from "../state/ui";
 import { auroraOn } from "../domain/rewards";
+import { wake } from "../data/review";
 
 const SEEN_KEY = "praxis.sky.seen";
 const readSeen = () => { try { return Number(localStorage.getItem(SEEN_KEY)) || 0; } catch { return 0; } };
@@ -16,7 +17,7 @@ const fmtDate = (iso?: string | null) => (iso ? new Date(iso.length <= 10 ? `${i
 const dayWord = (n: number) => (n === 1 ? "1 day" : `${n} days`);
 
 /** Keeps the saved sky in step with Todoist, and returns it. */
-function useSkyRecord() {
+export function useSkyRecord() {
   const { config, connected } = useData();
   const activeQ = useActive(connected), completedQ = useCompleted(connected);
   const ready = !!config && activeQ.isSuccess && completedQ.isSuccess;
@@ -107,8 +108,8 @@ export function SkyView({ allAreas = false, selectedArea = null, onArea, actions
           ))}
 
           {lay.constellations.map((c, ci) => (
-            <g key={c.id} id={`con-${c.id}`} className={`sky-con ${picked === c.id ? "picked" : ""} ${c.late ? "late" : ""}`} transform={`translate(${c.x} ${c.y})`}
-               style={{ "--c": c.color } as React.CSSProperties} data-lit={c.lit} data-total={c.total}
+            <g key={c.id} id={`con-${c.id}`} className={`sky-con ${picked === c.id ? "picked" : ""} ${c.late ? "late" : ""} ${c.dim ? "faded" : ""}`} data-standing={c.standing} transform={`translate(${c.x} ${c.y})`}
+               style={{ "--c": c.color, "--fade": 1 - c.dim } as React.CSSProperties} data-lit={c.lit} data-total={c.total}
                onClick={(e) => { e.stopPropagation(); setPicked(picked === c.id ? null : c.id); }}>
               <rect className="sky-hit" x={-18} y={-18} width={c.w + 36} height={c.h + 70 * k} />
               {c.links.map((l, i) => (
@@ -132,7 +133,7 @@ export function SkyView({ allAreas = false, selectedArea = null, onArea, actions
               <g className="sky-label" transform={`translate(0 ${c.h + 22 * k})`}>
                 <text className="name" fontSize={14.5 * k}>{c.name}</text>
                 <text className="sub" y={18 * k} fontSize={12.5 * k}>
-                  {c.lit} of {c.total}{c.target ? ` · ${c.late ? `${dayWord(-(c.daysLeft || 0))} late` : c.daysLeft === 0 ? "due today" : `due ${fmtDate(c.target)}`}` : ""}
+                  {c.lit} of {c.total}{c.target ? ` · ${c.late ? `${dayWord(-(c.daysLeft || 0))} late` : c.daysLeft === 0 ? "due today" : `due ${fmtDate(c.target)}`}` : ""}{c.standing === "resting" ? " · set down" : c.standing === "stalled" || c.standing === "quiet" ? ` · quiet ${dayWord(c.quiet)}` : ""}
                 </text>
                 <rect className="bar" y={26 * k} width={90 * k} height={3 * k} rx={1.5 * k} />
                 <rect className="bar-fill" y={26 * k} width={90 * k * (c.total ? c.lit / c.total : 0)} height={3 * k} rx={1.5 * k} />
@@ -186,6 +187,8 @@ function Picked({ c, active, right, onClose }: { c: ConstellationView; active: T
         {c.finished ? ` · finished ${fmtDate(c.finished)}` : c.target ? ` · ${c.late ? `${dayWord(-(c.daysLeft || 0))} past its deadline` : c.daysLeft === 0 ? "due today" : `due ${fmtDate(c.target)}, in ${dayWord(c.daysLeft || 0)}`}` : ""}
       </p>
       {c.legend && <p className="sky-card-legend" id="sky-legend-line">{c.legend}</p>}
+      {c.standing === "resting" && <p className="sky-card-quiet" id="sky-card-quiet">Set down in a weekly review. It stays out of your plans until you pick it back up.</p>}
+      {(c.standing === "stalled" || c.standing === "quiet") && <p className="sky-card-quiet" id="sky-card-quiet">No star lit in {dayWord(c.quiet)}{c.standing === "stalled" ? ". It has faded; lighting one brings it back." : "."}</p>}
       <ol className="sky-steps">
         {c.stars.map((s) => (
           <li key={s.id} className={s.lit ? "lit" : s.next ? "next" : ""}>
@@ -194,7 +197,9 @@ function Picked({ c, active, right, onClose }: { c: ConstellationView; active: T
           </li>
         ))}
       </ol>
-      {next && !c.nextStep!.today && <button className="primary" id="sky-do-today" onClick={() => doToday(next)}>Do the next step today</button>}
+      {c.standing === "resting"
+        ? <button className="primary" id="sky-wake" onClick={() => wake(c.id)}>Pick it back up</button>
+        : next && !c.nextStep!.today && <button className="primary" id="sky-do-today" onClick={() => doToday(next)}>Do the next step today</button>}
     </div>
   );
 }

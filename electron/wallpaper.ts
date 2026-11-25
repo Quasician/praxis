@@ -14,6 +14,8 @@ import { currentWeather } from "./weather";
 import { dayIcon, type SkyIcon, type ValleyWeather } from "../src/valley/weather";
 import { DEFAULT_LAT, DEFAULT_LNG } from "../src/domain/sun";
 import { CITY_FILES } from "../src/city/model";
+import { dimOf } from "../src/domain/review";
+import type { SkyConstellation } from "../src/domain/sky";
 import NATIVE_CS from "./wallpaper-native.cs";
 
 type Cfg = Record<string, unknown>;
@@ -78,6 +80,12 @@ async function helper(args: string[], log: WallpaperDeps["log"]): Promise<string
   });
 }
 
+/** A colour mixed toward a dim blue-grey by k (0 = unchanged). */
+function fade(hex: string, k: number) {
+  if (!k) return hex;
+  const to = [70, 78, 104], n = parseInt(hex.slice(1), 16), c = [n >> 16, (n >> 8) & 255, n & 255];
+  return "#" + c.map((v, i) => Math.round(v + (to[i] - v) * k).toString(16).padStart(2, "0")).join("");
+}
 const COLORS = ["#8fb4ff", "#8fe0b0", "#f0b75a", "#c9a8ff", "#ff9fb0", "#9fd8ff", "#b8c4e8"];
 /** Your active projects from the sky record, as the renderer wants them. */
 /** 3.7: the shooting star (for 3 hours after you finish "the one") and the aurora (after a week of kept commitments). */
@@ -88,9 +96,10 @@ function eventsOf(cfg: Cfg, now = Date.now()) {
   return { meteorAt, aurora };
 }
 function projectsOf(cfg: Cfg) {
-  const sky = cfg.sky as { cons?: Record<string, { name: string; steps: { done?: string; min: number }[]; finished?: string; since: string; seed?: string }> } | undefined;
+  const sky = cfg.sky as { cons?: Record<string, SkyConstellation> } | undefined;
   const live = Object.entries(sky?.cons || {}).filter(([, c]) => !c.finished && c.steps?.length).sort((a, b) => (b[1].since || "").localeCompare(a[1].since || "")).slice(0, 7);
-  return live.map(([id, c], i) => ({ id, seed: c.seed, color: COLORS[i % COLORS.length], steps: c.steps.map((s) => ({ lit: !!s.done, min: s.min || 20 })) }));
+  // 4.0: a project with no star lit for a while fades here too (its colour is mixed toward the night sky).
+  return live.map(([id, c], i) => ({ id, seed: c.seed, color: fade(COLORS[i % COLORS.length], dimOf(c)), steps: c.steps.map((s) => ({ lit: !!s.done, min: s.min || 20 })) }));
 }
 
 export function createWallpaper(deps: WallpaperDeps) {
