@@ -1590,3 +1590,102 @@ body { background-image: linear-gradient(180deg, color-mix(in srgb, var(--sky-no
 .sky-con.faded { opacity: var(--fade, 1); transition: opacity .25s; }
 .sky-con.faded:hover, .sky-con.faded.picked { opacity: 1; }
 .sky-card-quiet { margin: -4px 0 12px; font-size: 13px; color: var(--night-ink-2); }
+
+/* ---------- 5.0: one canvas ---------- */
+.cv-app { position: relative; overflow: hidden; }
+.cv { position: relative; height: 100%; display: flex; flex-direction: column; overflow: hidden; color: var(--ink);
+  --strip: clamp(300px, 38vh, 520px); --land-h: clamp(150px, 25vh, 320px); --glass: color-mix(in srgb, var(--panel) 82%, transparent); }
+.cv[data-zoom="week"] { --strip: 56vh; }
+.cv[data-zoom="sky"] { --strip: 0px; --land-h: clamp(180px, 30vh, 380px); }
+.cv[data-zoom="week"] { --land-h: clamp(110px, 16vh, 220px); }
+.cv > :not(.cv-back) { position: relative; z-index: 1; }
+.cv-back { position: absolute; inset: 0; z-index: 0; pointer-events: none; }
+.cv-skybox { position: absolute; left: 0; top: 0; width: 100%; height: calc(100% - var(--strip) - var(--land-h) * .62); display: block; }
+.cv-land { position: absolute; left: 0; right: 0; bottom: calc(var(--strip) - 2px); width: 100%; height: var(--land-h); display: block; overflow: visible; }
+.cv-ground { position: absolute; left: 0; right: 0; bottom: 0; height: var(--strip); }
+
+/* The bar sits on the sky: white lettering with a soft shadow reads on every sky, buttons are glass. */
+.cv .topbar { padding: 18px 28px 12px; z-index: 4; }   /* above the panels, so its menu opens over them */
+.cv .topbar .weekday, .cv .topbar .fulldate, .cv .topbar .summary, .cv .topbar .summary b, .cv .topbar .sync-status { color: #fff; text-shadow: 0 1px 8px rgba(8, 14, 34, .45); }
+.cv .topbar .fulldate, .cv .topbar .summary, .cv .topbar .sync-status { color: rgba(255, 255, 255, .9); }
+.cv .topbar .summary .overdue b { color: #ffd2c2; }
+.cv .topbar .version-tag { background: rgba(255, 255, 255, .18); color: #fff; text-shadow: none; }
+.cv .views, .cv .topbar .icon-btn, .cv .topbar .ghost-btn, .cv .topbar .sum-tray, .cv .topbar .streak-chip, .cv .topbar .updated-chip, .cv .topbar .shutdown-pill { background: var(--glass); backdrop-filter: blur(10px); }
+.cv .topbar .icon-btn { border-color: color-mix(in srgb, var(--line) 70%, transparent); }
+
+.cv-mid { flex: 1; min-height: 0; display: flex; gap: 18px; padding: 0 28px 14px; }
+.cv-left { flex: 0 0 clamp(340px, 24vw, 460px); min-height: 0; display: flex; }
+.cv-left .tasks-pane { flex: 1; }
+.cv-right { flex: 0 0 clamp(300px, 20vw, 400px); min-height: 0; overflow-y: auto; }
+.cv .tasks-pane, .cv .timeline-pane, .cv-panel { background: var(--glass); backdrop-filter: blur(12px); border: 1px solid color-mix(in srgb, var(--line) 70%, transparent); border-radius: 18px; box-shadow: var(--shadow); }
+.cv-bottom { flex: 0 0 var(--strip); height: var(--strip); min-height: 0; display: flex; padding: 0 28px 20px; }
+.cv-bottom > * { flex: 1; min-width: 0; min-height: 0; }
+.cv-bottom.week .week-view { padding: 16px 20px 20px; background: var(--glass); backdrop-filter: blur(12px); border: 1px solid color-mix(in srgb, var(--line) 70%, transparent); border-radius: 18px; }
+.cv .hz-sky { opacity: .7; }
+
+/* The constellations: in the open sky between the two panels (all of it at the Sky zoom). */
+.cv-sky { position: relative; flex: 1; min-width: 0; min-height: 0; user-select: none; }
+.cv-sky-svg { display: block; width: 100%; height: 100%; overflow: visible; }
+.cvs-con { cursor: pointer; transition: opacity .25s; }
+.cvs-con:hover { opacity: 1 !important; }
+.cvs-hit, .cvs-star .hit { fill: transparent; }
+.cvs-link { stroke: var(--c); stroke-opacity: .45; }
+.cvs-link.lit { stroke-opacity: .9; }
+.cvs-star .core { fill: none; stroke: var(--c); }
+.cvs-star.lit .core { fill: #f4f6ff; stroke: none; }
+.cvs-star .halo { fill: #fff; opacity: .1; }
+.cvs-star .ring { fill: none; stroke: #f0b75a; }
+.cvs-name { fill: #f2f4fb; font-weight: 600; font-family: var(--sans); paint-order: stroke; stroke: rgba(8, 14, 34, .35); stroke-width: 3px; }
+.cvs-sub { fill: #c3cbe0; font-family: var(--sans); }
+.cvs-con.late .cvs-sub { fill: #ffc98a; }
+.cvs-milky line { stroke: #f3e3bf; stroke-opacity: .5; }
+.cvs-milky circle { fill: #f3e3bf; }
+.cvs-region { fill: #fff; font-weight: 600; font-family: var(--sans); cursor: pointer; paint-order: stroke; stroke: rgba(8, 14, 34, .4); stroke-width: 3px; }
+.cvs-region:hover { text-decoration: underline; }
+/* By day the same constellations are drawn like a star chart: dark lines in the project's colour, white stars with a dark rim. */
+.cv[data-lit] .cvs-link { stroke: color-mix(in srgb, var(--c) 45%, #0b1530); stroke-opacity: .75; }
+.cv[data-lit] .cvs-link.lit { stroke-opacity: 1; }
+.cv[data-lit] .cvs-star .core { stroke: color-mix(in srgb, var(--c) 45%, #0b1530); }
+.cv[data-lit] .cvs-star.lit .core { fill: #fff; stroke: #16224a; }
+.cv[data-lit] .cvs-star .halo { opacity: .55; }
+.cv[data-lit] .cvs-star .ring { stroke: #a86200; }
+.cv[data-lit] .cvs-name { fill: #101a36; stroke: rgba(255, 255, 255, .55); }
+.cv[data-lit] .cvs-sub { fill: #27365c; }
+.cv[data-lit] .cvs-con.late .cvs-sub { fill: #8a4d06; }
+.cv[data-lit] .cvs-milky line, .cv[data-lit] .cvs-milky circle { stroke: #3d4a70; fill: #3d4a70; }
+.cv .sky-card { bottom: 12px; }
+
+/* The record panel. */
+.cv-panel { padding: 16px 18px; display: flex; flex-direction: column; gap: 12px; }
+.rec-head { display: flex; align-items: center; justify-content: space-between; }
+.rec-head h3 { margin: 0; font-size: 12px; font-weight: 600; color: var(--ink-2); }
+.link-btn { border: 0; background: none; padding: 4px 2px; color: var(--accent); font: 600 13px var(--sans); cursor: pointer; }
+.link-btn:hover { text-decoration: underline; }
+.rec-says { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.rec-says li { font-size: 14.5px; line-height: 1.4; color: var(--ink); }
+.rec-wait, .rec-cap, .rec-warn { margin: 0; font-size: 13.5px; line-height: 1.4; color: var(--ink-2); }
+.rec-cap b { color: var(--ink); }
+.rec-warn { color: var(--late); }
+.rec-week { display: flex; flex-direction: column; gap: 6px; }
+.rec-week-title { font-size: 12px; font-weight: 600; color: var(--ink-2); }
+.rec-bars { display: flex; gap: 6px; height: 64px; }
+.rec-day { flex: 1; display: flex; flex-direction: column; gap: 4px; align-items: stretch; }
+.rec-track { flex: 1; display: flex; align-items: flex-end; border: 1px solid color-mix(in srgb, var(--ink-3) 45%, transparent); border-bottom: 0; border-radius: 4px 4px 0 0; }
+.rec-fill { width: 100%; background: var(--done); border-radius: 3px 3px 0 0; }
+.rec-day span { font-size: 11px; color: var(--ink-3); text-align: center; }
+
+/* Sky zoom: a couple of buttons along the ground. */
+.cv-sky-actions { position: absolute !important; right: 28px; bottom: 22px; display: flex; gap: 8px; }
+.cv-sky-actions .ghost-btn { background: var(--glass); backdrop-filter: blur(10px); }
+
+/* The pull-in panel: the numbers (or the areas), over the right of the canvas. */
+.cv-drawer { position: absolute !important; z-index: 5 !important; top: 12px; right: 12px; bottom: 12px; width: min(1180px, 72vw); display: flex; flex-direction: column;
+  background: color-mix(in srgb, var(--bg) 94%, transparent); backdrop-filter: blur(16px); border: 1px solid var(--line); border-radius: 22px; box-shadow: 0 24px 60px rgba(0, 0, 0, .3); animation: cv-pull .28s var(--ease); }
+@keyframes cv-pull { from { transform: translateX(40px); opacity: 0; } }
+.cv-drawer-head { display: flex; align-items: center; justify-content: space-between; padding: 16px 20px 6px 28px; }
+.cv-drawer-head h2 { margin: 0; font: 650 22px var(--display); }
+.cv-drawer > main { flex: 1; min-height: 0; overflow-y: auto; }
+.cv-drawer .areas-view.side { padding: 0 28px 24px; }
+.cv-drawer .pv-numbers-head h2 { display: none; }
+.cv-drawer .areas-view.side .areas-head h2 { display: none; }
+@media (prefers-reduced-motion: reduce) { .cv-drawer { animation: none; } }

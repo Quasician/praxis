@@ -116,6 +116,14 @@ Praxis is built to be easy on the eyes on a big monitor all day:
 - **Readable type**: Atkinson Hyperlegible for text (designed for legibility) and Bricolage Grotesque for headings, bundled so they work offline.
 - **Calm motion**: finishing a task fills the circle and folds the row away; the focus timer is a ring that fills. If Windows has "Show animations" turned off, Praxis stops animating too.
 
+## One canvas (4.1, preview)
+
+Switch it on under ⋯ → **One canvas (preview)**; switch it off there to go back to the tabs.
+
+The four tabs become one screen. The sky is the backdrop, lit by the real time of day (night, dawn, day, golden hour, dusk) over a mountain landscape, with your projects as constellations in it: by day they're drawn like a star chart, dark lines and white stars, so they still read on a blue sky. Today's list and the Now card sit at the left, **the record** (what Praxis has learned, today's limit, stalled projects, the last seven days) at the right, and your day along the bottom.
+
+**Day, Week and Sky** are zoom levels of the same screen: Week puts the week planner along the bottom, Sky gives the whole screen to your constellations (click an area's name for its details). **Numbers** pulls the full Progress page in from the right; Esc puts it away. In the canvas the sky sets light or dark, so the Theme setting applies to the tabs only.
+
 ## The feedback loop (4.0)
 
 Praxis already kept each day's plan and what got done. 4.0 reads that record in hours and by time of day, plans around it, and asks you once a week what to do about projects that have stopped moving.
@@ -430,5 +438,6 @@ Pushes that don't change the version are only checked, not released.
 - ~~3.6: never rot: offline queue, self-healing days, capture hotkey~~ ✓
 - ~~3.7: rewards: sky events, constellation legends, the Sunday letter, optional sound~~ ✓
 - ~~3.8: finish the theme: sunrise and sunset rituals, ideas as clouds, Areas in the sky, the Horizon clouds over as the day fills~~ ✓
+- ~~4.1: one canvas (preview): the sky as the backdrop by time of day, Day/Week/Sky as zoom levels, the record beside your day~~ ✓
 - ~~4.0: the feedback loop: the record in hours and by time of day, plans that stop at what you finish, the weekly review, fading constellations~~ ✓
 - ~~1.1: morning commit, committed vs. bonus, adaptive plans, Now card, first steps, backlog cleanup, Progress, learning~~ ✓
