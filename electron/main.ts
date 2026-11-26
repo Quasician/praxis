@@ -399,7 +399,7 @@ function startNudger() {
       if (due >= 0) list.unshift(snoozed.splice(due, 1)[0].nudge);
       // You're looking at Praxis already: skip the gentle ones.
       const looking = !!win?.isVisible() && win.isFocused();
-      const next = list.find((n) => !(looking && (n.kind === "heads-up" || n.kind === "time-check")));
+      const next = list.find((n) => !(looking && (n.kind === "heads-up" || n.kind === "time-check" || n.kind === "block-end")));   // the check-in card asks in Praxis
       for (const n of list) for (const k of n.key.split("|")) sent.add(k);   // a reminder can cover several blocks that start together
       if (next) showNudge(next, false);
     } catch (e) { log("nudge tick failed", (e as Error)?.message || e); }
@@ -407,8 +407,9 @@ function startNudger() {
   setTimeout(tick, 5000);
   setInterval(tick, 20_000);
   // Coming back from sleep: check straight away.
-  powerMonitor.on("resume", () => { activeSince = Date.now(); setTimeout(tick, 3000); });
-  powerMonitor.on("unlock-screen", () => { activeSince = Date.now(); setTimeout(tick, 3000); });
+  // Coming back from sleep: catch up with Todoist (4.6) before checking, so a block you ticked on your phone isn't nudged.
+  powerMonitor.on("resume", () => { activeSince = Date.now(); emit("resume"); setTimeout(tick, 5000); });
+  powerMonitor.on("unlock-screen", () => { activeSince = Date.now(); emit("resume"); setTimeout(tick, 5000); });
 }
 
 function showNudge(n: Nudge, test: boolean) {
@@ -483,6 +484,9 @@ function onNudgeAction(action: string, key: string) {
   switch (action) {
     case "start": if (n.taskId) { emit("start-focus", n.taskId); openMini(); } break;
     case "done": if (n.taskId) emit("complete", n.taskId); break;
+    case "block-done": if (n.taskId) emit("block-done", n.taskId); break;
+    case "block-skip": if (n.taskId) emit("block-skip", n.taskId); break;
+    case "block-partly": showWindow(); emit("check-in", n.taskId); break;   // how long you put in is asked in Praxis
     case "more": emit("focus-more"); break;
     case "stop": emit("focus-stop"); break;
     case "later": later(n.kind === "start" ? 10 : 15); break;

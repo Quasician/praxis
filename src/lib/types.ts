@@ -101,6 +101,7 @@ export interface DayRecord {
   energy?: Energy;
   tinyDone?: string[];                      // tasks whose tiny version you did today (counts as done for the day)
   star?: { id: string; prevPriority: number }; // "the one" was raised to p1 in Todoist; put back the next morning
+  actual?: Record<string, import("../domain/actuals").Actual>; // 4.6: how each block went when it ended, by task id
 }
 /** A finished focus session: how long a task really took vs. its estimate. */
 export interface Sample { wp: number; est: number; actual: number; at: string; guess?: number }

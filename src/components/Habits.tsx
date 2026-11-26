@@ -5,6 +5,9 @@ import { plain } from "../lib/text";
 import type { Project, Task } from "../lib/types";
 import type { Slot } from "../domain/nudges";
 import { blockMinutes } from "../lib/tasks";
+import { blockOf } from "../domain/actuals";
+import { plannerCfg } from "../domain/planner";
+import { answerBlock } from "../data/actuals";
 import { completeTask, reconcileSoon, updateConfigFresh } from "../data/actions";
 import { sync, uuid } from "../lib/api";
 import { pendingCount } from "../data/pending";
@@ -266,6 +269,11 @@ export function useDesktopBridge() {
     };
     const find = (e: Event) => todayTasks().find((t) => t.id === (e as CustomEvent<string>).detail);
     const onDone = (e: Event) => { const t = find(e); if (t) completeTask(t); };
+    // 4.6: the "block ended" reminder's buttons. Done counts the planned length; Partly opens the check-in in Praxis.
+    const ended = (e: Event) => { const t = find(e); return t ? blockOf(t) : null; };
+    const onBlockDone = (e: Event) => { const b = ended(e); if (b) answerBlock(b, "done", b.min, plannerCfg(queryClient.getQueryData(qk.config))).catch(() => undefined); };
+    const onBlockSkip = (e: Event) => { const b = ended(e); if (b) answerBlock(b, "skipped", undefined).catch(() => undefined); };
+    const onCheckIn = () => useUi.getState().setView("day");
     const onStart = (e: Event) => {
       const t = find(e);
       if (!t) return;
@@ -275,11 +283,17 @@ export function useDesktopBridge() {
     const onMore = () => updateConfigFresh((c) => (c.focus ? { ...c, focus: { ...c.focus, minutes: Math.ceil((Date.now() - Date.parse(c.focus.startedAt)) / 60_000) + 5 } } : c));
     const onStop = () => updateConfigFresh((c) => ({ ...c, focus: null }));
     window.addEventListener("praxis:complete", onDone);
+    window.addEventListener("praxis:block-done", onBlockDone);
+    window.addEventListener("praxis:block-skip", onBlockSkip);
+    window.addEventListener("praxis:check-in", onCheckIn);
     window.addEventListener("praxis:start-focus", onStart);
     window.addEventListener("praxis:focus-more", onMore);
     window.addEventListener("praxis:focus-stop", onStop);
     return () => {
       window.removeEventListener("praxis:complete", onDone);
+      window.removeEventListener("praxis:block-done", onBlockDone);
+      window.removeEventListener("praxis:block-skip", onBlockSkip);
+      window.removeEventListener("praxis:check-in", onCheckIn);
       window.removeEventListener("praxis:start-focus", onStart);
       window.removeEventListener("praxis:focus-more", onMore);
       window.removeEventListener("praxis:focus-stop", onStop);
