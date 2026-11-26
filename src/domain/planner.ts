@@ -3,7 +3,7 @@
 //   2. Candidates = today's/overdue tasks without a time + the next step of the nearest milestones.
 //   3. Rank by willpower (@deep > unlabelled > @light) + a boost for tasks that slipped before,
 //      then priority and overdue age; the hardest work gets the earliest slots.
-import { ceilTo, minOfDay, parseDue, sameDay, startOfToday, toMin } from "../lib/dates";
+import { ceilTo, minOfDay, parseDue, sameDay, startOfToday, toMin, ymd } from "../lib/dates";
 import { isMilestone, willpower } from "../lib/tasks";
 import type { CalEvent, Config, Energy, PlannerSettings, Task } from "../lib/types";
 import { layoutBlocks, visibleEvents } from "./layout";
@@ -192,4 +192,23 @@ export function buildPlan(input: PlanInput): Plan {
   }
   items.sort((x, y) => x.start - y.start);
   return { items, unplaced, freeMin, ...(weakAll ? { weakAll } : {}) };
+}
+
+/**
+ * 4.6: which planned blocks still make sense to save, given a fresh look at their tasks (null: couldn't look, keep them all).
+ * Out: a task that's gone (finished or deleted), and one whose date changed to after today since the plan was drafted (a
+ * repeating task ticked off elsewhere has moved to its next date; saving would pull that one back). The kept blocks carry the
+ * fresh task, so the time is written onto what Todoist holds now.
+ */
+export function stillToPlan<T extends { task: Task }>(items: T[], fresh: Task[] | null, now: Date): { kept: T[]; dropped: T[] } {
+  if (!fresh) return { kept: items, dropped: [] };
+  const byId = new Map(fresh.filter((t) => !t.checked && !t.is_deleted).map((t) => [t.id, t]));
+  const today = ymd(now), kept: T[] = [], dropped: T[] = [];
+  for (const it of items) {
+    const t = byId.get(it.task.id);
+    const was = it.task.due?.date, d = t ? parseDue(t.due) : null;
+    if (!t || (d && t.due?.date !== was && ymd(d.d) > today)) dropped.push(it);
+    else kept.push({ ...it, task: t });
+  }
+  return { kept, dropped };
 }

@@ -57,6 +57,7 @@ export function startFakeTodoist(port, now = new Date()) {
       if (p === "/projects") return res.end(page(projects));
       if (p === "/tasks/filter") return res.end(page(tasks.filter((t) => t.due)));
       if (p === "/tasks/completed/by_completion_date") return res.end(JSON.stringify({ items: completed, next_cursor: null }));
+      if (p === "/tasks" && u.searchParams.get("ids")) { const ids = new Set(u.searchParams.get("ids").split(",")); return res.end(page(tasks.filter((t) => ids.has(t.id)))); }
       if (p === "/tasks") return res.end(page(u.searchParams.get("project_id") ? tasks.filter((t) => t.project_id === u.searchParams.get("project_id")) : tasks));
       if (p === "/activities") {
         const type = u.searchParams.get("event_type"), lim = Number(u.searchParams.get("limit")) || 100;

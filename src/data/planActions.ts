@@ -2,7 +2,7 @@
 import { itemUpdate, sync } from "../lib/api";
 import { timedDue } from "../lib/tasks";
 import type { Config, Task } from "../lib/types";
-import { buildPlan, plannerCfg } from "../domain/planner";
+import { buildPlan, plannerCfg, stillToPlan, type PlanItem } from "../domain/planner";
 import { effectiveFill, learn, recordPlan } from "../domain/progress";
 import { bands, capacity, recordDays, weakHours } from "../domain/record";
 import { willpower } from "../lib/tasks";
@@ -10,7 +10,8 @@ import { ymd } from "../lib/dates";
 import { plain } from "../lib/text";
 import { updateConfig } from "./actions";
 import { triageItems } from "../domain/triage";
-import { fetchCompleted, queryClient, qk } from "./queries";
+import { fetchCompleted, queryClient, qk, refreshTodoist } from "./queries";
+
 import { reconcileSoon } from "./actions";
 import { toast, useUi } from "../state/ui";
 import { fetchAll } from "../lib/api";
@@ -96,10 +97,30 @@ export function adjustProposal(idx: number, target: { start: number; dur: number
   }
 }
 
-/** Saves the plan's times to Todoist and remembers what was planned (and committed) today. */
-export async function acceptPlan(opts: { committed?: boolean } = {}) {
+/**
+ * 4.6: a plan can sit open for a while, and the tasks in it can change elsewhere meanwhile. Just before saving, look again
+ * and leave out a block whose task was finished or deleted, or moved past today (a repeating task ticked off on your phone
+ * has moved to its next date: saving the block would pull that next one back to today). The rest carry the fresh task.
+ * Couldn't look (offline)? Keep the plan as it is.
+ */
+export async function freshenPlan(): Promise<{ kept: PlanItem[]; dropped: PlanItem[] }> {
   const items = useUi.getState().plan.items.slice();
-  if (!items.length) return discardPlan();
+  if (!items.length) return { kept: [], dropped: [] };
+  let fresh: Task[] | null = null;
+  try { fresh = await fetchAll<Task>(`/tasks?ids=${encodeURIComponent(items.map((it) => it.task.id).join(","))}`); } catch { fresh = null; }
+  const { kept, dropped } = stillToPlan(items, fresh, new Date());
+  if (dropped.length) useUi.getState().setPlan({ items: kept });
+  return { kept, dropped };
+}
+
+/** Saves the plan's times to Todoist and remembers what was planned (and committed) today. Returns what was saved. */
+export async function acceptPlan(opts: { committed?: boolean } = {}): Promise<PlanItem[]> {
+  const { kept: items, dropped } = await freshenPlan();
+  if (dropped.length) {
+    toast(`Left out ${dropped.length === 1 ? `“${plain(dropped[0].task.content).slice(0, 50)}”` : `${dropped.length} blocks`}: done or moved in Todoist since the plan was made.`);
+    refreshTodoist();
+  }
+  if (!items.length) { discardPlan(); return []; }
   const cfg = plannerCfg(queryClient.getQueryData<Config>(qk.config));
   const day = ymd(new Date());
   updateConfig((c) => ({
@@ -117,7 +138,8 @@ export async function acceptPlan(opts: { committed?: boolean } = {}) {
       : `Planned ${commands.length} block${commands.length > 1 ? "s" : ""}. Your phone will remind you as each one starts.`);
   } catch (e) {
     toast(`Couldn't save the plan: ${(e as Error).message}`);
-    return;
+    return [];
   }
   reconcileSoon(0);
+  return items;
 }

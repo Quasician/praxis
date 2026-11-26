@@ -123,9 +123,15 @@ try {
     await page.click('[data-view="day"]'); await tick(500);
     await page.keyboard.press("m"); await tick(3000);
     await page.waitForSelector('.ritual-panel[data-ritual="morning"] #mc-commit:not([disabled])');
+    // 4.6: one of the planned tasks gets ticked off "on your phone" while the plan is open: the commit must leave it alone.
+    const ids = await page.$$eval('.ritual-panel[data-ritual="morning"] .mc-row', (els) => els.map((e) => e.dataset.id));
+    if (ids.length < 2) throw new Error(`only ${ids.length} block in the plan`);
+    const gone = ids[ids.length - 1];
+    fake.completeOutside(gone);
     await page.click("#mc-commit"); await tick(3000);
     await waitFor(async () => (await config()).history?.[today]?.committedAt, "today's commitment in the settings");
     if (!fake.sent.some((c) => c.type === "item_update" && c.args?.due?.date?.startsWith(today))) throw new Error("no block was sent to Todoist");
+    if (fake.sent.some((c) => c.type === "item_update" && c.args?.id === gone)) throw new Error("the commit rescheduled a task finished meanwhile");
   });
   await check("the weekly review sets a stalled project down", async () => {
     await page.click("#menu-btn"); await page.click("#review-btn"); await tick(2000);

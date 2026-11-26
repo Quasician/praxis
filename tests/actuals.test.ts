@@ -65,3 +65,18 @@ test("reminder: a block that just ended asks how it went, once; a timer on it or
   assert.equal(dueNudges({ ...base, focus: { taskId: "a", content: "Write", startedAt: new Date(+at(14, 0)).toISOString(), minutes: 60 } }, new Set()).filter((x) => x.kind === "block-end").length, 0);
   assert.equal(dueNudges({ ...base, now: at(15, 10) }, new Set()).filter((x) => x.kind === "block-end").length, 0);   // only in its first minutes
 });
+
+test("committing a plan leaves out a task finished or moved on elsewhere since it was drafted", async () => {
+  const { stillToPlan } = await import("../src/domain/planner");
+  const now = at(15, 0), today = ymd(now), next = ymd(addDays(startOfToday(), 21));
+  const rec = (id: string, date: string, recurring = false): Task => ({ id, content: id, project_id: "p", priority: 1, due: { date, is_recurring: recurring } });
+  const items = [{ task: rec("groceries", today, true) }, { task: rec("done", today) }, { task: rec("same", today) }, { task: rec("undated", "") }];
+  items[3].task.due = null;
+  const fresh = [rec("groceries", next, true), { ...rec("same", today), content: "same, renamed" }, rec("undated", "")];
+  fresh[2].due = null;
+  const { kept, dropped } = stillToPlan(items, fresh, now);
+  assert.deepEqual(dropped.map((x) => x.task.id), ["groceries", "done"]);
+  assert.deepEqual(kept.map((x) => x.task.id), ["same", "undated"]);
+  assert.equal(kept[0].task.content, "same, renamed");
+  assert.equal(stillToPlan(items, null, now).kept.length, 4);   // couldn't look: keep the plan
+});

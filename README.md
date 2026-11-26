@@ -122,7 +122,9 @@ Praxis is built to be easy on the eyes on a big monitor all day:
 - **Done today.** At the bottom of Today, what you finished today, here or anywhere else, ticked and greyed (click the heading to fold it away).
 - **Better actuals.** When a planned block ends, a small card at the top of Today asks how it went: **Done** (ticks it off in Todoist), **Partly** or **Didn't happen**, then how long it really took (or how long you put in). The desktop reminder asks too (⋯ → Reminders → "When it ends, ask how it went"). A done block's real length teaches Praxis how long that kind of task takes, like a timed focus session, and the record counts the real hours, including the time you put into a block you only partly did.
 
-The release checks now tick a task off "on your phone" and wait for Praxis to show it as done, and answer a block's check-in.
+- **Plans don't undo your phone.** Just before a plan is saved (Accept, or Commit in the morning ritual), Praxis looks at its tasks again and leaves out any that were finished, deleted or moved past today in the meantime. Before, a repeating task ticked off on your phone while the plan was open got its next date pulled back to today.
+
+The release checks now tick a task off "on your phone" and wait for Praxis to show it as done, tick one off while the morning plan is open and make sure the commit leaves it alone, and answer a block's check-in.
 
 ## Overlapping blocks (4.5)
 

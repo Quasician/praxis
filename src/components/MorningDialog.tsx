@@ -79,8 +79,8 @@ function MorningBody() {
   const commit = async () => {
     setPlan({ items: items.map((it) => ({ ...it, star: it.task.id === theOne })) });
     closeDialog("morning");
-    await acceptPlan({ committed: true });
-    const star = items.find((it) => it.task.id === theOne);
+    const saved = await acceptPlan({ committed: true });   // leaves out what was done or moved in Todoist meanwhile
+    const star = saved.find((it) => it.task.id === theOne);
     await starOnPhone(star?.task).catch(() => undefined);
     if (rest.length && spreadRest) {
       const days = Array.from({ length: 6 }, (_, i) => addDays(startOfToday(), i + 1));
