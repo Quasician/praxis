@@ -21,17 +21,22 @@ export const qk = {
 };
 
 const open = (ts: Task[]) => ts.filter((t) => !t.checked && !t.is_deleted);
-const SYNC_EVERY = 120_000;
+// 4.6: the day keeps in step with Todoist on its own. Everything refreshes every two minutes, also while the window is
+// hidden behind others or minimised (the desktop app shows the strip and reminders from it), and a cheap look at Todoist's
+// activity log every 30 seconds catches a change made elsewhere (a tick on your phone or the web) and refreshes at once.
+export const SYNC_EVERY = 120_000;
+export const WATCH_EVERY = 30_000;
+const bg = { refetchInterval: SYNC_EVERY, refetchIntervalInBackground: true } as const;
 
 export const useStatus = () => useQuery({ queryKey: qk.status, queryFn: () => api<{ connected: boolean; claude?: boolean; via?: "api" | "cli" | null }>("/api/status"), staleTime: Infinity, refetchOnWindowFocus: false });
 
 export const useProjects = (enabled: boolean) => useQuery({
-  queryKey: qk.projects, enabled, refetchInterval: SYNC_EVERY,
+  queryKey: qk.projects, enabled, ...bg,
   queryFn: () => fetchAll<Project>("/projects"),
 });
 
 export const useToday = (enabled: boolean) => useQuery({
-  queryKey: qk.today, enabled, refetchInterval: SYNC_EVERY,
+  queryKey: qk.today, enabled, ...bg,
   // Also ask for tomorrow, then keep what's due by tonight in *your* time: a time pinned to a time zone is
   // stored in UTC, so Todoist can file this evening's 6 PM under tomorrow.
   queryFn: async () => {
@@ -42,7 +47,7 @@ export const useToday = (enabled: boolean) => useQuery({
 });
 
 export const useInbox = (inboxId: string | undefined) => useQuery({
-  queryKey: qk.inbox, enabled: !!inboxId, refetchInterval: SYNC_EVERY,
+  queryKey: qk.inbox, enabled: !!inboxId, ...bg,
   queryFn: async () => open(await fetchAll<Task>(`/tasks?project_id=${encodeURIComponent(inboxId!)}`)),
 });
 
@@ -52,7 +57,7 @@ export interface EventsResult { events: CalEvent[]; errors: { name: string; erro
 export function useEvents(enabled: boolean, from = startOfToday(), to = addDays(startOfToday(), 1)) {
   const f = from.toISOString(), t = to.toISOString();
   return useQuery({
-    queryKey: qk.events(f, t), enabled, refetchInterval: SYNC_EVERY,
+    queryKey: qk.events(f, t), enabled, ...bg,
     queryFn: async () => {
       const force = calendarRefresh.force; calendarRefresh.force = false;
       try {
@@ -67,7 +72,7 @@ export function useEvents(enabled: boolean, from = startOfToday(), to = addDays(
 export const useConfig = (enabled: boolean) => useQuery({ queryKey: qk.config, enabled, queryFn: () => api<Config>("/api/config"), staleTime: Infinity, refetchOnWindowFocus: false });
 
 export const useActive = (enabled: boolean) => useQuery({
-  queryKey: qk.active, enabled, refetchInterval: 10 * 60_000, staleTime: 60_000,
+  queryKey: qk.active, enabled, refetchInterval: 10 * 60_000, refetchIntervalInBackground: true, staleTime: 60_000,
   queryFn: async () => open(await fetchAll<Task>("/tasks")),
 });
 
@@ -79,7 +84,8 @@ export async function fetchCompleted(): Promise<Task[]> {
     return [...done, ...(await recurringCompletions(done))];
   }
 
-export const useCompleted = (enabled: boolean) => useQuery({ queryKey: qk.completed, enabled, staleTime: 60_000, queryFn: fetchCompleted });
+// What got done feeds "Done today", the record, the streak and the sky, so it keeps up too (a tick in Todoist shows here).
+export const useCompleted = (enabled: boolean) => useQuery({ queryKey: qk.completed, enabled, staleTime: 60_000, ...bg, queryFn: fetchCompleted });
 
 export const projectMap = (ps: Project[] | undefined) => new Map((ps || []).map((p) => [p.id, p]));
 export const inboxOf = (ps: Project[] | undefined) => (ps || []).find((p) => p.inbox_project || p.is_inbox_project) || (ps || []).find((p) => p.name === "Inbox");
@@ -88,6 +94,51 @@ export const inboxOf = (ps: Project[] | undefined) => (ps || []).find((p) => p.i
 export function refreshAll(force = false) {
   if (force) calendarRefresh.force = true;
   return Promise.all([qk.projects, qk.today, qk.inbox, ["events"]].map((k) => queryClient.invalidateQueries({ queryKey: k })));
+}
+
+/** Refetch what Todoist holds (not the calendars): the day, the Inbox, all open tasks and what got done. */
+export const refreshTodoist = () =>
+  Promise.all([qk.projects, qk.today, qk.inbox, qk.active, qk.completed].map((k) => queryClient.invalidateQueries({ queryKey: k })));
+
+/** The newest entry in Todoist's activity log, as a short mark ("" when there's none or the plan has no log). */
+export async function latestActivity(): Promise<string | null> {
+  try {
+    const r = await api<{ results?: { id?: string; event_date?: string; object_id?: string; event_type?: string }[] }>("/api/todoist/activities?limit=1");
+    const e = r?.results?.[0];
+    return e ? `${e.id ?? ""}:${e.event_date ?? ""}:${e.object_id ?? ""}:${e.event_type ?? ""}` : "";
+  } catch { return null; }
+}
+
+/**
+ * Keeps the day in step with Todoist (4.6): every 30 seconds, also in the background, it looks at the newest activity in
+ * Todoist and refreshes when anything changed, wherever the change was made. It also refreshes when the computer wakes,
+ * the network comes back or the window is shown again.
+ */
+export function startTodoistWatch(): () => void {
+  let last: string | null | undefined, busy = false;
+  const look = async () => {
+    if (busy) return;
+    busy = true;
+    try {
+      const mark = await latestActivity();
+      if (mark === null) return;                     // couldn't ask: the 2-minute refresh still runs
+      if (last !== undefined && mark !== last) await refreshTodoist();
+      last = mark;
+    } finally { busy = false; }
+  };
+  const now = () => { refreshTodoist(); look(); };
+  const onVisible = () => { if (document.visibilityState === "visible") now(); };
+  look();
+  const id = window.setInterval(look, WATCH_EVERY);
+  window.addEventListener("online", now);
+  window.addEventListener("praxis:resume", now);
+  document.addEventListener("visibilitychange", onVisible);
+  return () => {
+    window.clearInterval(id);
+    window.removeEventListener("online", now);
+    window.removeEventListener("praxis:resume", now);
+    document.removeEventListener("visibilitychange", onVisible);
+  };
 }
 
 interface Activity { object_id: string; event_date: string; parent_project_id?: string; extra_data?: { content?: string } }

@@ -7,7 +7,7 @@ import { skyAt } from "./useAppearance";
 // everything (full-screen apps included) without taking keyboard focus.
 
 const LABEL: Record<NudgeKind, string> = {
-  start: "Starting now", "heads-up": "Coming up", "focus-end": "Focus timer", shutdown: "Evening",
+  start: "Starting now", "heads-up": "Coming up", "block-end": "Block ended", "focus-end": "Focus timer", shutdown: "Evening",
   "wind-down": "Evening", "time-check": "Time check", test: "Praxis",
 };
 
@@ -15,6 +15,7 @@ type Btn = { action: string; label: string; primary?: boolean };
 const BUTTONS: Record<NudgeKind, Btn[]> = {
   start: [{ action: "start", label: "Start focus", primary: true }, { action: "done", label: "Already done" }, { action: "later", label: "In 10 min" }],
   "heads-up": [{ action: "dismiss", label: "Got it", primary: true }],
+  "block-end": [{ action: "block-done", label: "Done", primary: true }, { action: "block-partly", label: "Partly" }, { action: "block-skip", label: "Didn't happen" }],
   "focus-end": [{ action: "done", label: "Done", primary: true }, { action: "more", label: "+5 min" }, { action: "stop", label: "Stop timer" }],
   shutdown: [{ action: "shutdown", label: "Shut down now", primary: true }, { action: "later", label: "In 15 min" }],
   "wind-down": [{ action: "dismiss", label: "Winding down", primary: true }, { action: "later", label: "In 15 min" }],

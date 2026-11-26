@@ -7,7 +7,7 @@ import { plannerCfg } from "../domain/planner";
 import { observeTasks } from "../domain/triage";
 import { ensureConfig, updateConfig } from "../data/actions";
 import { acceptPlan, computePlan, proposePlan } from "../data/planActions";
-import { queryClient, qk, refreshAll, useActive } from "../data/queries";
+import { queryClient, qk, refreshAll, startTodoistWatch, useActive } from "../data/queries";
 import { useData } from "../data/useData";
 import { toast, useUi } from "../state/ui";
 import { AreasView } from "./AreasView";
@@ -109,6 +109,8 @@ function useBackgroundJobs() {
   const { todayQ, projectsQ, configQ, eventsQ, connected } = useData();
   const activeQ = useActive(connected); // full task list every 10 minutes (catches postponements made on your phone)
   const weeklyStarted = useWeeklyAuto();
+  // 4.6: keep the day in step with Todoist, also while the window is hidden.
+  useEffect(() => (connected ? startTodoistWatch() : undefined), [connected]);
 
   // First-run settings (areas guessed from project names).
   useEffect(() => { if (configQ.isSuccess && projectsQ.isSuccess) ensureConfig().catch(() => undefined); }, [configQ.isSuccess, projectsQ.isSuccess]);

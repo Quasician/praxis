@@ -116,6 +116,14 @@ Praxis is built to be easy on the eyes on a big monitor all day:
 - **Readable type**: Atkinson Hyperlegible for text (designed for legibility) and Bricolage Grotesque for headings, bundled so they work offline.
 - **Calm motion**: finishing a task fills the circle and folds the row away; the focus timer is a ring that fills. If Windows has "Show animations" turned off, Praxis stops animating too.
 
+## In step with Todoist, and how each block really went (4.6)
+
+- **Real-time sync.** Praxis looks at Todoist's activity log every 30 seconds and refreshes the moment anything changed, wherever you changed it (a tick on your phone or on the web shows here within a minute). Everything also refreshes every two minutes, now even while the window is hidden behind others or minimised, and straight away when the computer wakes, the network comes back or you bring the window up.
+- **Done today.** At the bottom of Today, what you finished today, here or anywhere else, ticked and greyed (click the heading to fold it away).
+- **Better actuals.** When a planned block ends, a small card at the top of Today asks how it went: **Done** (ticks it off in Todoist), **Partly** or **Didn't happen**, then how long it really took (or how long you put in). The desktop reminder asks too (⋯ → Reminders → "When it ends, ask how it went"). A done block's real length teaches Praxis how long that kind of task takes, like a timed focus session, and the record counts the real hours, including the time you put into a block you only partly did.
+
+The release checks now tick a task off "on your phone" and wait for Praxis to show it as done, and answer a block's check-in.
+
 ## Overlapping blocks (4.5)
 
 Tasks and events that overlap now show clearly everywhere:

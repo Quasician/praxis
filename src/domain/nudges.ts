@@ -4,6 +4,7 @@
 export interface Reminders {
   blocks: boolean;          // when a planned block starts
   headsUp: number;          // minutes of warning before a block (0 = none)
+  blockEnd: boolean;        // 4.6: when a planned block ends, ask how it went
   focusEnd: boolean;        // when a focus timer runs out
   shutdown: boolean;        // at the shut-down time
   windDown: boolean;        // at the end of your day
@@ -13,7 +14,7 @@ export interface Reminders {
 }
 
 export const REMINDER_DEFAULTS: Reminders = {
-  blocks: true, headsUp: 5, focusEnd: true, shutdown: true, windDown: true, timeChecks: 90, style: "overlay", sound: true,
+  blocks: true, headsUp: 5, blockEnd: true, focusEnd: true, shutdown: true, windDown: true, timeChecks: 90, style: "overlay", sound: true,
 };
 
 export const reminderCfg = (r?: Partial<Reminders> | null): Reminders => ({ ...REMINDER_DEFAULTS, ...(r || {}) });
@@ -21,7 +22,7 @@ export const reminderCfg = (r?: Partial<Reminders> | null): Reminders => ({ ...R
 /** A timed task on today's timeline (epoch ms). */
 export interface Slot { id: string; title: string; start: number; end: number }
 
-export type NudgeKind = "start" | "heads-up" | "focus-end" | "shutdown" | "wind-down" | "time-check" | "test";
+export type NudgeKind = "start" | "heads-up" | "block-end" | "focus-end" | "shutdown" | "wind-down" | "time-check" | "test";
 
 export interface Nudge {
   key: string;
@@ -85,6 +86,17 @@ export function dueNudges(input: NudgeInput, sent: Set<string>): Nudge[] {
       const [s, ...rest] = soon, left = Math.max(1, Math.ceil((s.start - t) / MIN));
       push({ key: soon.map((x) => `heads-up:${x.id}:${x.start}`).join("|"), kind: "heads-up", title: title(soon),
         body: `Starts in ${mins(left)}, at ${clockText(s.start)}. Time to find a stopping point.${rest.length ? ` Then: ${rest.map((x) => `${x.title} at ${clockText(x.start)}`).join(", ")}.` : ""}`, at: s.start, taskId: s.id, sticky: false });
+    }
+  }
+
+  // 4.6: a block that just ended asks how it went (unless a focus timer is on it: its own reminder asks). A block that ends
+  // as another starts gives way to the start; the check-in card in Praxis still asks.
+  if (r.blocks && r.blockEnd) {
+    const ended = slots.filter((s) => t >= s.end && t < s.end + START_GRACE && s.id !== input.focus?.taskId && !sent.has(`end:${s.id}:${s.end}`));
+    if (ended.length) {
+      const s = ended[0];
+      push({ key: `end:${s.id}:${s.end}`, kind: "block-end", title: s.title,
+        body: `Your block ended at ${clockText(s.end)}. How did it go?${ended.length > 1 ? ` (${ended.length - 1} more ended too: answer them in Praxis.)` : ""}`, at: s.end, taskId: s.id, sticky: true });
     }
   }
 

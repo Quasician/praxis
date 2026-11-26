@@ -8,6 +8,8 @@ import type { Task } from "../lib/types";
 import { completeTask, quickAdd } from "../data/actions";
 import { useCommitted, useData } from "../data/useData";
 import { NowCard } from "./NowCard";
+import { CheckInCard } from "./CheckIn";
+import { useCompleted } from "../data/queries";
 import { updateConfig } from "../data/actions";
 import { useUi } from "../state/ui";
 import { startDrag } from "./drag";
@@ -15,7 +17,8 @@ import { startDrag } from "./drag";
 type Ctx = "overdue" | "today" | "inbox";
 
 export function TasksPane() {
-  const { today, inbox, trayIds, loading, config } = useData();
+  const { today, inbox, trayIds, loading, config, connected } = useData();
+  const completed = useCompleted(connected).data;
   const { tab, setTab, project, openDialog } = useUi();
   const { overdue, today: todayList } = useMemo(() => splitToday(today.filter((t) => !trayIds.has(t.id))), [today, trayIds]);
   const source = tab === "today" ? [...overdue, ...todayList] : inbox;
@@ -37,6 +40,7 @@ export function TasksPane() {
   return (
     <section className="tasks-pane">
       <NowCard />
+      <CheckInCard />
       <HealNoteCard />
       <nav className="tabs" role="tablist">
         <button role="tab" data-tab="today" className={`tab ${tab === "today" ? "active" : ""}`} onClick={() => setTab("today")}>
@@ -66,6 +70,7 @@ export function TasksPane() {
               {!overdue.filter(keep).length && !todayList.filter(keep).length && (
                 <div className="empty"><div className="big">All clear.</div>Nothing due today. Enjoy it, or pull something from your Inbox.</div>
               )}
+              <DoneToday tasks={doneToday(completed, today).filter(keep)} />
             </>
           ) : (() => {
             const items = sortTasks(inbox.filter(keep), "inbox");
@@ -106,6 +111,35 @@ function Chips({ tasks }: { tasks: Task[] }) {
         );
       })}
     </div>
+  );
+}
+
+/** What you finished today, here or anywhere else (a tick on your phone shows up within a minute). Newest first. */
+function doneToday(completed: Task[] | undefined, open: Task[]): Task[] {
+  const now = new Date(), still = new Set(open.map((t) => t.id)), seen = new Set<string>();
+  return (completed || [])
+    .filter((t) => t.completed_at && sameDay(new Date(t.completed_at), now) && !still.has(t.id))
+    .sort((a, b) => Date.parse(b.completed_at!) - Date.parse(a.completed_at!))
+    .filter((t) => (seen.has(t.id) ? false : (seen.add(t.id), true)));
+}
+
+const DONE_OPEN = "praxis.done.open";
+function DoneToday({ tasks }: { tasks: Task[] }) {
+  const [open, setOpen] = useState(() => { try { return localStorage.getItem(DONE_OPEN) !== "0"; } catch { return true; } });
+  if (!tasks.length) return null;
+  return (
+    <details className="done-today" id="done-today" open={open} onToggle={(e) => { const o = (e.currentTarget as HTMLDetailsElement).open; setOpen(o); try { localStorage.setItem(DONE_OPEN, o ? "1" : "0"); } catch { /* fine */ } }}>
+      <summary className="group-title">Done today <span className="n">{tasks.length}</span></summary>
+      <ul className="tasks done-list">
+        {tasks.map((t) => (
+          <li key={t.id} className="done-row" data-id={t.id}>
+            <span className="done-check" aria-hidden>✓</span>
+            <span className="done-title"><Inline text={t.content} /></span>
+            <span className="done-at">{fmtTime(new Date(t.completed_at!))}</span>
+          </li>
+        ))}
+      </ul>
+    </details>
   );
 }
 

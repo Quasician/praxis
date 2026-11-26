@@ -47,6 +47,7 @@ function Body() {
             <option value={0}>no heads-up</option><option value={2}>2 min before</option><option value={5}>5 min before</option><option value={10}>10 min before</option><option value={15}>15 min before</option>
           </select>
         </label>
+        <label className={`rem-sub ${r.blocks ? "" : "off"}`}><input type="checkbox" id="rem-blockend" checked={r.blockEnd} disabled={!r.blocks} onChange={(e) => set("blockEnd", e.target.checked)} /> When it ends, ask how it went</label>
         <label className="switch-row"><input type="checkbox" id="rem-focus" checked={r.focusEnd} onChange={(e) => set("focusEnd", e.target.checked)} /> <span>When a focus timer runs out</span></label>
         <label className="switch-row"><input type="checkbox" id="rem-shutdown" checked={r.shutdown} onChange={(e) => set("shutdown", e.target.checked)} /> <span>Shut down the day at</span>
           <input type="time" id="rem-shutdown-at" step={900} value={shutdownAt} onChange={(e) => setShutdownAt(e.target.value)} /></label>

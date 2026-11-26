@@ -4,6 +4,7 @@
 import { addDays, fmtSpan, startOfToday, ymd } from "../lib/dates";
 import { DEFAULT_BLOCK } from "../lib/tasks";
 import type { Config, PlannedItem, PlannerSettings, Task } from "../lib/types";
+import { actualMinutes } from "./actuals";
 
 const key = (id: string, day: string) => `${id}@${day}`;
 const median = (xs: number[]) => { const s = [...xs].sort((a, b) => a - b), m = Math.floor(s.length / 2); return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2; };
@@ -13,7 +14,8 @@ export interface RecordDay { day: string; weekday: number; planned: number; done
 
 /**
  * One line per day that had a plan, oldest first. A block's length is what the plan recorded; for plans made before 4.0
- * (no length recorded) it is the task's duration in Todoist, else the default block.
+ * (no length recorded) it is the task's duration in Todoist, else the default block. 4.6: when you said how long a block
+ * really took (the check-in when it ends), the hours done use that, and a block you partly did counts the minutes you put in.
  */
 export function recordDays(config: Config | undefined, completed: Task[], active: Task[] = [], days = 56, includeToday = false): RecordDay[] {
   const history = config?.history || {};
@@ -29,9 +31,10 @@ export function recordDays(config: Config | undefined, completed: Task[], active
     const r: RecordDay = { day, weekday: d.getDay(), planned: 0, done: 0, plannedMin: 0, doneMin: 0, committed: 0, committedDone: 0 };
     for (const p of rec.planned) {
       const min = p.min ?? minutesOfTask(byId.get(p.id)) ?? DEFAULT_BLOCK;
-      const ok = done.has(key(p.id, day)) || tiny.has(p.id);
+      const ok = done.has(key(p.id, day)) || tiny.has(p.id), real = actualMinutes(rec, p.id);
       r.planned++; r.plannedMin += min;
-      if (ok) { r.done++; r.doneMin += min; }
+      if (ok) { r.done++; r.doneMin += real ?? min; }
+      else if (real != null) r.doneMin += Math.min(real, min);   // partly done: the time you put in
       if (p.committed) { r.committed++; if (ok) r.committedDone++; }
     }
     out.push(r);

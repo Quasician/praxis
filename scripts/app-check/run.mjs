@@ -88,6 +88,25 @@ try {
     await page.goto(BASE); await page.waitForSelector("#canvas"); await tick(3000);
     await waitFor(async () => (await page.locator("#list li.task").count()) >= 4, "four tasks in the list");
   });
+  await check("a block that ended asks how it went; Done ticks it off and keeps the real length", async () => {
+    const card = page.locator("#check-in", { hasText: "Morning pages" });
+    await card.waitFor();
+    await page.click("#ci-done"); await tick(1500);
+    await page.click('#check-in [data-min="45"]'); await tick(1500);
+    await waitFor(() => fake.sent.some((c) => c.type === "close" && c.id === "e0"), "the block ticked off in Todoist");
+    const c = await waitFor(async () => { const x = await config(); return x.history?.[today]?.actual?.e0?.min === 45 ? x : null; }, "the answer saved");
+    if (c.history[today].actual.e0.o !== "done") throw new Error(`saved as ${c.history[today].actual.e0.o}`);
+    const s = (c.samples || []).at(-1);
+    if (!s || s.est !== 30 || s.actual !== 45) throw new Error(`no sample for the real length: ${JSON.stringify(s)}`);
+    if (await page.locator("#check-in").count()) throw new Error("the check-in didn't go away");
+  });
+  await check("a task ticked off in Todoist (on your phone) shows as done within a minute", async () => {
+    await waitFor(async () => (await page.locator("#list li.task", { hasText: "Order the groceries" }).count()) === 1, "the repeating task in today's list");
+    fake.completeOutside("r0");
+    await tick(31_000);   // one look at Todoist's activity log
+    await waitFor(async () => (await page.locator("#list li.task", { hasText: "Order the groceries" }).count()) === 0, "the task gone from the open list");
+    await waitFor(async () => (await page.locator("#done-today li", { hasText: "Order the groceries" }).count()) === 1, "the task under Done today");
+  });
   await check("the week view drafts the week", async () => {
     await page.click('[data-view="week"]'); await tick();
     await page.waitForSelector("#week-view .week-board");
