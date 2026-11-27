@@ -14,12 +14,12 @@ interface WState {
 }
 
 export function WallpaperDialog() {
-  return <Dialog name="wallpaper" id="wallpaper-dialog"><Body /></Dialog>;
+  return <Dialog name="wallpaper" id="wallpaper-dialog"><WallpaperBody /></Dialog>;
 }
 
 const pretty = (name?: string) => (name || "").replace(/\.(png|jpe?g|webp)$/i, "").replace(/^[0-9a-z]{1,4}-/i, "").replace(/-/g, " ");
 
-function Body() {
+export function WallpaperBody() {
   const close = useUi((s) => s.closeDialog);
   const [st, setSt] = useState<WState | null>(null);
   const [busy, setBusy] = useState<string | null>(null);

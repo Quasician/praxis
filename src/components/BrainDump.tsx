@@ -141,7 +141,7 @@ interface CliStatus { installed: boolean; loggedIn: boolean; method: string; ver
 interface AiStatus { provider: "auto" | "cli" | "api"; apiKey: boolean; cli: CliStatus }
 
 /** Connect Claude: your Claude subscription through Claude Code (recommended), or an Anthropic API key. */
-function ClaudeKey({ intro = false, onDone }: { intro?: boolean; onDone: () => void }) {
+export function ClaudeKey({ intro = false, onDone }: { intro?: boolean; onDone: () => void }) {
   const status = useStatus();
   const [ai, setAi] = useState<AiStatus | null>(null);
   const [checking, setChecking] = useState(false);

@@ -11,10 +11,10 @@ import { previewScale } from "../lib/chime";
 const DOW = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 export function PlannerSettingsDialog() {
-  return <Dialog name="planner" id="planner-dialog"><Body /></Dialog>;
+  return <Dialog name="planner" id="planner-dialog"><PlannerBody /></Dialog>;
 }
 
-function Body() {
+export function PlannerBody() {
   const { cfg } = useData();
   const close = useUi((s) => s.closeDialog);
   const [s, setS] = useState<Settings>(cfg);

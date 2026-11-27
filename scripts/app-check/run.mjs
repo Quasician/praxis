@@ -89,10 +89,10 @@ try {
     await waitFor(async () => (await page.locator("#list li.task").count()) >= 4, "four tasks in the list");
   });
   await check("a block that ended asks how it went; Done ticks it off and keeps the real length", async () => {
-    const card = page.locator("#check-in", { hasText: "Morning pages" });
+    const card = page.locator('#check-in [data-block="e0"]', { hasText: "Morning pages" });
     await card.waitFor();
-    await page.click("#ci-done"); await tick(1500);
-    await page.click('#check-in [data-min="45"]'); await tick(1500);
+    await card.locator(".ci-done").click(); await tick(1500);
+    await card.locator('[data-min="45"]').click(); await tick(1500);
     await waitFor(() => fake.sent.some((c) => c.type === "close" && c.id === "e0"), "the block ticked off in Todoist");
     const c = await waitFor(async () => { const x = await config(); return x.history?.[today]?.actual?.e0?.min === 45 ? x : null; }, "the answer saved");
     if (c.history[today].actual.e0.o !== "done") throw new Error(`saved as ${c.history[today].actual.e0.o}`);
@@ -106,6 +106,69 @@ try {
     await tick(31_000);   // one look at Todoist's activity log
     await waitFor(async () => (await page.locator("#list li.task", { hasText: "Order the groceries" }).count()) === 0, "the task gone from the open list");
     await waitFor(async () => (await page.locator("#done-today li", { hasText: "Order the groceries" }).count()) === 1, "the task under Done today");
+  });
+  await check("the command bar moves, skips and undoes; the day shows done blocks, ghosts and skips", async () => {
+    await page.click('[data-view="day"]'); await tick(800);
+    // The block that ended at 9 was answered "done" above: it stays on the day, ticked.
+    await waitFor(async () => (await page.locator('#timeline .done-block[data-id="e0"]').count()) === 1, "the finished block kept on the day");
+    const cmd = async (text) => {
+      await page.keyboard.press("Control+k"); await page.waitForSelector("#cmd-input");
+      await page.fill("#cmd-input", text); await page.press("#cmd-input", "Enter"); await tick(1500);
+      return page.locator("#cmd-result").textContent();
+    };
+    // Stand-up notes started at 9:45; pushing it now (after its start) leaves a ghost where it was.
+    const said = await cmd("push stand-up 30 min");
+    if (!/Moved .*Stand-up notes.* 10:15/.test(said)) throw new Error(`the command bar said: ${said}`);
+    const id = (await fake.tasks()).find((t) => t.content === "Stand-up notes").id;
+    await waitFor(() => fake.sent.some((c) => c.type === "item_update" && c.args?.id === id && c.args?.due?.date?.includes("T10:15")), "the move sent to Todoist");
+    await page.click("#cmd-undo"); await tick(1500);
+    await waitFor(() => fake.sent.filter((c) => c.type === "item_update" && c.args?.id === id).at(-1)?.args?.due?.date?.includes("T09:45"), "the undo sent to Todoist");
+    await page.keyboard.press("Escape"); await tick(300);
+    await cmd("push stand-up 30 min"); await page.keyboard.press("Escape");
+    await waitFor(async () => { await tick(1000); return (await page.locator(`#timeline .ghost-block[data-id="${id}"]`).count()) === 1; }, "a ghost where the moved block was", 20000);
+    if (!(await page.locator(`#timeline .ghost-block[data-id="${id}"]`).textContent()).includes("Moved to 10:15")) throw new Error("the ghost doesn't say where the block went");
+    // Skipping with a reason: kept in the record, and the block says so.
+    const said2 = await cmd("skip call the bank, no time today");
+    if (!said2.includes("Skipped")) throw new Error(`the command bar said: ${said2}`);
+    await page.keyboard.press("Escape");
+    const bank = (await fake.tasks()).find((t) => t.content === "Call the bank").id;
+    const c = await waitFor(async () => { const x = await config(); return x.history?.[today]?.actual?.[bank]?.o === "skipped" ? x : null; }, "the skip saved");
+    if (c.history[today].actual[bank].why !== "no time today") throw new Error(`the reason wasn't kept: ${c.history[today].actual[bank].why}`);
+    await waitFor(async () => (await page.locator(`#timeline .tl-block.mark-skipped[data-id="${bank}"]`).count()) === 1, "the skipped block marked on the day");
+    if (SHOTS) await page.screenshot({ path: path.join(SHOTS, "day-as-it-happened.png") });
+  });
+  await check("one thing asks at a time; after an update, a short what's-new card", async () => {
+    const cfg = await config();
+    await fetch(`${BASE}/api/config`, { method: "POST", headers: { "Content-Type": "application/json", "X-Planner": "1" }, body: JSON.stringify({ ...cfg, lastSeenVersion: "4.6.0" }) });
+    await page.reload(); await tick(3000);
+    await page.click('[data-view="day"]'); await tick(800);
+    const asks = async () => ({ ci: await page.locator(".cv-left #check-in").count(), wn: await page.locator(".cv-left #whats-new").count() });
+    let a = await waitFor(async () => { const x = await asks(); return x.ci + x.wn ? x : null; }, "an ask in the Today pane");
+    if (a.ci && a.wn) throw new Error("two asks at once");
+    while (a.ci) {   // answer what's waiting, and the next one takes its turn
+      if (!(await page.locator(".cv-left #check-in .ci-more").textContent()).includes("1 more thing")) throw new Error("the check-in doesn't say something else is waiting");
+      for (const b of await page.locator(".cv-left #check-in .ci-skipped").all()) { await b.click(); await tick(800); }
+      a = await waitFor(async () => { const x = await asks(); return x.ci + x.wn ? x : null; }, "the next ask");
+    }
+    const text = await page.locator(".cv-left #whats-new").textContent();
+    if (!text.includes("Your day, as it happened") || !text.includes("Block gate") && !text.includes("block gate")) throw new Error(`what's new: ${text.slice(0, 200)}`);
+    if (await page.locator("#whats-new a[href*='github']").count()) throw new Error("what's new should be a card, not a link out");
+    await page.click(".cv-left #wn-ok"); await tick(1000);
+    if ((await config()).lastSeenVersion !== PKG.version) throw new Error("what's new didn't remember it was seen");
+  });
+  await check("one settings page with search", async () => {
+    await page.click("#menu-btn"); await page.click("#settings-btn"); await tick(500);
+    for (const k of ["look", "planner", "reminders", "calendars", "wallpaper", "claude", "app"]) if (!(await page.locator(`.settings-nav [data-section="${k}"]`).count())) throw new Error(`no ${k} section`);
+    await page.fill("#settings-search", "lock"); await tick(300);
+    const shown = await page.$$eval(".settings-nav [data-section]", (els) => els.map((e) => e.dataset.section));
+    if (shown.join() !== "reminders") throw new Error(`searching "lock" shows: ${shown.join()}`);
+    await page.waitForSelector(".settings-body #fl-lock");
+    if (SHOTS) await page.screenshot({ path: path.join(SHOTS, "settings.png") });
+    await page.click("#settings-close"); await tick(300);
+    // The old dialogs open their section of the settings.
+    await page.evaluate(() => window.dispatchEvent(new CustomEvent("praxis:wallpaper"))); await tick(500);
+    await page.waitForSelector('.settings-body[data-section="wallpaper"]');
+    await page.click("#settings-close"); await tick(300);
   });
   await check("the block gate asks start, move or skip; the lock card makes unlocking slow", async () => {
     const g = await ctx.newPage();
@@ -188,10 +251,10 @@ try {
     await page.keyboard.press("Escape"); await tick(500);
     if (await page.locator("#cv-drawer").count()) throw new Error("the numbers didn't close");
     await page.click('[data-view="day"]'); await tick(500);
-    await page.click("#menu-btn"); await page.click("#canvas-layout"); await tick(1500);   // off: the tabs
+    await page.click("#menu-btn"); await page.click("#settings-btn"); await page.click('[data-section="look"]'); await page.click("#canvas-layout"); await page.click("#settings-close"); await tick(1500);   // off: the tabs
     await page.waitForSelector("main.layout #list li.task");
     await page.click('[data-view="areas"]'); await tick(); await waitFor(async () => (await page.locator(".sky-con").count()) >= 2, "the Sky tab");
-    await page.click("#menu-btn"); await page.click("#canvas-layout"); await tick(1500);   // and back on
+    await page.click("#menu-btn"); await page.click("#settings-btn"); await page.click("#canvas-layout"); await page.click("#settings-close"); await tick(1500);   // and back on
     await page.waitForSelector("#canvas");
   });
   await check("overlapping blocks: separate rows on the day, lanes on the edge strip, all of them named", async () => {

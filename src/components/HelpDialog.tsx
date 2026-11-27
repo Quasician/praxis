@@ -4,7 +4,8 @@ import { Dialog } from "./common";
 import { RELEASE_URL, VERSION } from "../lib/version";
 
 const KEYS: [string, string][] = [
-  ["Q  or  /", "Quick add"],
+  ["/  or  Ctrl+K", "Command bar: say it in plain words (move groceries to 4, skip gym, focus on taxes)"],
+  ["Q", "Quick add"],
   ["B", "Brain dump (Claude)"],
   ["P", "Plan my day"],
   ["Enter", "Accept the proposed plan"],

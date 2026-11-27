@@ -8,6 +8,9 @@ import { observeTasks } from "../domain/triage";
 import { ensureConfig, updateConfig } from "../data/actions";
 import { acceptPlan, computePlan, proposePlan } from "../data/planActions";
 import { queryClient, qk, refreshAll, startTodoistWatch, useActive } from "../data/queries";
+import { useDayTrace } from "../data/trace";
+import { CommandBar } from "./CommandBar";
+import { SettingsDialog } from "./SettingsDialog";
 import { useData } from "../data/useData";
 import { toast, useUi } from "../state/ui";
 import { AreasView } from "./AreasView";
@@ -81,6 +84,8 @@ function Shell() {
       {view === "areas" && <AreasView />}
       {view === "progress" && <ProgressView />}
       </>}
+      <CommandBar />
+      <SettingsDialog />
       <TriageDialog />
       <PlannerSettingsDialog />
       <CalendarsDialog />
@@ -111,6 +116,7 @@ function useBackgroundJobs() {
   const weeklyStarted = useWeeklyAuto();
   // 4.6: keep the day in step with Todoist, also while the window is hidden.
   useEffect(() => (connected ? startTodoistWatch() : undefined), [connected]);
+  useDayTrace(connected);   // 5.0: where today's blocks sat, so the day shows what happened
 
   // First-run settings (areas guessed from project names).
   useEffect(() => { if (configQ.isSuccess && projectsQ.isSuccess) ensureConfig().catch(() => undefined); }, [configQ.isSuccess, projectsQ.isSuccess]);
@@ -181,13 +187,17 @@ function useShortcuts() {
       const ui = useUi.getState();
       const el = document.activeElement as HTMLElement | null;
       const typing = (el && /INPUT|TEXTAREA|SELECT/.test(el.tagName)) || !!document.querySelector("dialog[open], .ritual-panel");
+      // 5.0: the command bar: Ctrl+K anywhere, or / when you're not typing.
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") { e.preventDefault(); useUi.setState({ cmdOpen: true }); return; }
       if (e.key === "Escape") {
+        if (ui.cmdOpen) { useUi.setState({ cmdOpen: false }); return; }
         if (isDragging()) { cancelDrag(); return; }
         el?.blur();
         return;
       }
       if (typing || e.ctrlKey || e.metaKey || e.altKey) return;
-      if (e.key === "q" || e.key === "/") { e.preventDefault(); ui.focusQuickAdd(); }
+      if (e.key === "/") { e.preventDefault(); useUi.setState({ cmdOpen: true }); }
+      else if (e.key === "q") { e.preventDefault(); ui.focusQuickAdd(); }
       else if (e.key === "r") refreshAll(true);
       else if (e.key === "1") { ui.setView("day"); ui.setTab("today"); }
       else if (e.key === "2") { ui.setView("day"); ui.setTab("inbox"); }

@@ -18,6 +18,8 @@ import { useNow } from "./useNow";
 import { usePending } from "../data/pending";
 import { CheckIcon, PlanBanner } from "./Timeline";
 import { DayWeatherLayer, IdeaClouds, dayWeather } from "./SkyClouds";
+import { useTrace } from "../data/trace";
+import type { DoneBlock, Ghost, Mark } from "../domain/trace";
 
 const ROW_H_FULL = 70;      // one row of blocks (64 in the canvas, where the strip is shorter)
 const LABEL_MIN = 120;      // the least room a block's label gets
@@ -79,6 +81,7 @@ export function assignRows(items: Item[], hourW: number) {
 export function HorizonPane({ compact = false }: { compact?: boolean } = {}) {
   const { today, events, projects, cfg, trayIds, loading, config } = useData();
   const committedIds = useCommitted();
+  const trace = useTrace();
   const plan = useUi((s) => s.plan);
   const drag = useUi((s) => s.drag);
   const now = useNow();
@@ -119,6 +122,9 @@ export function HorizonPane({ compact = false }: { compact?: boolean } = {}) {
   const items: Item[] = [
     ...blocks.map((b, i) => ({ key: b.task ? `t${b.task.id}` : `e${i}`, start: b.start, dur: b.dur, endAnchored: b.end <= nowMin,
       label: labelPx(b.task ? plain(b.task.content) + (b.task.due?.is_recurring ? " ↻" : "") + (b.task && committedIds.has(b.task.id) ? "★ " : "") : b.event?.title || "", timeText(b)) - (b.event ? 30 : 0) })),
+    // 5.0: what happened: finished blocks in their place, ghosts where moved blocks were.
+    ...trace.done.map((d) => ({ key: `d${d.id}`, start: d.s, dur: d.m, endAnchored: d.s + d.m <= nowMin, label: labelPx(plain(d.c), `${fmtMin(d.s)} – ${fmtMin(d.s + d.m)} · took 45m`) })),
+    ...trace.ghosts.map((g) => ({ key: `g${g.id}@${g.s}`, start: g.s, dur: g.m, endAnchored: g.s + g.m <= nowMin, label: Math.min(labelPx(plain(g.c), "Moved to 12:30 PM"), 260) })),
     ...(plan.active ? plan.items.map((it, i) => ({ key: `p${i}`, start: it.start, dur: it.dur, label: labelPx((it.committed ? "★ " : "") + plain(it.task.content), `${fmtMin(it.start)} – ${fmtMin(it.start + it.dur)} ${it.committed ? "" : "Bonus "}${it.source === "milestone" && it.milestone ? "◆ " + plain(it.milestone.content).slice(0, 24) : "Light"}` + "   ") - 30 })) : []),
   ];
   const itemOf = new Map(items.map((it) => [it.key, it]));
@@ -242,8 +248,11 @@ export function HorizonPane({ compact = false }: { compact?: boolean } = {}) {
               </div>
             </div>
           ) : (
-            <HzTask key={b.task!.id} b={b} color={color(b.task!)} past={b.end <= nowMin} lifting={lifting(b.task!)} short={isShort(`t${b.task!.id}`, b.dur)} style={pos(b.start, b.dur, rows.get(`t${b.task!.id}`) || 0, color(b.task!), `t${b.task!.id}`)} onPointerDown={(e) => onBlockDown(e, b)} />
+            <HzTask key={b.task!.id} b={b} color={color(b.task!)} past={b.end <= nowMin} lifting={lifting(b.task!)} short={isShort(`t${b.task!.id}`, b.dur)} mark={trace.marks.get(b.task!.id)} why={config?.history?.[ymd(now)]?.actual?.[b.task!.id]?.why} style={pos(b.start, b.dur, rows.get(`t${b.task!.id}`) || 0, color(b.task!), `t${b.task!.id}`)} onPointerDown={(e) => onBlockDown(e, b)} />
           ))}
+
+          {trace.ghosts.map((g) => <GhostBlock key={`g${g.id}@${g.s}`} g={g} style={pos(g.s, g.m, rows.get(`g${g.id}@${g.s}`) || 0, colorOf(projects.get(g.p || "")?.color) || "var(--ink-3)", `g${g.id}@${g.s}`)} />)}
+          {trace.done.map((d) => <DoneBlockView key={`d${d.id}`} d={d} short={isShort(`d${d.id}`, d.m)} style={pos(d.s, d.m, rows.get(`d${d.id}`) || 0, colorOf(projects.get(d.p || "")?.color) || "var(--accent)", `d${d.id}`)} />)}
 
           {target && (
             <div className="tl-block preview" style={{ ...pos(target.start, target.dur, 0, "var(--accent)", drag?.kind !== "new" && drag?.proposalIdx === undefined ? `t${drag!.task.id}` : drag?.proposalIdx !== undefined ? `p${drag.proposalIdx}` : undefined), top: SKY_H + 30 + (drag?.kind !== "new" && drag?.proposalIdx === undefined ? (rows.get(`t${drag!.task.id}`) ?? 0) : drag?.proposalIdx !== undefined ? (rows.get(`p${drag.proposalIdx}`) ?? 0) : count) * ROW_H }}>
@@ -294,19 +303,49 @@ function SunArc({ width, rise, set, nowMin, X, skyH: SKY_H }: { width: number; r
   );
 }
 
-function HzTask({ b, color, past, lifting, short, style, onPointerDown }: { b: Block; color: string; past: boolean; lifting: boolean; short: boolean; style: CSSProperties; onPointerDown: (e: PointerEvent) => void }) {
+/** 5.0: a block you finished, kept in its place: ticked, with how long it really took when you said. */
+export function DoneBlockView({ d, style, short = false }: { d: DoneBlock; style: CSSProperties; short?: boolean }) {
+  return (
+    <div className={`tl-block done-block ${short ? "short" : ""}`} data-id={d.id} data-trace="done" style={style}
+         title={`Done: ${plain(d.c)} · ${fmtMin(d.s)}–${fmtMin(d.s + d.m)}${d.took ? ` · took ${fmtSpan(d.took)}` : ""}`}>
+      <span className="blk-len" aria-hidden="true" />
+      <span className="blk-check done" aria-hidden="true"><CheckIcon /></span>
+      <div className="blk-body">
+        <div className="blk-title">{plain(d.c)}</div>
+        <div className="blk-time">{fmtMin(d.s)} – {fmtMin(d.s + d.m)}{d.took ? ` · took ${fmtSpan(d.took)}` : " · done"}</div>
+      </div>
+    </div>
+  );
+}
+
+/** 5.0: where a block was before you moved it (after its time had come): a faint outline pointing to its new time. */
+export function GhostBlock({ g, style }: { g: Ghost; style: CSSProperties }) {
+  const where = g.to === null ? "Moved off today" : `Moved to ${fmtMin(g.to)}`;
+  return (
+    <div className="tl-block ghost-block" data-id={g.id} data-trace="moved" style={style} title={`${plain(g.c)} · planned ${fmtMin(g.s)}–${fmtMin(g.s + g.m)} · ${where}`}>
+      <div className="blk-body">
+        <div className="blk-title">{plain(g.c)}</div>
+        <div className="blk-time">{where} →</div>
+      </div>
+    </div>
+  );
+}
+
+const MARK_TEXT: Record<Mark, string> = { skipped: "Didn't happen", partly: "Partly done" };
+
+function HzTask({ b, color, past, lifting, short, style, onPointerDown, mark, why }: { b: Block; color: string; past: boolean; lifting: boolean; short: boolean; style: CSSProperties; onPointerDown: (e: PointerEvent) => void; mark?: Mark; why?: string }) {
   const committed = useCommitted();
   const t = b.task!;
   const pending = usePending().ids.has(t.id);
   const rec = t.due && t.due.is_recurring;
   return (
-    <div className={`tl-block ${past ? "past" : ""} ${lifting ? "lifting" : ""} ${short ? "short" : ""} ${pending ? "pending" : ""}`} data-id={t.id} style={{ ...style, ["--c" as string]: color }}
-         title={`${plain(t.content)} · ${fmtMin(b.start)}–${fmtMin(b.end)}`} onPointerDown={onPointerDown}>
+    <div className={`tl-block ${past ? "past" : ""} ${lifting ? "lifting" : ""} ${short ? "short" : ""} ${pending ? "pending" : ""} ${mark ? `mark-${mark}` : ""}`} data-id={t.id} data-mark={mark || undefined} style={{ ...style, ["--c" as string]: color }}
+         title={`${plain(t.content)} · ${fmtMin(b.start)}–${fmtMin(b.end)}${mark ? ` · ${MARK_TEXT[mark]}${why ? `: ${why}` : ""}` : ""}`} onPointerDown={onPointerDown}>
       <span className="blk-len" aria-hidden="true" />
       <button className="blk-check" title="Complete" aria-label="Complete task" onClick={() => completeTask(t)}><CheckIcon /></button>
       <div className="blk-body">
         <div className="blk-title">{committed.has(t.id) && <span className={`commit-star ${committed.get(t.id)!.star ? "the-one" : ""}`}>★ </span>}{plain(t.content)}{rec ? <span className="rec" title="Repeats"> ↻</span> : null}</div>
-        <div className="blk-time">{fmtMin(b.start)} – {fmtMin(b.end)} · {fmtSpan(b.dur)}</div>
+        <div className="blk-time">{fmtMin(b.start)} – {fmtMin(b.end)} · {mark ? <span className={`pbadge mark ${mark}`}>{MARK_TEXT[mark]}</span> : fmtSpan(b.dur)}</div>
       </div>
       <div className="tl-resize" title="Drag to change length" />
     </div>

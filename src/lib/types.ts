@@ -103,6 +103,8 @@ export interface DayRecord {
   star?: { id: string; prevPriority: number }; // "the one" was raised to p1 in Todoist; put back the next morning
   actual?: Record<string, import("../domain/actuals").Actual>; // 4.6: how each block went when it ended, by task id
   unlocked?: { id: string; what: string; at: string }[];       // 4.7: focus locks you lifted early
+  seen?: Record<string, import("../domain/trace").Seen>;       // 5.0: where today's blocks sat
+  moves?: import("../domain/trace").Move[];                     // 5.0: blocks moved once their time had come
   gate?: { id: string; choice: "start" | "move" | "skip"; at: string }[];  // 4.7: what you chose at each block's gate
 }
 /** A finished focus session: how long a task really took vs. its estimate. */

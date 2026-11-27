@@ -6,7 +6,7 @@ import fs from "fs";
 import path from "path";
 import { createStore } from "./store";
 import { eventsForRange, testCalendar } from "./calendar";
-import { ClaudeError, firstSteps, looksLikeKey, reviewBacklog, sortDump, tinyVersions, drawConstellation, nextMove, tagMottos, writeLegend, writeLetter, verifyKey, type Auth, type BacklogTask, type SortContext, type StuckTask } from "./claude";
+import { ClaudeError, firstSteps, looksLikeKey, reviewBacklog, sortDump, tinyVersions, drawConstellation, nextMove, tagMottos, writeLegend, writeLetter, verifyKey, readCommand, type Auth, type BacklogTask, type SortContext, type StuckTask } from "./claude";
 import { cachedCliStatus, cliStatus } from "./claudecode";
 import { CITY_FILES } from "../src/city/model";
 
@@ -309,6 +309,17 @@ export function createPraxisServer(opts: ServerOptions) {
         const tried = Array.isArray(body.tried) ? body.tried.filter((x): x is string => typeof x === "string").slice(0, 8).map((x) => x.slice(0, 200)) : [];
         return sendJSON(res, 200, await nextMove(a, { task, notes: str(body.notes, 1000), project: str(body.project, 80), tried, minutesIn: Number(body.minutesIn) || 0, today }));
       } catch (e) { return sendJSON(res, e instanceof ClaudeError ? e.status : 500, { error: (e as Error).message }); }
+    }
+    if (route === "POST /api/claude/command") {
+      const a = await auth();
+      if (!a) return sendJSON(res, 401, { error: NO_AUTH });
+      let body: Record<string, unknown>;
+      try { body = JSON.parse(await readBody(req)); } catch { return sendJSON(res, 400, { error: "Invalid JSON" }); }
+      const text = typeof body.text === "string" ? body.text.trim().slice(0, 300) : "";
+      if (!text) return sendJSON(res, 400, { error: "Type what you'd like to do." });
+      const tasks = Array.isArray(body.tasks) ? body.tasks.slice(0, 80).map((t: { id?: unknown; title?: unknown; when?: unknown }) => ({ id: String(t.id || "").slice(0, 40), title: String(t.title || "").slice(0, 200), when: typeof t.when === "string" ? t.when.slice(0, 40) : undefined })) : [];
+      try { return sendJSON(res, 200, await readCommand(a, { text, tasks, now: String(body.now || "").slice(0, 20), today: String(body.today || new Date().toDateString()).slice(0, 40) })); }
+      catch (e) { return sendJSON(res, e instanceof ClaudeError ? e.status : 500, { error: (e as Error).message }); }
     }
     if (route === "POST /api/claude/sort") {
       const a = await auth();

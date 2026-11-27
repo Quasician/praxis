@@ -57,6 +57,7 @@ jobs:
       - run: npm run build
       - run: npx playwright install --with-deps chromium
       - run: npm run check:app
+      - run: xvfb-run -a npm run check:desktop
 
   windows:
     needs: [version, app-check]

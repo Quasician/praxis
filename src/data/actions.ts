@@ -272,10 +272,16 @@ export async function bulkPlace(pairs: [Task, string][], label: string) {
 }
 
 /** Like updateConfig, but starts from what's on disk right now: the Now pop-out and the main window both write. */
-export async function updateConfigFresh(fn: (c: Config) => Config) {
-  const cur = await api<Config>("/api/config");
-  const next = fn(cur);
-  queryClient.setQueryData(qk.config, next);
-  await api("/api/config", { method: "POST", body: next });
-  return next;
+// 5.0: one fresh write at a time, so two changes made together (a gate choice and its skip) never overwrite each other.
+export function updateConfigFresh(fn: (c: Config) => Config): Promise<Config> {
+  const run = async () => {
+    const cur = await api<Config>("/api/config");
+    const next = fn(cur);
+    queryClient.setQueryData(qk.config, next);
+    await api("/api/config", { method: "POST", body: next });
+    return next;
+  };
+  const p = saveChain.then(run, run);   // the same line as updateConfig: one save at a time, in order
+  saveChain = p.catch(() => undefined);
+  return p;
 }

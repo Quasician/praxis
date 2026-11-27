@@ -11,6 +11,8 @@ import { useCommitted, useData } from "../data/useData";
 import { useUi } from "../state/ui";
 import { hourPx, minToY, pointerMin, startDrag } from "./drag";
 import { useHourHeight, useNow } from "./useNow";
+import { useTrace } from "../data/trace";
+import { DoneBlockView, GhostBlock } from "./Horizon";
 
 const blockStyle = (start: number, dur: number, color: string, col = 0, cols = 1, minH = 20): CSSProperties => ({
   top: minToY(start), height: Math.max((dur / 60) * hourPx() - 2, minH),
@@ -30,6 +32,7 @@ export function TimelinePane() {
   const tlRef = useRef<HTMLDivElement>(null);
   const scrolled = useRef(false);
 
+  const trace = useTrace();
   const todayList = useMemo(() => today.filter((t) => !trayIds.has(t.id)), [today, trayIds]);
   const blocks = useMemo(() => layoutBlocks(todayList, visibleEvents(events, todayList)), [todayList, events, now]); // eslint-disable-line
   const allDay = allDayEventsOn(events, ymd(now));
@@ -129,6 +132,9 @@ export function TimelinePane() {
           ) : (
             <TaskBlock key={b.task!.id} b={b} color={color(b.task!)} past={b.end <= nowMin} lifting={lifting(b.task!)} onPointerDown={(e) => onBlockDown(e, b)} />
           ))}
+          {/* 5.0: what happened: finished blocks in their place, ghosts where moved blocks were (half width, beside what's there now). */}
+          {trace.ghosts.map((g) => <GhostBlock key={`g${g.id}@${g.s}`} g={g} style={{ ...blockStyle(g.s, g.m, colorOf(projects.get(g.p || "")?.color) || "var(--ink-3)", 1, 2), zIndex: 1 }} />)}
+          {trace.done.map((d) => <DoneBlockView key={`d${d.id}`} d={d} style={blockStyle(d.s, d.m, colorOf(projects.get(d.p || "")?.color) || "var(--accent)")} />)}
 
           {target && (
             <div className={`tl-block preview ${target.dur < 45 ? "compact" : ""}`} style={{ top: minToY(target.start), height: Math.max((target.dur / 60) * hourPx() - 2, 20) }}>
