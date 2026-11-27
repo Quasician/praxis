@@ -116,6 +116,14 @@ Praxis is built to be easy on the eyes on a big monitor all day:
 - **Readable type**: Atkinson Hyperlegible for text (designed for legibility) and Bricolage Grotesque for headings, bundled so they work offline.
 - **Calm motion**: finishing a task fills the circle and folds the row away; the focus timer is a ring that fills. If Windows has "Show animations" turned off, Praxis stops animating too.
 
+## The block gate and the focus lock (4.7)
+
+- **The gate.** When a planned block starts, every screen is covered by a card until you choose: **Start** (a focus timer runs to the end of the block), **Move it** (15, 30 or 60 minutes later today) or **Skip it** (with a reason, kept in your record). It closes by itself when the block's time is over. Your other screens show a quiet note; the choice is on the screen your mouse is on.
+- **The lock.** While a focus timer runs, the apps and sites you listed are out of reach: when one comes to the front it is minimised and covered by a card naming the block and the time left. By default that's **Firefox**, **Steam** (and any game installed through it) and **Reddit** in any browser. Everything else stays usable, so the work itself is never in the way. **Back to work** closes the card; unlocking early takes a minute's wait and typing "I'm choosing to stop", and it goes in the day's record.
+- **Settings:** ⋯ → Reminders → *Block gate and focus lock*: the gate on or off, only for blocks you committed to, the lock on or off, and the lists of apps (program names) and sites (words in a tab's title). The Now card shows what's locked while you focus. If a gate ever gets stuck, the tray menu has **Close the block gate**.
+
+Windows only (the lock asks Windows which window is in front, through the same small helper the wallpaper uses). Ctrl+Alt+Del and the lock screen always work.
+
 ## In step with Todoist, and how each block really went (4.6)
 
 - **Real-time sync.** Praxis looks at Todoist's activity log every 30 seconds and refreshes the moment anything changed, wherever you changed it (a tick on your phone or on the web shows here within a minute). Everything also refreshes every two minutes, now even while the window is hidden behind others or minimised, and straight away when the computer wakes, the network comes back or you bring the window up.

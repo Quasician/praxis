@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { SAMPLES_KEEP } from "../domain/progress";
 import { minOfDay, parseDue, sameDay, startOfToday, ymd } from "../lib/dates";
 import { blockMinutes, sortTasks, willpower } from "../lib/tasks";
+import { lockCfg, niceName } from "../domain/focuslock";
 import { plain } from "../lib/text";
 import type { Task } from "../lib/types";
 import { completeTask, scheduleTask, updateConfigFresh as updateConfig } from "../data/actions";
@@ -89,7 +90,7 @@ export function NowCard({ mini = false }: { mini?: boolean }) {
 
   const start = () => {
     try { if ("Notification" in window && Notification.permission === "default") Notification.requestPermission(); } catch { /* ignore */ }
-    updateConfig((c) => ({ ...c, focus: { taskId: task.id, content: task.content, startedAt: new Date().toISOString(), minutes: FOCUS_MIN } }));
+    updateConfig((c) => ({ ...c, focus: { taskId: task.id, content: task.content, startedAt: new Date().toISOString(), minutes: FOCUS_MIN, lock: true } }));
   };
   const stop = () => updateConfig((c) => ({ ...c, focus: null }));
   const more = () => updateConfig((c) => (c.focus ? { ...c, focus: { ...c.focus, minutes: Math.ceil(elapsed / 60) + 5 } } : c));
@@ -110,6 +111,7 @@ export function NowCard({ mini = false }: { mini?: boolean }) {
   const snooze = () => { const dd = parseDue(task.due); if (dd?.hasTime) scheduleTask(task, minOfDay(dd.d) + 10, blockMinutes(task)); };
   const skip = () => setSkipped((s) => new Set([...s, task.id]));
   const running = !!focus && focus.taskId === task.id;
+  const lc = lockCfg(config?.focusLock), lockOn = lc.lock && !!focus?.lock && !focus?.unlockedAt && (lc.apps.length + lc.sites.length) > 0;
   const clock = (sec: number) => { const a = Math.abs(Math.round(sec)); return `${sec < 0 ? "+" : ""}${Math.floor(a / 60)}:${String(a % 60).padStart(2, "0")}`; };
   const c = committed.get(task.id);
   const d = parseDue(task.due);
@@ -128,7 +130,7 @@ export function NowCard({ mini = false }: { mini?: boolean }) {
     <div className={`now-card ${mini ? "mini" : ""} ${running ? "running" : ""} ${running && left <= 0 ? "over" : ""}`} id={mini ? "now-mini" : "now-card"} data-id={task.id}>
       {!mini && <span className="now-sun" aria-hidden="true" />}
       <div className="now-main">
-        <span className="now-label">{running ? "Focusing" : "Now"}{c && <span className={`commit-star ${c.star ? "the-one" : ""}`}> ★</span>}</span>
+        <span className="now-label">{running ? "Focusing" : "Now"}{c && <span className={`commit-star ${c.star ? "the-one" : ""}`}> ★</span>}{running && !mini && lockOn && <span className="now-lock" id="now-lock" title={`Locked until the timer ends: ${[...lc.apps, ...lc.sites].join(", ")}`}> · locked: {[...lc.apps, ...lc.sites].map(niceName).join(", ")}</span>}</span>
         <span className="now-title" title={plain(task.content)}>{plain(task.content)}</span>
         {!running && nextIn !== null && <span className="now-next-in" id="now-next-in">Next block in {nextIn < 60 ? `${nextIn} min` : `${Math.floor(nextIn / 60)}h ${nextIn % 60}m`}</span>}
         {tiny && <span className="now-tiny" id="now-tiny-text" title="On a low day, this counts">Tiny: {tiny}</span>}

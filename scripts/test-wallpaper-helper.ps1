@@ -37,4 +37,16 @@ Write-Host "3. ping and status answered through a pipe: $($r.out)"
 $r = Run @("watch", "999999")
 if ($r.code -ne 0) { throw "watch with a dead parent: exit $($r.code) '$($r.err)'" }
 Write-Host "4. watch stops when its parent is gone"
+
+# 4.7 the focus lock: "front" names the window in front (four tab-separated fields), "minimize" refuses a window that
+# doesn't exist, and "frontwatch" stops by itself when its parent is gone.
+$r = Run @("front")
+if ($r.code -ne 0) { throw "front: exit $($r.code) '$($r.err)'" }
+$parts = $r.out -split "`t"
+if ($parts.Count -lt 3) { throw "front should give hwnd, pid, program and title separated by tabs, got '$($r.out)'" }
+$r = Run @("minimize", "0")
+if ($r.code -ne 0 -or $r.out -ne "no-window") { throw "minimize 0: exit $($r.code), said '$($r.out)' '$($r.err)'" }
+$r = Run @("frontwatch", "999999")
+if ($r.code -ne 0) { throw "frontwatch with a dead parent: exit $($r.code) '$($r.err)'" }
+Write-Host "5. front, minimize and frontwatch answer"
 Write-Host "All wallpaper helper checks passed."

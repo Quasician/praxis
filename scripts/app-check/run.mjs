@@ -107,6 +107,39 @@ try {
     await waitFor(async () => (await page.locator("#list li.task", { hasText: "Order the groceries" }).count()) === 0, "the task gone from the open list");
     await waitFor(async () => (await page.locator("#done-today li", { hasText: "Order the groceries" }).count()) === 1, "the task under Done today");
   });
+  await check("the block gate asks start, move or skip; the lock card makes unlocking slow", async () => {
+    const g = await ctx.newPage();
+    await g.clock.install({ time: new Date(+now + 3 * 3600e3) });   // 1 PM
+    g.on("pageerror", (e) => pageErrors.push(`gate: ${e.message}`));
+    await g.setViewportSize({ width: 1600, height: 900 });
+    const posts = [];
+    await g.route("**/api/desktop/**", async (r) => { posts.push({ url: new URL(r.request().url()).pathname, body: JSON.parse(r.request().postData() || "{}") }); await r.fulfill({ status: 200, contentType: "application/json", body: "{\"ok\":true}" }); });
+    const start = +now + 3 * 3600e3, job = { key: "start:x", taskId: "t0", title: "Write the report", start, end: start + 3600e3, main: true };
+    await g.goto(`${BASE}/?gate=${encodeURIComponent(JSON.stringify(job))}&theme=dark`); await g.clock.runFor(500);
+    if (!(await g.locator("#gate-title").textContent()).includes("Write the report")) throw new Error("the gate doesn't name the block");
+    for (const id of ["#gate-start", "#gate-move", "#gate-skip"]) await g.locator(id).waitFor();
+    if (SHOTS) await g.screenshot({ path: path.join(SHOTS, "gate.png") });
+    await g.click("#gate-skip");
+    if (!(await g.locator("#gate-skip-go").isDisabled())) throw new Error("skipping needs a reason");
+    await g.fill("#gate-why", "the call ran over"); await g.click("#gate-skip-go"); await g.clock.runFor(300);
+    await waitFor(() => posts.some((p) => p.url === "/api/desktop/gate" && p.body.action === "skip" && p.body.reason === "the call ran over"), "the skip sent with its reason");
+    await g.goto(`${BASE}/?gate=${encodeURIComponent(JSON.stringify(job))}&theme=dark`); await g.clock.runFor(500);
+    await g.click("#gate-move"); await g.click("[data-at]");
+    await waitFor(() => posts.some((p) => p.body.action === "move" && p.body.at === 13 * 60 + 15), "the move sent with a new time");
+    await g.goto(`${BASE}/?gate=${encodeURIComponent(JSON.stringify({ ...job, main: false }))}&theme=dark`); await g.clock.runFor(300);
+    if (await g.locator("#gate-start").count()) throw new Error("the other screens shouldn't have the buttons");
+    const lock = { what: "Firefox", title: "Write the report", until: start + 3600e3 };
+    await g.goto(`${BASE}/?lock=${encodeURIComponent(JSON.stringify(lock))}&theme=dark`); await g.clock.runFor(500);
+    if (!(await g.locator("#lock").textContent()).includes("Firefox is locked")) throw new Error("the lock card doesn't say what's locked");
+    if (SHOTS) await g.screenshot({ path: path.join(SHOTS, "lock.png") });
+    await g.click("#lock-ask");
+    if (!(await g.locator("#lock-phrase").isDisabled())) throw new Error("unlocking should make you wait first");
+    await g.clock.runFor(61_000);
+    await g.fill("#lock-phrase", "I'm choosing to stop");
+    await g.click("#lock-unlock");
+    await waitFor(() => posts.some((p) => p.url === "/api/desktop/lock" && p.body.action === "unlock"), "the unlock sent");
+    await g.close();
+  });
   await check("the week view drafts the week", async () => {
     await page.click('[data-view="week"]'); await tick();
     await page.waitForSelector("#week-view .week-board");

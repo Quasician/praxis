@@ -1,6 +1,7 @@
 // The wallpaper's helper: a small windowed program (no console), so running it can never open a terminal window.
 // Praxis starts it with an action and reads one line back:
 //   ping | status | set <file> <position> | slideshow <folder> <options> <tick> <position> | attach <hwnd> <w> <h> | watch [parent pid]
+//   front | minimize <hwnd> | frontwatch [parent pid]   (4.7: the focus lock asks which window is in front)
 using System;
 using System.Runtime.InteropServices;
 namespace PraxisWall {
@@ -138,6 +139,31 @@ namespace PraxisWall {
       if (!GetMonitorInfo(MonitorFromWindow(f, 2), ref mi)) return "normal";
       return (wr.Left <= mi.rcMonitor.Left && wr.Top <= mi.rcMonitor.Top && wr.Right >= mi.rcMonitor.Right && wr.Bottom >= mi.rcMonitor.Bottom) ? "full" : "normal";
     }
+    [DllImport("user32.dll")] static extern uint GetWindowThreadProcessId(IntPtr h, out uint pid);
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)] static extern int GetWindowText(IntPtr h, System.Text.StringBuilder sb, int n);
+    [DllImport("user32.dll")] static extern bool ShowWindow(IntPtr h, int cmd);
+    [DllImport("user32.dll")] static extern bool IsWindow(IntPtr h);
+    [DllImport("kernel32.dll")] static extern IntPtr OpenProcess(uint access, bool inherit, uint pid);
+    [DllImport("kernel32.dll", CharSet = CharSet.Unicode)] static extern bool QueryFullProcessImageName(IntPtr p, uint flags, System.Text.StringBuilder sb, ref uint n);
+    [DllImport("kernel32.dll")] static extern bool CloseHandle(IntPtr h);
+    /** The window in front as one line: hwnd, process id, program path, title (tab-separated; tabs in the title become spaces). */
+    public static string Front() {
+      IntPtr f = GetForegroundWindow();
+      if (f == IntPtr.Zero) return "0\t0\t\t";
+      uint pid; GetWindowThreadProcessId(f, out pid);
+      string exe = "";
+      IntPtr p = OpenProcess(0x1000, false, pid);   // PROCESS_QUERY_LIMITED_INFORMATION: works for most programs, even elevated ones
+      if (p != IntPtr.Zero) { var b = new System.Text.StringBuilder(1024); uint n = 1024; if (QueryFullProcessImageName(p, 0, b, ref n)) exe = b.ToString(); CloseHandle(p); }
+      var t = new System.Text.StringBuilder(512); GetWindowText(f, t, 512);
+      return f.ToInt64() + "\t" + pid + "\t" + exe.Replace('\t', ' ') + "\t" + t.ToString().Replace('\t', ' ').Replace('\n', ' ').Replace('\r', ' ');
+    }
+    /** Minimises a window (the focus lock moving a locked app out of the way). */
+    public static string Minimize(long hwnd) {
+      IntPtr h = new IntPtr(hwnd);
+      if (hwnd == 0 || !IsWindow(h)) return "no-window";
+      ShowWindow(h, 6);   // SW_MINIMIZE
+      return "ok";
+    }
     public static void Slideshow(string folder, int options, uint tick, int position) {
       Guid iidItem = typeof(IShellItem).GUID, iidArr = typeof(IShellItemArray).GUID;
       IShellItem item; SHCreateItemFromParsingName(folder, IntPtr.Zero, ref iidItem, out item);
@@ -176,6 +202,18 @@ namespace PraxisWall {
           // Says every two seconds whether a full-screen app is in front; stops when Praxis is gone.
           int parent = 0; if (a.Length >= 2) int.TryParse(a[1], out parent);
           while (parent == 0 || Alive(parent)) { Console.Out.WriteLine(W.Foreground()); Console.Out.Flush(); System.Threading.Thread.Sleep(2000); }
+        }
+        else if (act == "front") Console.Out.WriteLine(W.Front());
+        else if (act == "minimize" && a.Length >= 2) Console.Out.WriteLine(W.Minimize(long.Parse(a[1])));
+        else if (act == "frontwatch") {
+          // The focus lock: says which window is in front whenever it changes (and every few seconds anyway); stops with Praxis.
+          int parent = 0; if (a.Length >= 2) int.TryParse(a[1], out parent);
+          string last = null; int quiet = 0;
+          while (parent == 0 || Alive(parent)) {
+            string now = W.Front();
+            if (now != last || ++quiet >= 8) { Console.Out.WriteLine(now); Console.Out.Flush(); last = now; quiet = 0; }
+            System.Threading.Thread.Sleep(400);
+          }
         }
         else { Console.Error.WriteLine("Unknown action: " + act); return 2; }
         Console.Out.Flush();

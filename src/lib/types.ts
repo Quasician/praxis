@@ -102,10 +102,15 @@ export interface DayRecord {
   tinyDone?: string[];                      // tasks whose tiny version you did today (counts as done for the day)
   star?: { id: string; prevPriority: number }; // "the one" was raised to p1 in Todoist; put back the next morning
   actual?: Record<string, import("../domain/actuals").Actual>; // 4.6: how each block went when it ended, by task id
+  unlocked?: { id: string; what: string; at: string }[];       // 4.7: focus locks you lifted early
+  gate?: { id: string; choice: "start" | "move" | "skip"; at: string }[];  // 4.7: what you chose at each block's gate
 }
 /** A finished focus session: how long a task really took vs. its estimate. */
 export interface Sample { wp: number; est: number; actual: number; at: string; guess?: number }
-export interface Focus { taskId: string; content: string; startedAt: string; minutes: number; guess?: number }
+export interface Focus { taskId: string; content: string; startedAt: string; minutes: number; guess?: number;
+  lock?: boolean;              // 4.7: the focus lock is on for this timer (while the setting is on)
+  unlockedAt?: string | null;  // you unlocked early
+}
 
 /** canvas: the one canvas instead of the four tabs (4.1 preview; the default since 4.4, false = the tabs). */
 export interface Appearance { theme?: "auto" | "dark" | "light"; warmEvenings?: boolean; focus?: boolean; dayLayout?: "horizon" | "classic"; canvas?: boolean }
@@ -118,6 +123,7 @@ export interface Config {
   history?: Record<string, DayRecord>;
   samples?: Sample[];
   focus?: Focus | null;
+  focusLock?: Partial<import("../domain/focuslock").FocusLockCfg>;
   tiny?: Record<string, string>;            // task id → its 2-minute version
   lastOpen?: string;                        // ymd Praxis was last opened (for the fresh start)
   ui?: Appearance;

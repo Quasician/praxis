@@ -46,7 +46,7 @@ export const NATIVE_EXE = `praxis-wall-${crypto.createHash("sha1").update(NATIVE
 /** The helper program: the one shipped with the app, else one built once into Praxis's own folder.
  *  It is a windowed program, not a console one, so starting it never opens a terminal window (PowerShell, used before 3.9.3, could). */
 let building: Promise<string> | null = null;
-function helperExe(log: WallpaperDeps["log"]): Promise<string> {
+export function helperExe(log: WallpaperDeps["log"]): Promise<string> {
   const shipped = path.join(process.resourcesPath || "", "native", NATIVE_EXE);
   if (fs.existsSync(shipped)) return Promise.resolve(shipped);
   const dir = app.getPath("userData"), own = path.join(dir, NATIVE_EXE);
@@ -69,7 +69,7 @@ function helperExe(log: WallpaperDeps["log"]): Promise<string> {
 }
 
 /** Runs the helper with an action and gives back the line it printed. */
-async function helper(args: string[], log: WallpaperDeps["log"]): Promise<string> {
+export async function helper(args: string[], log: WallpaperDeps["log"]): Promise<string> {
   if (!isWin) { log("wallpaper (not Windows): would run", args.join(" ")); return args[0] === "status" ? "{}" : "ok"; }
   const exe = await helperExe(log);
   return new Promise((resolve, reject) => {
