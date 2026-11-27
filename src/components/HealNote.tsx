@@ -6,6 +6,7 @@ import { ymd } from "../lib/dates";
 import { dayLabel } from "../domain/week";
 import { plain } from "../lib/text";
 import { useUi } from "../state/ui";
+import type { Config } from "../lib/types";
 import { Dialog } from "./common";
 
 export function HealAskDialog() {
@@ -33,11 +34,17 @@ function Ask() {
 }
 
 /** The morning note: what moved overnight, with an undo. Sits at the top of the task list until you dismiss it. */
+/** 5.0: is the leftovers note waiting (for the attention queue)? */
+export const healNoteDue = (config: Config | undefined) => {
+  const note = (config?.planner as { healNote?: Note } | undefined)?.healNote;
+  return !!note && !note.seen && note.day === ymd(new Date()) && note.moves.length > 0;
+};
+
 export function HealNoteCard() {
   const { config } = useData();
   const note = (config?.planner as { healNote?: Note } | undefined)?.healNote;
   const [busy, setBusy] = useState(false);
-  if (!note || note.seen || note.day !== ymd(new Date()) || !note.moves.length) return null;
+  if (!note || !healNoteDue(config)) return null;
   return (
     <div className="heal-note" id="heal-note" role="status">
       <div className="heal-head">

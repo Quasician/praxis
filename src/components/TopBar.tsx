@@ -8,7 +8,9 @@ import { useUi, type View } from "../state/ui";
 import { useNow } from "./useNow";
 import { RitualMarker } from "./ShutdownDialog";
 import { StreakChip } from "./Habits";
-import { RELEASE_URL, VERSION } from "../lib/version";
+import { VERSION } from "../lib/version";
+import { WhatsNewCard } from "./Asks";
+import { openSettings } from "./SettingsDialog";
 import { updateConfig } from "../data/actions";
 import { flush, usePending } from "../data/pending";
 import { copyDiagnostics } from "../lib/diagnostics";
@@ -75,29 +77,13 @@ export function TopBar() {
             <svg viewBox="0 0 24 24" width="18" height="18"><circle cx="5" cy="12" r="1.8" fill="currentColor" /><circle cx="12" cy="12" r="1.8" fill="currentColor" /><circle cx="19" cy="12" r="1.8" fill="currentColor" /></svg>
           </button>
           <div id="menu" className="menu" hidden={!menu}>
-            <button id="planner-settings-btn" onClick={() => { setMenu(false); openDialog("planner"); }}>Planner settings…</button>
+            <button id="settings-btn" className="menu-strong" onClick={() => { setMenu(false); openSettings(); }}>Settings… <span className="menu-hint">theme, planner, reminders, lock, wallpaper</span></button>
+            <button id="cmd-btn" onClick={() => { setMenu(false); useUi.setState({ cmdOpen: true }); }}>Command bar… (/)</button>
             <button id="new-project-btn" onClick={() => { setMenu(false); openDialog("constellation"); }}>New project…</button>
-            <button id="reminders-btn" onClick={() => { setMenu(false); openDialog("reminders"); }}>Reminders…</button>
-            <button id="wallpaper-btn" onClick={() => { setMenu(false); openDialog("wallpaper"); }}>Wallpaper…</button>
             <button id="letter-btn" onClick={() => { setMenu(false); openDialog("letter"); }}>Sunday letter…</button>
             <button id="review-btn" onClick={() => { setMenu(false); openDialog("review"); }}>Weekly review…</button>
-            <button id="calendars-btn" onClick={() => { setMenu(false); openDialog("calendars"); }}>Calendars…</button>
-            <button id="claude-btn" onClick={() => { setMenu(false); openDialog("claude"); }}>Claude…</button>
             <button id="backlog-btn" onClick={() => { setMenu(false); openDialog("backlog"); }}>Clean up backlog with Claude…</button>
             <button id="shutdown-btn" onClick={() => { setMenu(false); openDialog("shutdown"); }}>Shut down the day… (S)</button>
-            <div className="menu-group" id="appearance">
-              <span className="menu-label">Theme</span>
-              <div className="seg" role="radiogroup" aria-label="Theme">
-                {(["auto", "dark", "light"] as const).map((t) => (
-                  <button key={t} role="radio" aria-checked={(config?.ui?.theme || "auto") === t} data-theme-opt={t} className={(config?.ui?.theme || "auto") === t ? "on" : ""}
-                    onClick={(e) => { e.stopPropagation(); updateConfig((c) => ({ ...c, ui: { ...(c.ui || {}), theme: t } })); }}>{t === "auto" ? "Auto" : t === "dark" ? "Dark" : "Light"}</button>
-                ))}
-              </div>
-              <label className="menu-switch" onClick={(e) => e.stopPropagation()}><input type="checkbox" id="warm-evenings" checked={config?.ui?.warmEvenings !== false} onChange={(e) => updateConfig((c) => ({ ...c, ui: { ...(c.ui || {}), warmEvenings: e.target.checked } }))} /> Warmer colors after 8 PM</label>
-              <label className="menu-switch" onClick={(e) => e.stopPropagation()}><input type="checkbox" id="canvas-layout" checked={config?.ui?.canvas !== false} onChange={(e) => { const on = e.target.checked; updateConfig((c) => ({ ...c, ui: { ...(c.ui || {}), canvas: on } })); if (useUi.getState().view === "progress") setView("day"); }} /> One canvas (off: the four tabs)</label>
-              <label className="menu-switch" onClick={(e) => e.stopPropagation()}><input type="checkbox" id="horizon-layout" checked={config?.ui?.dayLayout !== "classic"} onChange={(e) => updateConfig((c) => ({ ...c, ui: { ...(c.ui || {}), dayLayout: e.target.checked ? "horizon" : "classic" } }))} /> Day as a horizon (left to right)</label>
-              <label className="menu-switch" onClick={(e) => e.stopPropagation()}><input type="checkbox" id="focus-mode" checked={!!config?.ui?.focus} onChange={(e) => updateConfig((c) => ({ ...c, ui: { ...(c.ui || {}), focus: e.target.checked } }))} /> Focus mode (F): only what's next</label>
-            </div>
             <button id="help-btn" onClick={() => { setMenu(false); openDialog("help"); }}>Keyboard shortcuts (?)</button>
             <button id="diagnostics-btn" title="Copies the version, settings (nothing private) and recent log, to paste into a chat with Claude when something's wrong" onClick={async () => {
               setMenu(false);
@@ -113,7 +99,7 @@ export function TopBar() {
             }}>Disconnect Todoist</button>
             <div className="menu-foot" id="menu-version">
               <span>Praxis <b>{VERSION}</b></span>
-              <a href={RELEASE_URL} target="_blank" rel="noopener">What's new</a>
+              <button type="button" className="link-like" id="menu-news" onClick={() => useUi.setState({ newsOpen: true })}>What's new</button>
             </div>
           </div>
         </div>
@@ -122,17 +108,23 @@ export function TopBar() {
   );
 }
 
-/** After an update: "Updated to 1.0.1 · What's new" until you dismiss it. */
+/** After an update: "Updated to 1.0.1 · What's new" opens a short card of what changed (5.0: in the app, not a link out). */
 function UpdatedChip() {
   const { config } = useData();
   const seen = config?.lastSeenVersion as string | undefined;
+  const open = useUi((s) => s.newsOpen);
   const dismiss = () => updateConfig((c) => ({ ...c, lastSeenVersion: VERSION })).catch(() => undefined);
   useEffect(() => { if (config && !seen) dismiss(); }, [!!config, seen]); // first install: nothing to announce
-  if (!config || !seen || seen === VERSION) return null;
+  const fresh = !!config && !!seen && seen !== VERSION;
   return (
-    <span className="updated-chip" id="updated-chip">
-      <a href={RELEASE_URL} target="_blank" rel="noopener" onClick={dismiss}>✦ Updated to {VERSION} · What's new</a>
-      <button aria-label="Dismiss" title="Dismiss" onClick={dismiss}>×</button>
-    </span>
+    <>
+      {fresh && (
+        <span className="updated-chip" id="updated-chip">
+          <button type="button" className="link-like" onClick={() => useUi.setState({ newsOpen: !open })}>✦ Updated to {VERSION} · What's new</button>
+          <button aria-label="Dismiss" title="Dismiss" onClick={dismiss}>×</button>
+        </span>
+      )}
+      {open && <div className="news-pop" id="news-pop" role="dialog" aria-label="What's new"><WhatsNewCard always onClose={() => useUi.setState({ newsOpen: false })} /></div>}
+    </>
   );
 }

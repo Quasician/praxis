@@ -10,6 +10,7 @@ import fs from "fs";
 import path from "path";
 import { createPraxisServer } from "../server/app";
 import { dueNudges, reminderCfg, testNudge, type Nudge, type Slot } from "../src/domain/nudges";
+import { pickNudge } from "../src/domain/asks";
 import { createWallpaper } from "./wallpaper";
 import { createFocusGuard } from "./focus";
 
@@ -371,6 +372,7 @@ let current: Nudge | null = null;
 const sent = new Set<string>();
 const snoozed: { at: number; nudge: Nudge }[] = [];
 let lastNudgeAt = Date.now();
+let lastShownAt = 0;
 let activeSince = Date.now();
 const CARD = { width: 560, height: 176 };
 const PILL = { width: 340, height: 60 };
@@ -402,14 +404,20 @@ function startNudger() {
       }, sent);
       // Reminders you pushed back ("In 10 min") come back first.
       const due = snoozed.findIndex((x) => x.at <= now.getTime());
-      if (due >= 0) list.unshift(snoozed.splice(due, 1)[0].nudge);
-      // You're looking at Praxis already: skip the gentle ones.
+      const snz = due >= 0 ? snoozed.splice(due, 1)[0].nudge : null;
+      if (snz) list.unshift(snz);
+      // 5.0: one reminder at a time. Looking at Praxis already: the gentle ones are answered in the app. While the block
+      // gate is up, the rest wait; gentle ones are spaced out (a reminder that waits too long simply lapses).
       const looking = !!win?.isVisible() && win.isFocused();
-      const next = list.find((n) => !(looking && (n.kind === "heads-up" || n.kind === "time-check" || n.kind === "block-end")));   // the check-in card asks in Praxis
-      for (const n of list) for (const k of n.key.split("|")) sent.add(k);   // a reminder can cover several blocks that start together
-      // 4.7: a block starting opens the full-screen gate instead (unless it's off for this block); a gate already up wins.
-      if (next && next.kind === "start" && guard?.maybeGate(next, slots.find((x) => x.id === next.taskId))) closeNudge();
-      else if (next && !guard?.gateOpen()) showNudge(next, false);
+      const { show, settle } = pickNudge(list, { looking, gateOpen: !!guard?.gateOpen(), sinceLast: Date.now() - lastShownAt });
+      for (const n of settle) for (const k of n.key.split("|")) sent.add(k);
+      if (snz && show !== snz && !settle.includes(snz)) snoozed.push({ at: Date.now() + 60_000, nudge: snz });   // its turn comes later
+      if (!show) return;
+      for (const k of show.key.split("|")) sent.add(k);   // a reminder can cover several blocks that start together
+      lastShownAt = Date.now();
+      // 4.7: a block starting opens the full-screen gate instead (unless it's off for this block).
+      if (show.kind === "start" && guard?.maybeGate(show, slots.find((x) => x.id === show.taskId))) closeNudge();
+      else showNudge(show, false);
     } catch (e) { log("nudge tick failed", (e as Error)?.message || e); }
   };
   setTimeout(tick, 5000);

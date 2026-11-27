@@ -6,7 +6,7 @@ const DAY = 864e5;
 const ymd = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 
 /** Starts the stand-in on `port`; returns { server, sent, data }. Dates are relative to `now`. */
-export function startFakeTodoist(port, now = new Date()) {
+export function startFakeTodoist(port, now = new Date(), opts = {}) {
   const d0 = new Date(now); d0.setHours(0, 0, 0, 0);
   const at = (daysAgo, hour = 12) => new Date(+d0 - daysAgo * DAY + hour * 3600e3).toISOString();
   const projects = [{ id: "inbox", name: "Inbox", color: "grey", inbox_project: true }, { id: "home", name: "Home", color: "blue" }, { id: "music", name: "Music", color: "violet" }, { id: "work", name: "Work", color: "green" }];
@@ -34,6 +34,8 @@ export function startFakeTodoist(port, now = new Date()) {
   tasks.push(T({ id: "r0", content: "Order the groceries", project_id: "home", labels: ["groceries"], due: { date: ymd(d0), is_recurring: true, string: "every week" }, child_order: 21 }));
   for (let n = 1; n <= 10; n++) completed.push(T({ id: `h${n}-0`, content: "Morning block", completed_at: at(n, 10), duration: { amount: 60, unit: "minute" } }));
 
+  // 5.0 the desktop check: no made-up week, just the projects (it adds its own block).
+  if (opts.bare) { tasks = []; completed.length = 0; }
   const sent = [];
   const activity = [];   // newest first, like Todoist's activity log
   const t0 = Date.now(), stamp = () => new Date(+now + (Date.now() - t0)).toISOString();   // the checks' clock, not the real one
@@ -80,5 +82,5 @@ export function startFakeTodoist(port, now = new Date()) {
     });
   });
   server.listen(port, "127.0.0.1");
-  return { server, sent, tasks: () => tasks, completeOutside };
+  return { server, sent, tasks: () => tasks, completeOutside, addTask: (t) => { tasks.push(T(t)); } };
 }

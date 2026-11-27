@@ -116,6 +116,15 @@ Praxis is built to be easy on the eyes on a big monitor all day:
 - **Readable type**: Atkinson Hyperlegible for text (designed for legibility) and Bricolage Grotesque for headings, bundled so they work offline.
 - **Calm motion**: finishing a task fills the circle and folds the row away; the focus timer is a ring that fills. If Windows has "Show animations" turned off, Praxis stops animating too.
 
+## Your day, as it happened (5.0)
+
+- **Plan next to what happened.** Finished blocks stay on the day in their place, ticked (with how long they really took, when you said). A block you moved once its time had come leaves a faint dashed outline: "Moved to 4:30 PM →" (or "Moved off today"). A block you skipped is struck through and hatched, with your reason on hover; one you partly did is half-filled. Praxis keeps a light trace of where each block sat in the day's record to draw this.
+- **One thing asks at a time.** The check-in when blocks end, the note about yesterday's leftovers and what's new take turns in one spot at the top of Today, most important first, and wait while a ritual is open. Several blocks that ended while you were away are asked about in one card. On the desktop, reminders take turns too: one at a time, gentle ones (heads-ups, check-ins, time checks) at least 90 seconds apart, and nothing while the block gate is up.
+- **Command bar.** Press **/** (or **Ctrl+K**) and type what you want: "move groceries to 4", "push the report 30 min", "skip gym, too tired", "done laundry", "focus on taxes for 45 min", "add call mom tomorrow", "plan my day". Most sentences are read right in Praxis; anything else goes to Claude when you've added a key. Each change has **Undo**; when two tasks match, it asks which one.
+- **One settings page** (⋯ → Settings…): Look, Planner, Reminders, gate and lock, Calendars, Wallpaper, Claude, and App and help, with a search box ("lock", "theme", "shutdown"…).
+- **What's new** after an update is a short card in the app (a few lines per version), from the "Updated to …" chip or Settings → App and help.
+- **Checks on the real desktop app.** Besides the browser checks, the release now starts the actual Electron app against the stand-in Todoist: a block starting opens the gate on every screen, and skipping it lands in the record (on Windows, the focus lock covers a locked app too). It already caught a bug: two changes saved at the same moment could overwrite each other (fixed: saves now go one at a time).
+
 ## The block gate and the focus lock (4.7)
 
 - **The gate.** When a planned block starts, every screen is covered by a card until you choose: **Start** (a focus timer runs to the end of the block), **Move it** (15, 30 or 60 minutes later today) or **Skip it** (with a reason, kept in your record). It closes by itself when the block's time is over. Your other screens show a quiet note; the choice is on the screen your mouse is on.

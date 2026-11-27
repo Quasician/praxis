@@ -16,10 +16,10 @@ const CAL_COLORS: Record<string, string> = {
 const maskUrl = (u: string) => { try { const x = new URL(u); return `${x.host}/…${x.pathname.slice(-12)}`; } catch { return "…"; } };
 
 export function CalendarsDialog() {
-  return <Dialog name="calendars" id="calendars-dialog"><Body /></Dialog>;
+  return <Dialog name="calendars" id="calendars-dialog"><CalendarsBody /></Dialog>;
 }
 
-function Body() {
+export function CalendarsBody() {
   const { config } = useData();
   const close = useUi((s) => s.closeDialog);
   // Local copy so toggles respond instantly; saved to settings on every change.

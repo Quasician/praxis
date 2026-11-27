@@ -22,6 +22,8 @@ jobs:
       # The release checks: the built app against a stand-in Todoist, clicked through in a real browser.
       - run: npx playwright install --with-deps chromium
       - run: npm run check:app
+      # 5.0: the real desktop app (Electron) on a virtual screen: the block gate opens, and a skip lands in the record.
+      - run: xvfb-run -a npm run check:desktop
 
   # The wallpaper's helper only runs on Windows: build it and check it is a windowed program that answers.
   windows-helper:
@@ -33,7 +35,9 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - run: npm run build:node
+      - run: npm run build
       - name: Test the wallpaper helper
         shell: powershell
         run: ./scripts/test-wallpaper-helper.ps1
+      # 5.0: the real desktop app on Windows: the block gate, and the focus lock over a locked app (Notepad).
+      - run: npm run check:desktop

@@ -1,7 +1,7 @@
 {
   "name": "praxis",
   "productName": "Praxis",
-  "version": "4.7.0",
+  "version": "5.0.0",
   "description": "Turn ideas into action: a desktop planner on top of Todoist.",
   "author": "Quasician",
   "private": true,
@@ -21,7 +21,8 @@
     "serve": "npm run build && node dist/server/standalone.cjs",
     "start": "npm run build && electron .",
     "dist": "npm run build && electron-builder --win --publish never",
-    "release": "npm run build && electron-builder --win --publish always"
+    "release": "npm run build && electron-builder --win --publish always",
+    "check:desktop": "node scripts/app-check/desktop.mjs"
   },
   "build": {
     "appId": "com.quasician.praxis",

@@ -11,10 +11,10 @@ import { Dialog } from "./common";
 const isDesktop = () => /Electron/i.test(navigator.userAgent);
 
 export function RemindersDialog() {
-  return <Dialog name="reminders" id="reminders-dialog"><Body /></Dialog>;
+  return <Dialog name="reminders" id="reminders-dialog"><RemindersBody /></Dialog>;
 }
 
-function Body() {
+export function RemindersBody() {
   const { config, cfg } = useData();
   const close = useUi((s) => s.closeDialog);
   const [r, setR] = useState<Reminders>(reminderCfg(config?.reminders));

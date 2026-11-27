@@ -9,7 +9,7 @@ import type { Proposal } from "../domain/dump";
 export type CheerKind = "confetti" | "meteor" | "aurora" | "sunrise" | "sunset";
 
 export type View = "day" | "week" | "areas" | "progress";
-export type DialogName = "triage" | "planner" | "calendars" | "areas" | "dump" | "claude" | "shutdown" | "help" | "morning" | "backlog" | "fresh" | "reminders" | "constellation" | "wallpaper" | "heal" | "letter" | "review";
+export type DialogName = "settings" | "triage" | "planner" | "calendars" | "areas" | "dump" | "claude" | "shutdown" | "help" | "morning" | "backlog" | "fresh" | "reminders" | "constellation" | "wallpaper" | "heal" | "letter" | "review";
 
 /** 4.3: the rituals open in one docked panel at the side (one at a time), not as pop-ups over everything. */
 export const RITUALS: DialogName[] = ["morning", "shutdown", "review", "letter", "triage", "backlog", "fresh", "heal"];
@@ -39,6 +39,9 @@ interface UiState {
   tab: "today" | "inbox"; setTab: (t: "today" | "inbox") => void;
   project: string | null; setProject: (p: string | null) => void;
   toast: Toast | null; showToast: (msg: string, action?: Toast["action"]) => void; hideToast: () => void;
+  newsOpen?: boolean;   // 5.0: the What's new card, from the update chip or the menu
+  cmdOpen?: boolean;    // 5.0: the command bar
+  settingsAt?: string;  // 5.0: which section the settings open at
   dialogs: Record<DialogName, boolean>; openDialog: (d: DialogName) => void; closeDialog: (d: DialogName) => void;
   plan: PlanState; setPlan: (p: Partial<PlanState>) => void; clearPlan: () => void;
   drag: DragState | null; setDrag: (d: DragState | null) => void;
@@ -69,8 +72,11 @@ export const useUi = create<UiState>((set) => ({
     toastTimer = setTimeout(() => set({ toast: null }), 5000);
   },
   hideToast: () => set({ toast: null }),
-  dialogs: { triage: false, planner: false, calendars: false, areas: false, dump: false, claude: false, shutdown: false, help: false, morning: false, backlog: false, fresh: false, reminders: false, constellation: false, wallpaper: false, heal: false, letter: false, review: false },
+  dialogs: { settings: false, triage: false, planner: false, calendars: false, areas: false, dump: false, claude: false, shutdown: false, help: false, morning: false, backlog: false, fresh: false, reminders: false, constellation: false, wallpaper: false, heal: false, letter: false, review: false },
   openDialog: (d) => set((s) => {
+    // 5.0: the old settings dialogs live in the one settings page now; asking for one opens that section.
+    const at = ({ planner: "planner", reminders: "reminders", wallpaper: "wallpaper", calendars: "calendars" } as Record<string, string>)[d];
+    if (at) return { dialogs: { ...s.dialogs, settings: true }, settingsAt: at };
     const dialogs = { ...s.dialogs };
     if (RITUALS.includes(d)) for (const r of RITUALS) dialogs[r] = false;   // one ritual at a time
     dialogs[d] = true;

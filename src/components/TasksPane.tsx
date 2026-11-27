@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type PointerEvent } from "react";
 import { usePending } from "../data/pending";
-import { HealNoteCard } from "./HealNote";
 import { fmtDayShort, fmtDuration, fmtTime, durationMinutes, parseDue, sameDay } from "../lib/dates";
 import { blockMinutes, sortTasks, splitToday } from "../lib/tasks";
 import { Inline, colorOf, plain } from "../lib/text";
@@ -8,7 +7,7 @@ import type { Task } from "../lib/types";
 import { completeTask, quickAdd } from "../data/actions";
 import { useCommitted, useData } from "../data/useData";
 import { NowCard } from "./NowCard";
-import { CheckInCard } from "./CheckIn";
+import { AskSlot } from "./Asks";
 import { useCompleted } from "../data/queries";
 import { updateConfig } from "../data/actions";
 import { useUi } from "../state/ui";
@@ -40,8 +39,7 @@ export function TasksPane() {
   return (
     <section className="tasks-pane">
       <NowCard />
-      <CheckInCard />
-      <HealNoteCard />
+      <AskSlot />
       <nav className="tabs" role="tablist">
         <button role="tab" data-tab="today" className={`tab ${tab === "today" ? "active" : ""}`} onClick={() => setTab("today")}>
           Today <span className="count" id="count-today">{loading ? "" : overdue.length + todayList.length || ""}</span>
