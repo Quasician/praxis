@@ -5,10 +5,10 @@ import { plain } from "../lib/text";
 import type { Project, Task } from "../lib/types";
 import type { Slot } from "../domain/nudges";
 import { blockMinutes } from "../lib/tasks";
-import { blockOf } from "../domain/actuals";
+import { blockOf, withGate, withUnlock } from "../domain/actuals";
 import { plannerCfg } from "../domain/planner";
 import { answerBlock } from "../data/actuals";
-import { completeTask, reconcileSoon, updateConfigFresh } from "../data/actions";
+import { completeTask, reconcileSoon, scheduleTask, updateConfigFresh } from "../data/actions";
 import { sync, uuid } from "../lib/api";
 import { pendingCount } from "../data/pending";
 import { AWAY_DAYS, PILE, daysAway, freshStart, overdueNow } from "../data/habits";
@@ -278,7 +278,34 @@ export function useDesktopBridge() {
       const t = find(e);
       if (!t) return;
       useUi.getState().setNowTask(t.id);
-      updateConfigFresh((c) => ({ ...c, focus: { taskId: t.id, content: t.content, startedAt: new Date().toISOString(), minutes: FOCUS_MIN } }));
+      updateConfigFresh((c) => ({ ...c, focus: { taskId: t.id, content: t.content, startedAt: new Date().toISOString(), minutes: FOCUS_MIN, lock: true } }));
+    };
+    // 4.7: the block gate. Start runs a locked focus timer for the rest of the block; Move gives it a new time today;
+    // Skip notes the reason (the check-in won't ask about it again). Every choice goes in the day's record.
+    const gateOf = (e: Event) => { try { return JSON.parse((e as CustomEvent<string>).detail || "{}") as { taskId?: string; end?: number; at?: number; reason?: string }; } catch { return {}; } };
+    const today = () => ymd(new Date());
+    const onGateStart = (e: Event) => {
+      const g = gateOf(e), t = todayTasks().find((x) => x.id === g.taskId);
+      if (!t) return;
+      useUi.getState().setNowTask(t.id);
+      const minutes = Math.max(5, Math.ceil(((g.end || Date.now() + blockMinutes(t) * 60_000) - Date.now()) / 60_000));
+      updateConfigFresh((c) => withGate({ ...c, focus: { taskId: t.id, content: t.content, startedAt: new Date().toISOString(), minutes, lock: true } }, today(), t.id, "start"));
+    };
+    const onGateMove = (e: Event) => {
+      const g = gateOf(e), t = todayTasks().find((x) => x.id === g.taskId);
+      if (!t || !g.at) return;
+      scheduleTask(t, g.at, blockMinutes(t));
+      updateConfigFresh((c) => withGate(c, today(), t.id, "move"));
+    };
+    const onGateSkip = (e: Event) => {
+      const g = gateOf(e), t = todayTasks().find((x) => x.id === g.taskId);
+      if (!t) return;
+      updateConfigFresh((c) => withGate(c, today(), t.id, "skip"));
+      answerBlock(blockOf(t), "skipped", undefined, undefined, false, g.reason).catch(() => undefined);
+    };
+    const onUnlock = (e: Event) => {
+      const g = gateOf(e) as { taskId?: string; what?: string };
+      updateConfigFresh((c) => withUnlock(c, today(), g.taskId || c.focus?.taskId || "", g.what || ""));
     };
     const onMore = () => updateConfigFresh((c) => (c.focus ? { ...c, focus: { ...c.focus, minutes: Math.ceil((Date.now() - Date.parse(c.focus.startedAt)) / 60_000) + 5 } } : c));
     const onStop = () => updateConfigFresh((c) => ({ ...c, focus: null }));
@@ -287,6 +314,10 @@ export function useDesktopBridge() {
     window.addEventListener("praxis:block-skip", onBlockSkip);
     window.addEventListener("praxis:check-in", onCheckIn);
     window.addEventListener("praxis:start-focus", onStart);
+    window.addEventListener("praxis:gate-start", onGateStart);
+    window.addEventListener("praxis:gate-move", onGateMove);
+    window.addEventListener("praxis:gate-skip", onGateSkip);
+    window.addEventListener("praxis:lock-unlock", onUnlock);
     window.addEventListener("praxis:focus-more", onMore);
     window.addEventListener("praxis:focus-stop", onStop);
     return () => {
@@ -295,6 +326,10 @@ export function useDesktopBridge() {
       window.removeEventListener("praxis:block-skip", onBlockSkip);
       window.removeEventListener("praxis:check-in", onCheckIn);
       window.removeEventListener("praxis:start-focus", onStart);
+      window.removeEventListener("praxis:gate-start", onGateStart);
+      window.removeEventListener("praxis:gate-move", onGateMove);
+      window.removeEventListener("praxis:gate-skip", onGateSkip);
+      window.removeEventListener("praxis:lock-unlock", onUnlock);
       window.removeEventListener("praxis:focus-more", onMore);
       window.removeEventListener("praxis:focus-stop", onStop);
     };

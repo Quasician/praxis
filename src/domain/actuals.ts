@@ -9,7 +9,7 @@ import { SAMPLES_KEEP } from "./progress";
 
 export type Outcome = "done" | "partly" | "skipped";
 /** One answer: what happened and, for done or partly, the minutes it took. */
-export interface Actual { o: Outcome; min?: number; at: string }
+export interface Actual { o: Outcome; min?: number; at: string; why?: string }
 
 export interface EndedBlock { id: string; title: string; start: number; end: number; min: number; task: Task }
 
@@ -53,15 +53,31 @@ export function lengthChoices(planned: number, outcome: Outcome): number[] {
  * Writes an answer into the day's record (made if the day had no plan) and, for a finished block with a length, adds a
  * sample: estimate vs what it really took. `wp` is the task's willpower (1–3), as the planner counts it.
  */
-export function withActual(c: Config, day: string, block: { id: string; min: number }, outcome: Outcome, minutes: number | undefined, wp: number, at = new Date()): Config {
+export function withActual(c: Config, day: string, block: { id: string; min: number }, outcome: Outcome, minutes: number | undefined, wp: number, at = new Date(), why?: string): Config {
   const rec: DayRecord = (c.history?.[day] as DayRecord | undefined) || { planned: [] };
   const min = minutes != null && minutes > 0 ? Math.min(Math.round(minutes), 600) : undefined;
-  const actual: Actual = { o: outcome, ...(min != null && outcome !== "skipped" ? { min } : {}), at: at.toISOString() };
+  const actual: Actual = { o: outcome, ...(min != null && outcome !== "skipped" ? { min } : {}), at: at.toISOString(), ...(why ? { why: why.slice(0, 300) } : {}) };
   const sample: Sample | null = outcome === "done" && min != null && min >= 3 ? { wp, est: block.min, actual: min, at: at.toISOString() } : null;
   return {
     ...c,
     history: { ...(c.history || {}), [day]: { ...rec, actual: { ...(rec.actual || {}), [block.id]: actual } } },
     samples: sample ? [...(c.samples || []), sample].slice(-SAMPLES_KEEP) : c.samples,
+  };
+}
+
+/** 4.7: what you chose at a block's gate, kept in the day's record (start, move or skip). */
+export function withGate(c: Config, day: string, id: string, choice: "start" | "move" | "skip", at = new Date()): Config {
+  const rec: DayRecord = (c.history?.[day] as DayRecord | undefined) || { planned: [] };
+  return { ...c, history: { ...(c.history || {}), [day]: { ...rec, gate: [...(rec.gate || []), { id, choice, at: at.toISOString() }].slice(-50) } } };
+}
+
+/** 4.7: a focus lock lifted early, kept in the day's record. */
+export function withUnlock(c: Config, day: string, id: string, what: string, at = new Date()): Config {
+  const rec: DayRecord = (c.history?.[day] as DayRecord | undefined) || { planned: [] };
+  return {
+    ...c,
+    focus: c.focus ? { ...c.focus, unlockedAt: at.toISOString() } : c.focus,
+    history: { ...(c.history || {}), [day]: { ...rec, unlocked: [...(rec.unlocked || []), { id, what, at: at.toISOString() }].slice(-50) } },
   };
 }
 

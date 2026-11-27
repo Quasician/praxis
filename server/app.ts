@@ -20,7 +20,9 @@ export interface ServerOptions {
   cityDir?: string;
   /** Only in the desktop app: reminders that float above other windows. */
   desktop?: { nudge(action: string, key: string): void; test(): void; miniFit?(height: number): void; trayDial?(img16: string, img32: string, tip: string): void; taskbarDark?(): boolean;
-    wallpaper?(action: string, arg?: string): Promise<unknown> };
+    wallpaper?(action: string, arg?: string): Promise<unknown>;
+    /** 4.7: the block gate's and the focus lock's buttons. */
+    gate?(action: string, body: Record<string, unknown>): void; lock?(action: string): void };
 }
 
 const MIME: Record<string, string> = {
@@ -131,6 +133,17 @@ export function createPraxisServer(opts: ServerOptions) {
       let body: { action?: string; key?: string };
       try { body = JSON.parse((await readBody(req)) || "{}"); } catch { return sendJSON(res, 400, { error: "Invalid JSON" }); }
       opts.desktop.nudge(String(body.action || "").slice(0, 20), String(body.key || "").slice(0, 200));
+      return sendJSON(res, 200, { ok: true });
+    }
+
+    if (route === "POST /api/desktop/gate" || route === "POST /api/desktop/lock") {
+      const fn = route.endsWith("gate") ? opts.desktop?.gate : opts.desktop?.lock;
+      if (!fn) return sendJSON(res, 404, { error: "Only in the desktop app." });
+      let body: Record<string, unknown>;
+      try { body = JSON.parse((await readBody(req)) || "{}"); } catch { return sendJSON(res, 400, { error: "Invalid JSON" }); }
+      const action = String(body.action || "").slice(0, 20);
+      if (route.endsWith("gate")) opts.desktop!.gate!(action, { at: Number(body.at) || 0, reason: String(body.reason || "").slice(0, 300) });
+      else opts.desktop!.lock!(action);
       return sendJSON(res, 200, { ok: true });
     }
 

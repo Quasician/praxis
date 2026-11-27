@@ -11,6 +11,7 @@ import path from "path";
 import { createPraxisServer } from "../server/app";
 import { dueNudges, reminderCfg, testNudge, type Nudge, type Slot } from "../src/domain/nudges";
 import { createWallpaper } from "./wallpaper";
+import { createFocusGuard } from "./focus";
 
 const QUICK_ADD = "CommandOrControl+Shift+Space";
 const UPDATE_EVERY = 30 * 60 * 1000; // plus a check whenever the window is brought up
@@ -43,7 +44,7 @@ if (!app.requestSingleInstanceLock()) {
   app.on("second-instance", (_e, argv) => { if (!runArgs(argv)) showWindow(); });
   app.whenReady().then(start).catch((e) => { log("startup failed", e?.stack || e); dialog.showErrorBox("Praxis couldn't start", String(e)); app.quit(); });
   app.on("before-quit", () => { quitting = true; });
-  app.on("will-quit", () => { globalShortcut.unregisterAll(); wallpaper?.stop(); });
+  app.on("will-quit", () => { globalShortcut.unregisterAll(); wallpaper?.stop(); guard?.stop(); });
   app.on("window-all-closed", () => { /* stay in the tray */ });
 }
 
@@ -52,10 +53,12 @@ async function start() {
     dataDir: app.getPath("userData"), staticDir: rendererDir,
     mottosDir: path.join(app.getPath("pictures"), "Mottos"),
     cityDir: path.join(app.getPath("pictures"), "Praxis city kit", "keyframes-5k"),
-    desktop: { nudge: (action, key) => onNudgeAction(action, key), test: () => showNudge(testNudge(), true), miniFit, trayDial, taskbarDark: () => nativeTheme.shouldUseDarkColorsForSystemIntegratedUI ?? nativeTheme.shouldUseDarkColors,
+    desktop: { nudge: (action, key) => onNudgeAction(action, key),
+      gate: (action, body) => guard?.gateAction(action, body), lock: (action) => guard?.lockAction(action), test: () => showNudge(testNudge(), true), miniFit, trayDial, taskbarDark: () => nativeTheme.shouldUseDarkColorsForSystemIntegratedUI ?? nativeTheme.shouldUseDarkColors,
       wallpaper: (action, arg) => wallpaperAction(action, arg) },
   });
   readConfig = store.readConfig;
+  guard = createFocusGuard({ readConfig: store.readConfig, baseUrl: () => baseUrl, theme: themeNow, emit: (n, d) => { emit(n, d); }, log });
   wallpaper = createWallpaper({ readConfig: store.readConfig, writeConfig: store.writeConfig, baseUrl: () => baseUrl, log });
   startNudger();
   const port = await listen(Number(process.env.PRAXIS_PORT) || 4321);
@@ -222,6 +225,7 @@ function refreshTrayMenu() {
     { label: "Mark Now done", accelerator: NOW_DONE, click: nowDone },
     { label: "Capture clipboard to Inbox", accelerator: CAPTURE, click: () => { capture().catch(() => undefined); } },
     { label: "Show a test reminder", click: () => showNudge(testNudge(), true) },
+    { label: "Close the block gate", click: () => guard?.closeGate() },
     { label: "Wallpaper…", click: () => trigger("wallpaper") },
     { label: "Edge horizon (top of the screen)", type: "checkbox", checked: readPrefs().edgeStrip !== false, click: (item) => { writePrefs({ edgeStrip: item.checked }); if (item.checked) startStrip(); else stopStrip(); } },
     { label: "Full screen", accelerator: "F11", type: "checkbox", checked: !!win?.isFullScreen(), click: () => { showWindow(); toggleFullScreen(); } },
@@ -361,6 +365,7 @@ async function capture() {
 // notifications. So Praxis shows its own small card instead: always on top (above full-screen windows),
 // never taking keyboard focus, on the monitor your mouse is on.
 let readConfig: () => Record<string, unknown> = () => ({});
+let guard: ReturnType<typeof createFocusGuard> | null = null;
 let nudgeWin: BrowserWindow | null = null;
 let current: Nudge | null = null;
 const sent = new Set<string>();
@@ -388,8 +393,9 @@ function startNudger() {
       const cfg = readConfig();
       const r = reminderCfg(cfg.reminders as never);
       const planner = (cfg.planner || {}) as { shutdownAt?: string; dayEnd?: string; lastShutdown?: string | null };
+      const slots = await todaySlots();
       const list = dueNudges({
-        now, slots: await todaySlots(), r,
+        now, slots, r,
         shutdownAt: planner.shutdownAt || "21:00", windDownAt: planner.dayEnd || "21:30",
         shutdownDone: planner.lastShutdown === ymdOf(now),
         focus: (cfg.focus as never) || null, lastNudgeAt, activeSince,
@@ -401,7 +407,9 @@ function startNudger() {
       const looking = !!win?.isVisible() && win.isFocused();
       const next = list.find((n) => !(looking && (n.kind === "heads-up" || n.kind === "time-check" || n.kind === "block-end")));   // the check-in card asks in Praxis
       for (const n of list) for (const k of n.key.split("|")) sent.add(k);   // a reminder can cover several blocks that start together
-      if (next) showNudge(next, false);
+      // 4.7: a block starting opens the full-screen gate instead (unless it's off for this block); a gate already up wins.
+      if (next && next.kind === "start" && guard?.maybeGate(next, slots.find((x) => x.id === next.taskId))) closeNudge();
+      else if (next && !guard?.gateOpen()) showNudge(next, false);
     } catch (e) { log("nudge tick failed", (e as Error)?.message || e); }
   };
   setTimeout(tick, 5000);
@@ -419,7 +427,7 @@ function showNudge(n: Nudge, test: boolean) {
   if (r.style === "windows" && !test) return showToast(n);
   current = n;
   const ui = (cfg.ui || {}) as { theme?: string; warmEvenings?: boolean };
-  const theme = ui.theme === "light" || ui.theme === "dark" ? ui.theme : nativeTheme.shouldUseDarkColors ? "dark" : "light";
+  const theme = themeNow();
   const h = new Date().getHours();
   const q = new URLSearchParams({ nudge: JSON.stringify(n), theme });
   if (ui.warmEvenings !== false && (h >= 20 || h < 5)) q.set("evening", "1");
@@ -451,6 +459,11 @@ function showNudge(n: Nudge, test: boolean) {
   // 4.3.1: no glow on the taskbar button. A button asking for attention keeps an auto-hidden taskbar on screen
   // until it is answered, and the card already sits above everything.
   log("nudge", n.kind, n.key);
+}
+
+function themeNow(): "light" | "dark" {
+  const ui = (readConfig().ui || {}) as { theme?: string };
+  return ui.theme === "light" || ui.theme === "dark" ? ui.theme : nativeTheme.shouldUseDarkColors ? "dark" : "light";
 }
 
 function showToast(n: Nudge) {
