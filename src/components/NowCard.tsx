@@ -217,9 +217,10 @@ export async function finishNow(task: Task, cfg: ReturnType<typeof useData>["cfg
     // A timed session teaches Praxis how long this kind of task really takes (ignore accidental 1-minute runs).
     samples: actual >= 3 ? [...(c.samples || []), { wp: willpower(task, cfg), est: blockMinutes(task), actual: Math.min(actual, 600), at: new Date().toISOString(), ...(g ? { guess: g } : {}) }].slice(-SAMPLES_KEEP) : c.samples,
   }));
-  await completeTask(task);
+  const ok = await completeTask(task);
   // After the "Completed" message (and its Undo) has had its moment.
-  if (g && actual >= 3) setTimeout(() => toast(guessVerdict(g, actual)), 2600);
+  if (ok && g && actual >= 3) setTimeout(() => toast(guessVerdict(g, actual)), 2600);
+  return ok;
 }
 
 /** One line after a guessed session: how close you were. */

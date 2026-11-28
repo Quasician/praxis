@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { habitStreak } from "../domain/progress";
 import { parseDue, sameDay, minOfDay, ymd } from "../lib/dates";
 import { plain } from "../lib/text";
-import type { Project, Task } from "../lib/types";
+import type { Config, Project, Task } from "../lib/types";
 import type { Slot } from "../domain/nudges";
 import { blockMinutes } from "../lib/tasks";
 import { blockOf, withGate, withUnlock } from "../domain/actuals";
@@ -283,7 +283,17 @@ export function useDesktopBridge() {
       try { if (document.hidden && "Notification" in window) new Notification(title, { body, silent: true }); } catch { /* fine */ }
     };
     const notDone = (t: Task | null) => tell("Couldn't tick that off.", t ? `“${plain(t.content).slice(0, 60)}” is still open. Check it off in Praxis or Todoist.` : "Praxis couldn't find the task. Check it off in Praxis or Todoist.");
-    const onDone = async (e: Event) => { const t = await findOrFetch(e); if (!t || !(await completeTask(t))) notDone(t); };
+    // 5.1.2: Done on the focus timer's reminder also ends the session (and keeps its length as a sample), like Done in
+    // Praxis. It used to leave the timer set, so the same reminder came back after a restart.
+    const onDone = async (e: Event) => {
+      const t = await findOrFetch(e);
+      if (!t) return notDone(null);
+      const c = queryClient.getQueryData<Config>(qk.config), f = c?.focus;
+      const ok = f && f.taskId === t.id
+        ? await finishNow(t, plannerCfg(c), f, (Date.now() - Date.parse(f.startedAt)) / 1000)
+        : await completeTask(t);
+      if (!ok) notDone(t);
+    };
     // 4.6: the "block ended" reminder's buttons. Done counts the planned length; Partly opens the check-in in Praxis.
     const ended = async (e: Event) => { const t = await findOrFetch(e); return t ? blockOf(t) : null; };
     const onBlockDone = async (e: Event) => {
