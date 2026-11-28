@@ -2,6 +2,7 @@
 // Praxis starts it with an action and reads one line back:
 //   ping | status | set <file> <position> | slideshow <folder> <options> <tick> <position> | attach <hwnd> <w> <h> | watch [parent pid]
 //   front | minimize <hwnd> | frontwatch [parent pid]   (4.7: the focus lock asks which window is in front)
+//   raise <hwnd>   (5.0.1: brings the block gate back in front when something else took the screen)
 using System;
 using System.Runtime.InteropServices;
 namespace PraxisWall {
@@ -164,6 +165,33 @@ namespace PraxisWall {
       ShowWindow(h, 6);   // SW_MINIMIZE
       return "ok";
     }
+    [DllImport("user32.dll")] static extern bool SetForegroundWindow(IntPtr h);
+    [DllImport("user32.dll")] static extern bool BringWindowToTop(IntPtr h);
+    [DllImport("user32.dll")] static extern bool IsIconic(IntPtr h);
+    [DllImport("user32.dll")] static extern bool AttachThreadInput(uint a, uint b, bool attach);
+    [DllImport("user32.dll")] static extern short GetAsyncKeyState(int vk);
+    [DllImport("user32.dll")] static extern void keybd_event(byte vk, byte scan, uint flags, UIntPtr extra);
+    [DllImport("kernel32.dll")] static extern uint GetCurrentThreadId();
+    /** Puts a window back in front and gives it the keyboard, even when Windows would rather not hand the foreground over. */
+    public static string Raise(long hwnd) {
+      IntPtr h = new IntPtr(hwnd);
+      if (hwnd == 0 || !IsWindow(h)) return "no-window";
+      if (IsIconic(h)) ShowWindow(h, 9);   // SW_RESTORE
+      SetWindowPos(h, new IntPtr(-1), 0, 0, 0, 0, 0x0001 | 0x0002 | 0x0040);   // HWND_TOPMOST, no move or size, shown
+      IntPtr fg = GetForegroundWindow();
+      if (fg == h) return "ok";
+      uint other; uint fgThread = fg == IntPtr.Zero ? 0 : GetWindowThreadProcessId(fg, out other), me = GetCurrentThreadId();
+      bool attached = fgThread != 0 && fgThread != me && AttachThreadInput(me, fgThread, true);
+      BringWindowToTop(h);
+      bool ok = SetForegroundWindow(h);
+      if (!ok && (GetAsyncKeyState(0x12) & 0x8000) == 0) {
+        // Windows hands the foreground to whoever sent the last key: a tap of Alt (only when Alt isn't already held).
+        keybd_event(0x12, 0, 0, UIntPtr.Zero); keybd_event(0x12, 0, 2, UIntPtr.Zero);
+        ok = SetForegroundWindow(h);
+      }
+      if (attached) AttachThreadInput(me, fgThread, false);
+      return ok ? "ok" : "denied";
+    }
     public static void Slideshow(string folder, int options, uint tick, int position) {
       Guid iidItem = typeof(IShellItem).GUID, iidArr = typeof(IShellItemArray).GUID;
       IShellItem item; SHCreateItemFromParsingName(folder, IntPtr.Zero, ref iidItem, out item);
@@ -205,6 +233,7 @@ namespace PraxisWall {
         }
         else if (act == "front") Console.Out.WriteLine(W.Front());
         else if (act == "minimize" && a.Length >= 2) Console.Out.WriteLine(W.Minimize(long.Parse(a[1])));
+        else if (act == "raise" && a.Length >= 2) Console.Out.WriteLine(W.Raise(long.Parse(a[1])));
         else if (act == "frontwatch") {
           // The focus lock: says which window is in front whenever it changes (and every few seconds anyway); stops with Praxis.
           int parent = 0; if (a.Length >= 2) int.TryParse(a[1], out parent);

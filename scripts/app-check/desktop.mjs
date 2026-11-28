@@ -2,6 +2,7 @@
 // against the stand-in Todoist, and checks the parts only the desktop app has:
 //   1. a block starting opens the full-screen gate (a window per screen), and skipping it with a reason closes the gate
 //      and lands in the day's record;
+//      (on Windows, a window coming up in front of the gate — as Alt+Tab would — loses the front straight back to it);
 //   2. on Windows, the focus lock: an app you locked (here Notepad) is covered by the lock card while a timer runs.
 // Run: npm run build && npm run check:desktop   (on Linux, under xvfb-run).
 import { _electron as electron } from "playwright";
@@ -75,6 +76,24 @@ try {
     const flags = await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().filter((w) => w.getURL().includes("gate=")).map((w) => ({ top: w.isAlwaysOnTop(), closable: w.isClosable(), full: w.getBounds() })));
     console.log(`    (gate windows: ${JSON.stringify(flags)})`);
     if (process.platform !== "linux" && !flags.every((f) => f.top && !f.closable)) throw new Error("the gate isn't always on top, or can be closed");
+    if (isWin) {
+      // 5.0.1: another window taking the screen (as Alt+Tab would) doesn't get rid of the gate: it comes back in front.
+      const np = spawn("notepad.exe", [], { detached: true, stdio: "ignore" });
+      try {
+        const pid = await app.evaluate(() => process.pid);
+        const helper = fs.readdirSync("native-build").find((f) => /^praxis-wall-.*\.exe$/.test(f));
+        const front = () => new Promise((res) => { const p = spawn(path.join("native-build", helper), ["front"]); let out = ""; p.stdout.on("data", (b) => (out += b)); p.on("close", () => res(out.trim())); });
+        await new Promise((r) => setTimeout(r, 3000));   // Notepad opens and takes the front (if this machine lets it)
+        const back = await waitFor(async () => { const f = await front(); return f.split("\t")[1] === String(pid) ? f : null; }, "the gate back in front", 10000).catch(() => null);
+        if (!back) {
+          const f = await front();
+          if (/notepad\.exe/i.test(f)) throw new Error(`Notepad stayed in front of the gate (${f})`);
+          console.log(`    (nothing could take the front on this machine (${f}); the gate holding the screen isn't checked here)`);
+        }
+        const stillOpen = app.windows().some((w) => w.url().includes("gate="));
+        if (!stillOpen) throw new Error("the gate closed when another window came up");
+      } finally { try { process.kill(np.pid); } catch { /* gone */ } spawn("taskkill", ["/IM", "notepad.exe", "/F"], { stdio: "ignore" }); }
+    }
     await gate.click("#gate-skip");
     await gate.fill("#gate-why", "checking the gate");
     await gate.click("#gate-skip-go", { noWaitAfter: true }).catch((e) => { if (!/closed/i.test(e.message)) throw e; });   // the gate closes as it's answered
