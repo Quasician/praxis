@@ -497,6 +497,7 @@ const emit = (name: string, detail?: string) =>
 
 function onNudgeAction(action: string, key: string) {
   const n = current;
+  if (action !== "collapse" && action !== "expand") log("nudge action", action, key, n && n.key === key ? "" : "(no matching reminder)");
   if (!n || n.key !== key) { if (action !== "collapse" && action !== "expand") closeNudge(); return; }
   if (action === "collapse" || action === "expand") {
     if (!nudgeWin || nudgeWin.isDestroyed()) return;

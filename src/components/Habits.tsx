@@ -9,13 +9,13 @@ import { blockOf, withGate, withUnlock } from "../domain/actuals";
 import { plannerCfg } from "../domain/planner";
 import { answerBlock } from "../data/actuals";
 import { completeTask, reconcileSoon, scheduleTask, updateConfigFresh } from "../data/actions";
-import { sync, uuid } from "../lib/api";
+import { fetchAll, sync, uuid } from "../lib/api";
 import { pendingCount } from "../data/pending";
 import { AWAY_DAYS, PILE, daysAway, freshStart, overdueNow } from "../data/habits";
 import { proposePlan } from "../data/planActions";
 import { inboxOf, qk, queryClient, useCompleted } from "../data/queries";
 import { useData } from "../data/useData";
-import { useUi } from "../state/ui";
+import { toast, useUi } from "../state/ui";
 import type { CheerKind } from "../state/ui";
 import { Dialog } from "./common";
 import { FOCUS_MIN, finishNow } from "./NowCard";
@@ -268,11 +268,31 @@ export function useDesktopBridge() {
       } catch (e) { return { ok: false, error: (e as Error).message }; }
     };
     const find = (e: Event) => todayTasks().find((t) => t.id === (e as CustomEvent<string>).detail);
-    const onDone = (e: Event) => { const t = find(e); if (t) completeTask(t); };
+    // 5.1.1: a reminder's button names a task that today's list may not hold right now (it was just refreshed, or the
+    // task came in after the list was read): ask Todoist for it instead of quietly doing nothing.
+    const findOrFetch = async (e: Event): Promise<Task | null> => {
+      const id = (e as CustomEvent<string>).detail;
+      if (!id) return null;
+      const hit = find(e);
+      if (hit) return hit;
+      try { return (await fetchAll<Task>(`/tasks?ids=${encodeURIComponent(id)}`)).find((t) => t.id === id && !t.checked) || null; } catch { return null; }
+    };
+    // When Praxis is out of sight a failure toast goes unseen, so a reminder's button that didn't work says so on screen.
+    const tell = (title: string, body: string) => {
+      toast(`${title} ${body}`);
+      try { if (document.hidden && "Notification" in window) new Notification(title, { body, silent: true }); } catch { /* fine */ }
+    };
+    const notDone = (t: Task | null) => tell("Couldn't tick that off.", t ? `“${plain(t.content).slice(0, 60)}” is still open. Check it off in Praxis or Todoist.` : "Praxis couldn't find the task. Check it off in Praxis or Todoist.");
+    const onDone = async (e: Event) => { const t = await findOrFetch(e); if (!t || !(await completeTask(t))) notDone(t); };
     // 4.6: the "block ended" reminder's buttons. Done counts the planned length; Partly opens the check-in in Praxis.
-    const ended = (e: Event) => { const t = find(e); return t ? blockOf(t) : null; };
-    const onBlockDone = (e: Event) => { const b = ended(e); if (b) answerBlock(b, "done", b.min, plannerCfg(queryClient.getQueryData(qk.config))).catch(() => undefined); };
-    const onBlockSkip = (e: Event) => { const b = ended(e); if (b) answerBlock(b, "skipped", undefined).catch(() => undefined); };
+    const ended = async (e: Event) => { const t = await findOrFetch(e); return t ? blockOf(t) : null; };
+    const onBlockDone = async (e: Event) => {
+      const b = await ended(e);
+      if (!b) return notDone(null);
+      const r = await answerBlock(b, "done", b.min, plannerCfg(queryClient.getQueryData(qk.config))).catch((err: { completed?: boolean }) => ({ completed: err?.completed ?? false }));
+      if (!r.completed) notDone(b.task);
+    };
+    const onBlockSkip = async (e: Event) => { const b = await ended(e); if (b) answerBlock(b, "skipped", undefined).catch(() => undefined); };
     const onCheckIn = () => useUi.getState().setView("day");
     const onStart = (e: Event) => {
       const t = find(e);

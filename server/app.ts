@@ -36,13 +36,16 @@ function sendJSON(res: http.ServerResponse, status: number, data: unknown) {
   res.end(JSON.stringify(data));
 }
 
-function readBody(req: http.IncomingMessage): Promise<string> {
+/** Settings can grow past the 1 MB other requests are held to. */
+export const CONFIG_LIMIT = 20e6;
+
+function readBody(req: http.IncomingMessage, limit = 1e6): Promise<string> {
   return new Promise((resolve, reject) => {
     let size = 0;
     const chunks: Buffer[] = [];
     req.on("data", (c: Buffer) => {
       size += c.length;
-      if (size > 1e6) { reject(new Error("Body too large")); req.destroy(); }
+      if (size > limit) { reject(new Error("Body too large")); req.destroy(); }
       chunks.push(c);
     });
     req.on("end", () => resolve(Buffer.concat(chunks).toString("utf8")));
@@ -346,14 +349,18 @@ export function createPraxisServer(opts: ServerOptions) {
         platform: `${process.platform} ${process.arch}`, node: process.version, desktop: !!opts.desktop,
         connected: Boolean(store.getToken()), claude: provider(),
         settings: { configVersion: c.configVersion ?? null, planner, ui: c.ui ?? null, reminders: c.reminders ?? null, wallpaper, lastOpen: c.lastOpen ?? null, lastSeenVersion: c.lastSeenVersion ?? null },
+        settingsBytes: JSON.stringify(c).length,
         counts: { areas: count("areas"), calendars: count("calendars"), historyDays: count("history"), samples: count("samples"), letters: count("letters"), reviews: count("reviews"), ideas: count("ideas"), tiny: count("tiny"),
           projects: Object.values(sky?.cons || {}).filter((x) => !x.finished).length, resting: Object.values(sky?.cons || {}).filter((x) => x.rest && !x.finished).length },
         log,
       });
     }
     if (route === "POST /api/config") {
-      let cfg: unknown;
-      try { cfg = JSON.parse(await readBody(req)); } catch { return sendJSON(res, 400, { error: "Invalid JSON" }); }
+      // 5.1.1: the settings grow with your history (records, traces, stardust, the sky). They used to be capped at 1 MB here,
+      // and past that every save failed quietly: a reminder's Done recorded nothing and never ticked the task off.
+      let cfg: unknown, text: string;
+      try { text = await readBody(req, CONFIG_LIMIT); } catch { return sendJSON(res, 413, { error: "Settings too large to save" }); }
+      try { cfg = JSON.parse(text); } catch { return sendJSON(res, 400, { error: "Invalid JSON" }); }
       if (!cfg || typeof cfg !== "object" || Array.isArray(cfg)) return sendJSON(res, 400, { error: "Settings must be an object" });
       const next = cfg as Record<string, unknown>, cur = store.readConfig();
       if (cur.ai && !("ai" in next)) next.ai = cur.ai; // set by the Claude dialog; a window with older settings mustn't drop it
