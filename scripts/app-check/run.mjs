@@ -34,7 +34,7 @@ for (let n = 1; n <= 10; n++) history[ymd(new Date(+now - n * DAY))] = { committ
 ] };
 fs.writeFileSync(path.join(dataDir, "praxis.config.json"), JSON.stringify({
   areas: [{ id: "a1", name: "Home", color: "blue", projects: ["home"] }, { id: "a2", name: "Music", color: "violet", projects: ["music"] }, { id: "a3", name: "Work", color: "green", projects: ["work"] }],
-  planner: { lastAuto: today, morningCommit: true, selfHeal: false, sundayLetter: false, workDays: [], dayStart: "07:00", dayEnd: "21:30" },
+  planner: { lastAuto: today, morningCommit: true, selfHeal: false, sundayLetter: false, weeklyAuto: false, workDays: [], dayStart: "07:00", dayEnd: "21:30" },   // no Friday/weekend week draft taking over the screen: the checks start on the day
   history, lastOpen: today, lastSeenVersion: PKG.version, ui: { theme: "light" },
   // The projects have been in the sky for two months (a project Praxis has only just seen counts as brand new, never as stalled).
   sky: { dust: {}, cons: Object.fromEntries(["m1", "m2", "m3"].map((id) => [id, { name: id, since: new Date(+now - 60 * DAY).toISOString(), steps: [] }])) },
