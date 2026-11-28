@@ -112,7 +112,8 @@ try {
         // Which window is in front, as the lock sees it (the helper built next to the app).
         const helper = fs.readdirSync("native-build").find((f) => /^praxis-wall-.*\.exe$/.test(f));
         const front = () => new Promise((res) => { const p = spawn(path.join("native-build", helper), ["front"]); let out = ""; p.stdout.on("data", (b) => (out += b)); p.on("close", () => res(out.trim())); });
-        const inFront = await waitFor(async () => /notepad\.exe/i.test(await front()), "Notepad in front", 15000).catch(() => false);
+        // Notepad in front, or already covered by the lock card (the lock can be quicker than this look).
+        const inFront = await waitFor(async () => app.windows().some((w) => w.url().includes("lock=")) || /notepad\.exe/i.test(await front()), "Notepad in front", 15000).catch(() => false);
         if (!inFront) { console.log(`    (Notepad couldn't come to the front on this machine (${await front()}); the lock card isn't checked here)`); return; }
         const lock = await waitFor(async () => app.windows().find((w) => w.url().includes("lock=")), "the lock card over Notepad", 30000);
         await lock.waitForSelector("#lock");
@@ -129,11 +130,12 @@ try {
   console.log(`  ✗ the desktop app: ${e.message}`);
 } finally {
   try { const log = fs.readFileSync(path.join(dir, "praxis.log"), "utf8"); if (fail) console.log("\n--- praxis.log ---\n" + log.split("\n").slice(-40).join("\n")); } catch { /* no log */ }
-  // Quit, but never hang the run on it: after 20 s the app is stopped and that's reported (with what was still open).
+  // Quitting works whatever is up (5.0.1: a gate or lock card used to cancel it); a quit that hangs fails the check, with what was still open.
   const open = await Promise.race([app?.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().map((w) => `${w.getTitle()} ${w.getURL().split("?")[1]?.slice(0, 20) || ""} visible=${w.isVisible()} closable=${w.isClosable()}`)).catch((e) => [String(e)]), new Promise((r) => setTimeout(() => r(["(no answer)"]), 5000))]);
   const quit = app?.close().then(() => true).catch(() => true);
   if (quit && !(await Promise.race([quit, new Promise((r) => setTimeout(() => r(false), 20000))]))) {
-    console.log("  ! the app took more than 20 s to quit; stopped it. Windows open at the time:\n    " + (open || []).join("\n    "));
+    fail = true;
+    console.log("  ✗ the app didn't quit within 20 s (stopped it). Windows open at the time:\n    " + (open || []).join("\n    "));
     try { console.log("    log: " + fs.readFileSync(path.join(dir, "praxis.log"), "utf8").trim().split("\n").slice(-12).join("\n    log: ")); } catch { /* no log */ }
     try { app.process().kill(); } catch { /* gone */ }
   }

@@ -184,10 +184,10 @@ export function createFocusGuard(deps: FocusDeps) {
     } catch (e) { deps.log("lock: couldn't watch the window in front", (e as Error)?.message || e); }
   }
   function stopWatch() {
+    if (lockWin) hideLock();   // even if the helper already ended: a lock card never outlives the lock
     if (!watcher) return;
     try { watcher.kill(); } catch { /* gone */ }
     watcher = null;
-    hideLock();
     deps.log("lock off");
   }
 

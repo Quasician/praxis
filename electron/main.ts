@@ -44,7 +44,8 @@ if (!app.requestSingleInstanceLock()) {
   // Launching Praxis again (taskbar jump list, Start menu) reuses this window.
   app.on("second-instance", (_e, argv) => { if (!runArgs(argv)) showWindow(); });
   app.whenReady().then(start).catch((e) => { log("startup failed", e?.stack || e); dialog.showErrorBox("Praxis couldn't start", String(e)); app.quit(); });
-  app.on("before-quit", () => { quitting = true; });
+  // 5.0.1: the gate and the lock card refuse to close, which used to cancel a quit (from the tray, or to install an update) while one was up.
+  app.on("before-quit", () => { quitting = true; guard?.stop(); });
   app.on("will-quit", () => { globalShortcut.unregisterAll(); wallpaper?.stop(); guard?.stop(); });
   app.on("window-all-closed", () => { /* stay in the tray */ });
 }
