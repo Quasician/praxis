@@ -5,10 +5,8 @@
 //
 // Positions are in design units: a 1680 x 709 frame (the 5K2K screen's shape), scaled to the real screen when drawn.
 import { sunTimes, DEFAULT_LAT, DEFAULT_LNG } from "../domain/sun";
-import { moonPhase } from "../valley/model";
 import { shapeOf } from "../domain/sky";
-import type { SkyIcon } from "../valley/weather";
-import type { Weather } from "../valley/model";
+import type { SkyIcon, Weather } from "./weather";
 
 export const D_W = 1680, D_H = 709;
 
@@ -30,6 +28,13 @@ const hoursOf = (d: Date) => d.getHours() + d.getMinutes() / 60 + d.getSeconds()
 export const ARC = { cx: 840, hy: 640, rx: 800, ry: 540 };
 /** A point on the arc: t = 0 at the left end (where the sun rises), 1 at the right (where it sets). */
 export const onArc = (t: number) => ({ x: ARC.cx - ARC.rx * Math.cos(Math.PI * t), y: ARC.hy - ARC.ry * Math.sin(Math.PI * t) });
+
+// ---------------------------------------------------------------- the moon's real phase
+/** 0 = new, .25 = first quarter, .5 = full, .75 = last quarter. */
+export function moonPhase(d: Date) {
+  const SYN = 29.530588853, ref = Date.UTC(2000, 0, 6, 18, 14);
+  return (((d.getTime() - ref) / 864e5 / SYN) % 1 + 1) % 1;
+}
 
 // ---------------------------------------------------------------- the light
 export interface Light {

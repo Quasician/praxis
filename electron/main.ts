@@ -54,7 +54,6 @@ async function start() {
   const { listen, store } = createPraxisServer({
     dataDir: app.getPath("userData"), staticDir: rendererDir,
     mottosDir: path.join(app.getPath("pictures"), "Mottos"),
-    cityDir: path.join(app.getPath("pictures"), "Praxis city kit", "keyframes-5k"),
     desktop: { nudge: (action, key) => onNudgeAction(action, key),
       gate: (action, body) => guard?.gateAction(action, body), lock: (action) => guard?.lockAction(action), test: () => showNudge(testNudge(), true), miniFit, trayDial, taskbarDark: () => nativeTheme.shouldUseDarkColorsForSystemIntegratedUI ?? nativeTheme.shouldUseDarkColors,
       wallpaper: (action, arg) => wallpaperAction(action, arg) },
@@ -245,7 +244,7 @@ function refreshTrayMenu() {
   tray?.setContextMenu(menu);
 }
 
-// ---------- the valley wallpaper (3.4) ----------
+// ---------- the wallpaper: your mottos on the living sky (3.4; the sky since 5.1) ----------
 let wallpaper: ReturnType<typeof createWallpaper>;
 async function wallpaperAction(action: string, arg?: string) {
   switch (action) {
@@ -256,10 +255,6 @@ async function wallpaperAction(action: string, arg?: string) {
     case "live-off": return wallpaper.setLive(false);
     case "weather-on": return wallpaper.setWeather(true);
     case "weather-off": return wallpaper.setWeather(false);
-    case "pick-city-folder": {
-      const r = await dialog.showOpenDialog(win!, { title: "Choose your city kit's 5K paintings folder", properties: ["openDirectory"], defaultPath: wallpaper.state().city.folder });
-      return r.canceled || !r.filePaths[0] ? wallpaper.state() : wallpaper.setCityFolder(r.filePaths[0]);
-    }
     case "folder": return arg ? wallpaper.setFolder(arg) : wallpaper.state();
     case "pick-folder": {
       const st = wallpaper.state();

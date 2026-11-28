@@ -7,14 +7,14 @@ import { ErrorBoundary } from "./components/HelpDialog";
 import { NowMini } from "./components/NowCard";
 import { NudgeCard } from "./components/Nudge";
 import { EdgeStrip } from "./components/Glance";
-import { ValleyPage } from "./components/ValleyPage";
+import { WallpaperPage } from "./components/WallpaperPage";
 import { GateCard, LockCard } from "./components/Gate";
 
 const params = new URLSearchParams(location.search);
 const mini = params.has("mini");
 const nudge = params.has("nudge");
 const strip = params.has("strip");
-const valley = params.has("valley");
+const wallpaper = params.has("wallpaper");
 const gate = params.has("gate"), lock = params.has("lock");
 // Until settings load, follow Windows' light/dark choice.
 document.documentElement.dataset.theme = matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
@@ -25,7 +25,7 @@ import "./styles.css";
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
-      <ErrorBoundary>{gate ? <GateCard /> : lock ? <LockCard /> : nudge ? <NudgeCard /> : valley ? <ValleyPage /> : strip ? <EdgeStrip /> : mini ? <NowMini /> : <App />}</ErrorBoundary>
+      <ErrorBoundary>{gate ? <GateCard /> : lock ? <LockCard /> : nudge ? <NudgeCard /> : wallpaper ? <WallpaperPage /> : strip ? <EdgeStrip /> : mini ? <NowMini /> : <App />}</ErrorBoundary>
     </QueryClientProvider>
   </StrictMode>,
 );

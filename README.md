@@ -130,6 +130,8 @@ Praxis is built to be easy on the eyes on a big monitor all day:
 
 The city kit folder isn't used any more (Praxis never changed it, so it's still there).
 
+**5.1.1** removes the city's and the valley's code and the valley's built-in artwork (the app download is about 5 MB smaller), and the wallpaper's old picture files in Praxis's folder are tidied away. The notes below from 3.4 to 4.4 describe those retired scenes; the parts about mottos, your projects as constellations, the real weather, the shooting star and the aurora carry on in the sky.
+
 ## Your day, as it happened (5.0)
 
 - **Plan next to what happened.** Finished blocks stay on the day in their place, ticked (with how long they really took, when you said). A block you moved once its time had come leaves a faint dashed outline: "Moved to 4:30 PM →" (or "Moved off today"). A block you skipped is struck through and hatched, with your reason on hover; one you partly did is half-filled. Praxis keeps a light trace of where each block sat in the day's record to draw this.

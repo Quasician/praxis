@@ -33,7 +33,7 @@ function Body() {
     { key: "planner", label: "Planner", words: "work hours day start end shutdown wind down plan auto morning commit energy weekly letter learn chime deep light labels", render: () => <PlannerBody /> },
     { key: "reminders", label: "Reminders, gate and lock", words: "reminders nudges heads up notifications sound chime block gate full screen lock focus firefox steam reddit apps sites shutdown time check", render: () => <RemindersBody /> },
     { key: "calendars", label: "Calendars", words: "calendar google outlook ics events links", render: () => <CalendarsBody /> },
-    { key: "wallpaper", label: "Wallpaper", words: "wallpaper mottos city desktop background slideshow weather", render: () => <WallpaperBody /> },
+    { key: "wallpaper", label: "Wallpaper", words: "wallpaper mottos sky stars desktop background slideshow weather", render: () => <WallpaperBody /> },
     { key: "claude", label: "Claude", words: "claude ai anthropic key brain dump command bar", render: () => <ClaudeKey onDone={() => toast("Saved")} /> },
     { key: "app", label: "App and help", words: "version update diagnostics help shortcuts keyboard login strip tray todoist", render: () => <AppSection /> },
   ], []);
