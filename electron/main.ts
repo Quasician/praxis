@@ -44,7 +44,8 @@ if (!app.requestSingleInstanceLock()) {
   // Launching Praxis again (taskbar jump list, Start menu) reuses this window.
   app.on("second-instance", (_e, argv) => { if (!runArgs(argv)) showWindow(); });
   app.whenReady().then(start).catch((e) => { log("startup failed", e?.stack || e); dialog.showErrorBox("Praxis couldn't start", String(e)); app.quit(); });
-  app.on("before-quit", () => { quitting = true; });
+  // 5.0.1: the gate and the lock card refuse to close, which used to cancel a quit (from the tray, or to install an update) while one was up.
+  app.on("before-quit", () => { quitting = true; guard?.stop(); });
   app.on("will-quit", () => { globalShortcut.unregisterAll(); wallpaper?.stop(); guard?.stop(); });
   app.on("window-all-closed", () => { /* stay in the tray */ });
 }
@@ -213,11 +214,12 @@ function createTray() {
   tray.setToolTip("Praxis");
   tray.on("click", showWindow);
   tray.on("double-click", showWindow);
+  tray.on("right-click", () => guard?.hold(3000));   // the menu is about to open: let it
   refreshTrayMenu();
 }
 
 function refreshTrayMenu() {
-  tray?.setContextMenu(Menu.buildFromTemplate([
+  const menu = Menu.buildFromTemplate([
     { label: "Open Praxis", click: showWindow },
     { label: "Quick add…", accelerator: QUICK_ADD, click: quickAdd },
     { label: "Brain dump…", click: () => trigger("brain-dump") },
@@ -236,7 +238,11 @@ function refreshTrayMenu() {
     { label: `Version ${app.getVersion()}`, enabled: false },
     { type: "separator" },
     { label: "Quit Praxis", click: () => { quitting = true; app.quit(); } },
-  ]));
+  ]);
+  // 5.0.1: the block gate takes the screen back from anything else, but not from this menu (it's the way out of a stuck gate).
+  menu.on("menu-will-show", () => guard?.hold(60_000));
+  menu.on("menu-will-close", () => guard?.hold(0));
+  tray?.setContextMenu(menu);
 }
 
 // ---------- the valley wallpaper (3.4) ----------

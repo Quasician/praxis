@@ -2,6 +2,7 @@
 // against the stand-in Todoist, and checks the parts only the desktop app has:
 //   1. a block starting opens the full-screen gate (a window per screen), and skipping it with a reason closes the gate
 //      and lands in the day's record;
+//      (on Windows, a window coming up in front of the gate — as Alt+Tab would — loses the front straight back to it);
 //   2. on Windows, the focus lock: an app you locked (here Notepad) is covered by the lock card while a timer runs.
 // Run: npm run build && npm run check:desktop   (on Linux, under xvfb-run).
 import { _electron as electron } from "playwright";
@@ -75,6 +76,24 @@ try {
     const flags = await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().filter((w) => w.getURL().includes("gate=")).map((w) => ({ top: w.isAlwaysOnTop(), closable: w.isClosable(), full: w.getBounds() })));
     console.log(`    (gate windows: ${JSON.stringify(flags)})`);
     if (process.platform !== "linux" && !flags.every((f) => f.top && !f.closable)) throw new Error("the gate isn't always on top, or can be closed");
+    if (isWin) {
+      // 5.0.1: another window taking the screen (as Alt+Tab would) doesn't get rid of the gate: it comes back in front.
+      const np = spawn("notepad.exe", [], { detached: true, stdio: "ignore" });
+      try {
+        const pid = await app.evaluate(() => process.pid);
+        const helper = fs.readdirSync("native-build").find((f) => /^praxis-wall-.*\.exe$/.test(f));
+        const front = () => new Promise((res) => { const p = spawn(path.join("native-build", helper), ["front"]); let out = ""; p.stdout.on("data", (b) => (out += b)); p.on("close", () => res(out.trim())); });
+        await new Promise((r) => setTimeout(r, 3000));   // Notepad opens and takes the front (if this machine lets it)
+        const back = await waitFor(async () => { const f = await front(); return f.split("\t")[1] === String(pid) ? f : null; }, "the gate back in front", 10000).catch(() => null);
+        if (!back) {
+          const f = await front();
+          if (/notepad\.exe/i.test(f)) throw new Error(`Notepad stayed in front of the gate (${f})`);
+          console.log(`    (nothing could take the front on this machine (${f}); the gate holding the screen isn't checked here)`);
+        }
+        const stillOpen = app.windows().some((w) => w.url().includes("gate="));
+        if (!stillOpen) throw new Error("the gate closed when another window came up");
+      } finally { try { process.kill(np.pid); } catch { /* gone */ } spawn("taskkill", ["/IM", "notepad.exe", "/F"], { stdio: "ignore" }); }
+    }
     await gate.click("#gate-skip");
     await gate.fill("#gate-why", "checking the gate");
     await gate.click("#gate-skip-go", { noWaitAfter: true }).catch((e) => { if (!/closed/i.test(e.message)) throw e; });   // the gate closes as it's answered
@@ -93,14 +112,17 @@ try {
         // Which window is in front, as the lock sees it (the helper built next to the app).
         const helper = fs.readdirSync("native-build").find((f) => /^praxis-wall-.*\.exe$/.test(f));
         const front = () => new Promise((res) => { const p = spawn(path.join("native-build", helper), ["front"]); let out = ""; p.stdout.on("data", (b) => (out += b)); p.on("close", () => res(out.trim())); });
-        const inFront = await waitFor(async () => /notepad\.exe/i.test(await front()), "Notepad in front", 15000).catch(() => false);
+        // Notepad in front, or already covered by the lock card (the lock can be quicker than this look).
+        const inFront = await waitFor(async () => app.windows().some((w) => w.url().includes("lock=")) || /notepad\.exe/i.test(await front()), "Notepad in front", 15000).catch(() => false);
         if (!inFront) { console.log(`    (Notepad couldn't come to the front on this machine (${await front()}); the lock card isn't checked here)`); return; }
         const lock = await waitFor(async () => app.windows().find((w) => w.url().includes("lock=")), "the lock card over Notepad", 30000);
         await lock.waitForSelector("#lock");
         if (!(await lock.locator("#lock").textContent()).includes("locked")) throw new Error("the lock card doesn't say what's locked");
         await lock.click("#lock-back", { noWaitAfter: true }).catch((e) => { if (!/closed/i.test(e.message)) throw e; });
-      } finally { try { process.kill(np.pid); } catch { /* gone */ } spawn("taskkill", ["/IM", "notepad.exe", "/F"], { stdio: "ignore" }); }
-      await api("/api/config", { ...(await api("/api/config")), focus: null });
+      } finally {
+        try { process.kill(np.pid); } catch { /* gone */ } spawn("taskkill", ["/IM", "notepad.exe", "/F"], { stdio: "ignore" });
+        await api("/api/config", { ...(await api("/api/config")), focus: null });   // the timer off on every path (with a lock left on, the app could hang when quitting)
+      }
     });
   }
 } catch (e) {
@@ -108,7 +130,15 @@ try {
   console.log(`  ✗ the desktop app: ${e.message}`);
 } finally {
   try { const log = fs.readFileSync(path.join(dir, "praxis.log"), "utf8"); if (fail) console.log("\n--- praxis.log ---\n" + log.split("\n").slice(-40).join("\n")); } catch { /* no log */ }
-  await app?.close().catch(() => undefined);
+  // Quitting works whatever is up (5.0.1: a gate or lock card used to cancel it); a quit that hangs fails the check, with what was still open.
+  const open = await Promise.race([app?.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().map((w) => `${w.getTitle()} ${w.getURL().split("?")[1]?.slice(0, 20) || ""} visible=${w.isVisible()} closable=${w.isClosable()}`)).catch((e) => [String(e)]), new Promise((r) => setTimeout(() => r(["(no answer)"]), 5000))]);
+  const quit = app?.close().then(() => true).catch(() => true);
+  if (quit && !(await Promise.race([quit, new Promise((r) => setTimeout(() => r(false), 20000))]))) {
+    fail = true;
+    console.log("  ✗ the app didn't quit within 20 s (stopped it). Windows open at the time:\n    " + (open || []).join("\n    "));
+    try { console.log("    log: " + fs.readFileSync(path.join(dir, "praxis.log"), "utf8").trim().split("\n").slice(-12).join("\n    log: ")); } catch { /* no log */ }
+    try { app.process().kill(); } catch { /* gone */ }
+  }
   fake.server.close();
 }
 console.log(fail ? `${results.filter((r) => r[0] === "✗").length || 1} desktop check(s) failed.` : `All ${results.length} desktop checks passed.`);
