@@ -4,6 +4,10 @@
 export interface News { v: string; title: string; lines: string[] }
 
 export const NEWS: News[] = [
+  { v: "5.1.4", title: "Your year, edge to edge", lines: [
+    "Your year along the horizon now runs the full width of the screen, with each month's name centred on its own stretch.",
+    "“Today” marks the bright right end of the band.",
+  ] },
   { v: "5.1.3", title: "Done on the focus timer", lines: [
     "“Done” on the focus timer's reminder ticks the task off and ends the session, so the reminder no longer comes back after a restart.",
   ] },
