@@ -4,6 +4,9 @@
 export interface News { v: string; title: string; lines: string[] }
 
 export const NEWS: News[] = [
+  { v: "5.1.3", title: "Done on the focus timer", lines: [
+    "“Done” on the focus timer's reminder ticks the task off and ends the session, so the reminder no longer comes back after a restart.",
+  ] },
   { v: "5.1.2", title: "The sky, lined up", lines: [
     "The moving sky now fills your screen exactly: no more strip of an older picture down the left edge.",
     "Your projects' constellations show their names.",
