@@ -4,6 +4,11 @@
 export interface News { v: string; title: string; lines: string[] }
 
 export const NEWS: News[] = [
+  { v: "5.1.0", title: "The living sky", lines: [
+    "Your wallpaper is now a living sky: the real sun, moon and stars over Milpitas, the real weather, and the motto fitted in between.",
+    "Your projects shine as gold constellations, and everything you finished this year glows along the horizon.",
+    "Switching windows no longer lags: the moving wallpaper draws one picture a minute instead of redrawing all the time.",
+  ] },
   { v: "5.0.1", title: "The block gate holds", lines: [
     "When a block's full-screen card is up, Alt+Tab (or clicking anywhere else) can't send it away: it comes straight back until you start, move or skip.",
     "If it ever gets stuck, the tray menu's “Close the block gate” still closes it.",
