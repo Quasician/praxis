@@ -41,3 +41,4 @@ jobs:
         run: ./scripts/test-wallpaper-helper.ps1
       # 5.0: the real desktop app on Windows: the block gate, and the focus lock over a locked app (Notepad).
       - run: npm run check:desktop
+        timeout-minutes: 15

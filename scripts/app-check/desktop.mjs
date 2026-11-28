@@ -118,8 +118,10 @@ try {
         await lock.waitForSelector("#lock");
         if (!(await lock.locator("#lock").textContent()).includes("locked")) throw new Error("the lock card doesn't say what's locked");
         await lock.click("#lock-back", { noWaitAfter: true }).catch((e) => { if (!/closed/i.test(e.message)) throw e; });
-      } finally { try { process.kill(np.pid); } catch { /* gone */ } spawn("taskkill", ["/IM", "notepad.exe", "/F"], { stdio: "ignore" }); }
-      await api("/api/config", { ...(await api("/api/config")), focus: null });
+      } finally {
+        try { process.kill(np.pid); } catch { /* gone */ } spawn("taskkill", ["/IM", "notepad.exe", "/F"], { stdio: "ignore" });
+        await api("/api/config", { ...(await api("/api/config")), focus: null });   // the timer off on every path (with a lock left on, the app could hang when quitting)
+      }
     });
   }
 } catch (e) {
@@ -127,7 +129,12 @@ try {
   console.log(`  ✗ the desktop app: ${e.message}`);
 } finally {
   try { const log = fs.readFileSync(path.join(dir, "praxis.log"), "utf8"); if (fail) console.log("\n--- praxis.log ---\n" + log.split("\n").slice(-40).join("\n")); } catch { /* no log */ }
-  await app?.close().catch(() => undefined);
+  // Quit, but never hang the run on it: after 20 s the app is stopped and that's reported.
+  const quit = app?.close().then(() => true).catch(() => true);
+  if (quit && !(await Promise.race([quit, new Promise((r) => setTimeout(() => r(false), 20000))]))) {
+    console.log("  ! the app took more than 20 s to quit; stopped it");
+    try { app.process().kill(); } catch { /* gone */ }
+  }
   fake.server.close();
 }
 console.log(fail ? `${results.filter((r) => r[0] === "✗").length || 1} desktop check(s) failed.` : `All ${results.length} desktop checks passed.`);
