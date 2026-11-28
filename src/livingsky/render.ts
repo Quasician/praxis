@@ -218,6 +218,11 @@ export class LivingSkyRenderer {
       }
     }
 
+    // Your year (drawn further down); worked out now so the constellation names can keep clear of its "TODAY".
+    const hist = historyStars(job.history, job.when);
+    const [endX, endY] = hist.path[hist.path.length - 1];
+    const todayBox = { x0: endX - 70, x1: endX + 30, y0: endY - 46, y1: endY - 16 };
+
     // ---- faint field stars, then the real constellations over Milpitas
     const fieldO = L.night * 0.9 * veil;
     if (fieldO > 0.01) {
@@ -236,14 +241,17 @@ export class LivingSkyRenderer {
       }
       g.globalAlpha = realO * 0.62; g.fillStyle = "#d6e0ff"; g.font = `500 9.5px ${FONT}`; g.textAlign = "center"; g.textBaseline = "top";
       (g as Ctx & { letterSpacing: string }).letterSpacing = "2.4px";
-      for (const l of sky.labels) g.fillText(l.t, l.x, l.y);
+      for (const l of sky.labels) {
+        const half = l.t.length * 4.5;
+        if (l.x + half > todayBox.x0 && l.x - half < todayBox.x1 && l.y + 10 > todayBox.y0 && l.y < todayBox.y1) continue;
+        g.fillText(l.t, l.x, l.y);
+      }
       (g as Ctx & { letterSpacing: string }).letterSpacing = "0px";
     }
     this.aurora(g, job, L, veil);
     this.meteor(g, job, L, veil);
 
     // ---- your year along the horizon
-    const hist = historyStars(job.history, job.when);
     const galO = (0.45 + 0.55 * L.night) * (1 - wx.cover * 0.4);
     {
       g.save(); g.globalAlpha = galO; g.filter = `blur(${Math.round(18 * k)}px)`;
@@ -352,11 +360,16 @@ export class LivingSkyRenderer {
     }
 
     // ---- months under your year
-    g.globalAlpha = 0.6; g.fillStyle = "#ffffff"; g.font = `500 9.5px ${FONT}`; g.textAlign = "left"; g.textBaseline = "alphabetic";
-    (g as Ctx & { letterSpacing: string }).letterSpacing = "2.3px";
-    for (const m of hist.months) g.fillText(m.t, m.x, D_H - 16);
-    g.globalAlpha = 1; g.fillStyle = "#ffe2b0"; g.font = `600 9.5px ${FONT}`; g.textAlign = "right"; g.fillText("TODAY", D_W - 20, D_H - 16);
-    (g as Ctx & { letterSpacing: string }).letterSpacing = "0px";
+    // Each name centred on its month, across the full width; "TODAY" marks the right end of the band itself.
+    // (Letter spacing adds space after every letter, the last included: half of it is taken back so names centre truly.)
+    const ls = g as Ctx & { letterSpacing: string };
+    g.globalAlpha = 0.6; g.fillStyle = "#ffffff"; g.font = `500 9.5px ${FONT}`; g.textAlign = "center"; g.textBaseline = "alphabetic";
+    ls.letterSpacing = "2.3px";
+    for (const m of hist.months) g.fillText(m.t, m.x + 1.15, D_H - 16);
+    g.globalAlpha = 0.95; g.fillStyle = "#ffe2b0"; g.font = `600 9px ${FONT}`; g.textAlign = "right"; ls.letterSpacing = "2px";
+    g.shadowColor = "rgba(5,10,30,0.6)"; g.shadowBlur = 6 * k;
+    g.fillText("TODAY", endX + 2, endY - 26);
+    g.shadowBlur = 0; ls.letterSpacing = "0px";
 
     // ---- the motto, fitted to its zone
     if (job.motto) {

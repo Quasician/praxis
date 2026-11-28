@@ -98,8 +98,11 @@ test("history: one star per finished thing in the last year, today on the right,
   const june = h.stars.filter((s) => s.x > 800 && s.x < 1000);
   assert.ok(june.every((s) => s.o < today[0].o));
   assert.equal(h.stars.filter((s) => s.mile).length, 1);
-  assert.equal(h.months.length, 11);
-  assert.equal(h.months[h.months.length - 1].t, "NOV");
+  // 5.1.3: Dec … Nov, each centred on its own stretch, spread across the full width (the 3-day sliver of last November is left out)
+  assert.deepEqual(h.months.map((m) => m.t), ["DEC", "JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV"]);
+  const gaps = h.months.slice(1).map((m, i) => m.x - h.months[i].x);
+  assert.ok(Math.min(...gaps) > 120 && Math.max(...gaps) < 150, `even spacing: ${gaps.map((g) => g.toFixed(0)).join(",")}`);
+  assert.ok(h.months[0].x < 120 && h.months[11].x > 1580, "first and last names near the edges");
 });
 
 test("real sky: Pegasus is up on a November evening, Orion later that night", () => {

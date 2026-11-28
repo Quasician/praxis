@@ -129,6 +129,8 @@ Praxis is built to be easy on the eyes on a big monitor all day:
 
 ## The living sky (5.1)
 
+**5.1.4:** your year along the horizon runs the full width of the screen, each month's name centred on its own stretch, with "Today" marking the band's bright right end (constellation names step aside for it).
+
 **5.1.2:** the moving sky now lines up exactly with your screen (a frameless window's invisible border had pushed it about 10 px right, showing a strip of the still picture down the left edge); each project's constellation shows its name; and your year along the horizon fills in from Todoist's record of what you finished over the last year (fetched once a day), not only from when Praxis started counting.
 
 **A new wallpaper scene, replacing the city.** Your mottos now sit on a living sky, drawn at your screen's own resolution (sharp on a 5K2K screen), with nothing painted and nothing to download:

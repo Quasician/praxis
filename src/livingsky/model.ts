@@ -270,7 +270,8 @@ export function placeProjects(ps: ProjectIn[]): ProjectOut[] {
 // ---------------------------------------------------------------- your year, as stars along the horizon
 export interface History { days: Record<string, number>; milestones?: string[] }
 export interface HistoryStar { x: number; y: number; r: number; o: number; mile: boolean; fresh: boolean }
-export const HIST_X0 = 60, HIST_X1 = 1620;
+/** Your year runs the full width of the screen (5.1.3), oldest on the left, today at the right edge. */
+export const HIST_X0 = 24, HIST_X1 = 1656;
 const bandY = (u: number) => 578 + 10 * Math.sin(u * Math.PI * 3);
 const ymdLocal = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 /** One star per thing finished in the last 365 days, oldest on the left and today on the right; milestones are larger and gold. */
@@ -294,11 +295,15 @@ export function historyStars(h: History | null | undefined, when: Date): { stars
   const path: [number, number][] = [];
   for (let k = 0; k <= 60; k++) { const u = k / 60; path.push([HIST_X0 + u * (HIST_X1 - HIST_X0), bandY(u)]); }
   const MN = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
+  // Each month's name sits in the middle of its own stretch of the year (5.1.3); a sliver of a month at the far left
+  // (fewer than 12 days of it in the window) is left unnamed so names never crowd the edge.
   const months: { x: number; t: string }[] = [];
-  for (let k = 2; k <= 12; k++) {
-    const first = new Date(today.getFullYear(), today.getMonth() - 12 + k, 1);
-    const d = 364 - Math.round((today.getTime() - first.getTime()) / 864e5);
-    if (d >= 0) months.push({ x: HIST_X0 + (d / 365) * (HIST_X1 - HIST_X0), t: MN[first.getMonth()] });
+  const dayIndex = (d: Date) => 364 - Math.round((today.getTime() - new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime()) / 864e5);
+  for (let k = 0; k <= 12; k++) {
+    const first = new Date(today.getFullYear(), today.getMonth() - 12 + k, 1), next = new Date(first.getFullYear(), first.getMonth() + 1, 1);
+    const d0 = Math.max(0, dayIndex(first)), d1 = Math.min(365, dayIndex(next));
+    if (d1 - d0 < 12) continue;
+    months.push({ x: HIST_X0 + ((d0 + d1) / 2 / 365) * (HIST_X1 - HIST_X0), t: MN[first.getMonth()] });
   }
   return { stars, path, months, total };
 }
