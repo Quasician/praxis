@@ -1,6 +1,6 @@
-// Fetches the weather for the valley from the National Weather Service, every 15 minutes while the wallpaper is on.
+// Fetches the weather for the wallpaper from the National Weather Service, every 15 minutes while the wallpaper is on.
 // No key, no account: each request names the app (User-Agent), as the service asks. Location: Milpitas unless set.
-import { fromForecast, fromObservation, todayRange, type ValleyWeather } from "../src/valley/weather";
+import { fromForecast, fromObservation, todayRange, type WeatherReading } from "../src/livingsky/weather";
 
 const UA = "Praxis/3.5 (https://github.com/Quasician/praxis)";
 type Point = { stations: string; hourly: string; at: number };
@@ -14,7 +14,7 @@ async function get(url: string) {
 }
 
 /** The current weather at (lat, lng): the nearest station's reading, or the hourly forecast when the station has nothing. */
-export async function currentWeather(lat: number, lng: number, base = process.env.PRAXIS_NWS_BASE || "https://api.weather.gov"): Promise<ValleyWeather> {
+export async function currentWeather(lat: number, lng: number, base = process.env.PRAXIS_NWS_BASE || "https://api.weather.gov"): Promise<WeatherReading> {
   const day = 24 * 3600_000;
   if (!point || Date.now() - point.at > day) {
     const j = await get(`${base}/points/${lat.toFixed(4)},${lng.toFixed(4)}`);

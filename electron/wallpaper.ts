@@ -1,6 +1,6 @@
 // Your mottos on a living scene, as your Windows wallpaper (3.4; the living sky since 5.1, the city before it).
 //   • Opt-in. Turning it on remembers how your desktop was (a slideshow of your Mottos folder, say); turning it off puts it back.
-//   • A hidden window draws the picture (src/valley); this module picks the motto, says when to redraw, and hands the file to Windows.
+//   • A hidden window draws the picture (src/livingsky); this module picks the motto, says when to redraw, and hands the file to Windows.
 //   • Your Mottos folder is only ever read. Pictures go to Praxis's own folder (two files, alternating).
 //   • Redrawn every 10 minutes, on the hour with the next motto, when a star is lit in your sky, and when you come back to the PC.
 import { app, BrowserWindow, powerMonitor, screen } from "electron";
@@ -11,9 +11,8 @@ import path from "path";
 import { spawn, type ChildProcess } from "child_process";
 import { safeMottoName } from "../server/app";
 import { currentWeather } from "./weather";
-import { dayIcon, type SkyIcon, type ValleyWeather } from "../src/valley/weather";
+import { dayIcon, type SkyIcon, type WeatherReading } from "../src/livingsky/weather";
 import { DEFAULT_LAT, DEFAULT_LNG } from "../src/domain/sun";
-import { CITY_FILES } from "../src/city/model";
 import { dimOf } from "../src/domain/review";
 import type { SkyConstellation } from "../src/domain/sky";
 import NATIVE_CS from "./wallpaper-native.cs";
@@ -29,14 +28,12 @@ export interface WallpaperCfg {
   bag?: string[]; current?: { name: string; hour: string } | null;
   tags?: Record<string, string>; saved?: Saved | null;
   last?: { at: string; file: string; motto: string; ms: number } | null; error?: string | null;
-  weather?: ValleyWeather | null; useWeather?: boolean; lat?: number; lng?: number;
+  weather?: WeatherReading | null; useWeather?: boolean; lat?: number; lng?: number;
   liveHow?: string | null;
-  /** 3.9: the valley (drawn) or the city (paintings from the city kit folder). */
-  scene?: "valley" | "city"; cityFolder?: string;
   /** 3.9: the warmest and coldest readings seen today (°C), so the high stays right after the forecast has moved on. */
   tempDay?: { date: string; hi: number; lo: number; seen?: Partial<Record<SkyIcon, number>> } | null;
 }
-export interface WallpaperState extends WallpaperCfg { windows: boolean; mottos: number; defaultFolder: string; city: { folder: string; found: number; total: number } }
+export interface WallpaperState extends WallpaperCfg { windows: boolean; mottos: number; defaultFolder: string }
 
 const isWin = process.platform === "win32";
 
@@ -119,9 +116,6 @@ export function createWallpaper(deps: WallpaperDeps) {
   let timer: NodeJS.Timeout | null = null;
   let busy = false, lastKey = "", locked = false;
   const defaultFolder = path.join(app.getPath("pictures"), "Mottos");
-  const defaultCity = path.join(app.getPath("pictures"), "Praxis city kit", "keyframes-5k");
-  // 5.1: the living sky replaces the city (the valley was retired in 4.4); an old "valley" or "city" setting is read as the sky.
-  const sceneOf = (_w: WallpaperCfg) => "sky" as const;
   /** What the sky needs beyond the motto: the forecast's symbol, the wind, your year and where you are. */
   const skyExtras = () => { const w = cfgOf(), x = weatherNow(); return { icon: x?.icon || null, wind: x?.wind ?? 0.25, history: historyOf(deps.readConfig()), lat: w.lat ?? DEFAULT_LAT, lng: w.lng ?? DEFAULT_LNG }; };
   const cfgOf = (): WallpaperCfg => (deps.readConfig().wallpaper as WallpaperCfg) || {};
@@ -129,12 +123,12 @@ export function createWallpaper(deps: WallpaperDeps) {
   const folderOf = (w: WallpaperCfg) => w.folder || defaultFolder;
   const mottos = (w: WallpaperCfg) => { try { return fs.readdirSync(folderOf(w)).filter((n) => safeMottoName(n)).sort(); } catch { return []; } };
 
-  /** Resolves once the valley page in a window has loaded its land and trees. */
+  /** Resolves once the wallpaper page in a window is ready to draw. */
   async function waitReady(w: BrowserWindow) {
     const started = Date.now();
     for (;;) {
       if (w.isDestroyed()) throw new Error("The wallpaper window closed.");
-      const st = await w.webContents.executeJavaScript("window.__valley ? (window.__valley.error ? 'error:' + window.__valley.error : window.__valley.ready ? 'ready' : 'wait') : 'wait'").catch(() => "wait");
+      const st = await w.webContents.executeJavaScript("window.__wallpaper ? (window.__wallpaper.error ? 'error:' + window.__wallpaper.error : window.__wallpaper.ready ? 'ready' : 'wait') : 'wait'").catch(() => "wait");
       if (st === "ready") return;
       if (String(st).startsWith("error:")) throw new Error(String(st).slice(6));
       if (Date.now() - started > 60_000) throw new Error("The wallpaper took too long to load.");
@@ -144,16 +138,16 @@ export function createWallpaper(deps: WallpaperDeps) {
   function ensureWindow(): Promise<BrowserWindow> {
     return new Promise((resolve, reject) => {
       if (win && !win.isDestroyed()) return resolve(win);
-      win = new BrowserWindow({ show: false, width: 640, height: 270, skipTaskbar: true, focusable: false, title: "Praxis valley",
+      win = new BrowserWindow({ show: false, width: 640, height: 270, skipTaskbar: true, focusable: false, title: "Praxis wallpaper",
         webPreferences: { contextIsolation: true, sandbox: true, backgroundThrottling: false, offscreen: false } });
       win.on("closed", () => { win = null; });
       win.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
       win.webContents.on("will-navigate", (e) => e.preventDefault());
-      win.loadURL(`${deps.baseUrl()}/?valley=1`).catch(reject);
+      win.loadURL(`${deps.baseUrl()}/?wallpaper=1`).catch(reject);
       const started = Date.now();
       const wait = async () => {
         if (!win || win.isDestroyed()) return reject(new Error("The wallpaper window closed."));
-        const st = await win.webContents.executeJavaScript("window.__valley ? (window.__valley.error ? 'error:' + window.__valley.error : window.__valley.ready ? 'ready' : 'wait') : 'wait'").catch(() => "wait");
+        const st = await win.webContents.executeJavaScript("window.__wallpaper ? (window.__wallpaper.error ? 'error:' + window.__wallpaper.error : window.__wallpaper.ready ? 'ready' : 'wait') : 'wait'").catch(() => "wait");
         if (st === "ready") return resolve(win);
         if (String(st).startsWith("error:")) return reject(new Error(String(st).slice(6)));
         if (Date.now() - started > 60_000) return reject(new Error("The wallpaper took too long to load."));
@@ -227,7 +221,7 @@ export function createWallpaper(deps: WallpaperDeps) {
    *  desktop layer, which destroys that window: so while this is true, redraws only feed the moving picture (4.0.1). */
   let liveAttached = false;
   const livePaused = () => locked || onBattery || fullApp;
-  function syncPause() { if (live && !live.isDestroyed()) live.webContents.executeJavaScript(`window.__valley && window.__valley.pause(${livePaused()})`).catch(() => undefined); }
+  function syncPause() { if (live && !live.isDestroyed()) live.webContents.executeJavaScript(`window.__wallpaper && window.__wallpaper.pause(${livePaused()})`).catch(() => undefined); }
   async function startLive() {
     if (live && !live.isDestroyed()) return;
     const d = screen.getPrimaryDisplay(), b = d.bounds;
@@ -246,7 +240,7 @@ export function createWallpaper(deps: WallpaperDeps) {
       // Explorer restarting takes the window with it: come back if the live wallpaper is still on.
       if (cfgOf().enabled && cfgOf().live && !liveFailed) setTimeout(() => startLive().catch(() => undefined), 5000);
     });
-    await live.loadURL(`${deps.baseUrl()}/?valley=1&live=1`);
+    await live.loadURL(`${deps.baseUrl()}/?wallpaper=1&live=1`);
     await waitReady(live);
     live.showInactive();
     // Draw the first frame while it's still off-screen, so it never sits behind the icons as an empty dark rectangle
@@ -254,7 +248,7 @@ export function createWallpaper(deps: WallpaperDeps) {
     await feedLive();
     for (const t0 = Date.now(); !livePaused() && Date.now() - t0 < 15_000;) {
       if (!live || live.isDestroyed()) return;
-      if (await live.webContents.executeJavaScript("!!(window.__valley && (window.__valley.drawn || window.__valley.error))").catch(() => false)) break;
+      if (await live.webContents.executeJavaScript("!!(window.__wallpaper && (window.__wallpaper.drawn || window.__wallpaper.error))").catch(() => false)) break;
       await new Promise((r) => setTimeout(r, 150));
     }
     if (!live || live.isDestroyed()) return;
@@ -270,7 +264,7 @@ export function createWallpaper(deps: WallpaperDeps) {
     } catch (e) { deps.log("live wallpaper couldn't attach", (e as Error).message); save({ error: "The moving wallpaper couldn't get behind your desktop icons; showing the still picture instead." }); liveFailed = true; lastKey = ""; stopLive(); return; }
     await feedLive();
     if (isWin && !watcher) {
-      // One small helper keeps an eye on whether a full-screen app is in front (then the valley holds still).
+      // One small helper keeps an eye on whether a full-screen app is in front (then the sky holds still).
       watcher = spawn(await helperExe(deps.log), ["watch", String(process.pid)], { windowsHide: true, stdio: ["ignore", "pipe", "ignore"] });
       watcher.stdout?.on("data", (b: Buffer) => { const last = b.toString().trim().split(/\s+/).pop(); const full = last === "full"; if (full !== fullApp) { fullApp = full; syncPause(); } });
       watcher.on("exit", () => { watcher = null; });
@@ -284,8 +278,8 @@ export function createWallpaper(deps: WallpaperDeps) {
   async function feedLive() {
     if (!live || live.isDestroyed()) return;
     const now = new Date(), wx = weatherNow();
-    const job = { when: now.toISOString(), weather: wx?.kind || "clear", motto: cfgOf().current?.name || pickMotto(cfgOf(), now), projects: projectsOf(deps.readConfig()), events: eventsOf(deps.readConfig()), scene: sceneOf(cfgOf()), temp: tempNow(), ...skyExtras() };
-    await live.webContents.executeJavaScript(`window.__valley.live(${JSON.stringify(job)})`).catch((e) => deps.log("live feed failed", e?.message || e));
+    const job = { when: now.toISOString(), weather: wx?.kind || "clear", motto: cfgOf().current?.name || pickMotto(cfgOf(), now), projects: projectsOf(deps.readConfig()), events: eventsOf(deps.readConfig()), temp: tempNow(), ...skyExtras() };
+    await live.webContents.executeJavaScript(`window.__wallpaper.live(${JSON.stringify(job)})`).catch((e) => deps.log("live feed failed", e?.message || e));
     syncPause();
   }
   powerMonitor.on("on-battery", () => { onBattery = true; syncPause(); });
@@ -300,7 +294,7 @@ export function createWallpaper(deps: WallpaperDeps) {
     const projects = projectsOf(deps.readConfig()), events = eventsOf(deps.readConfig());
     await refreshWeather();
     const wx = weatherNow(), temp = tempNow();
-    const key = `${sceneOf(w)}|${temp ? `${temp.now}/${temp.hi}/${temp.lo}/${temp.icon}` : ""}|${motto}|${Math.floor((now.getHours() * 60 + now.getMinutes()) / 10)}|${now.toDateString()}|${JSON.stringify(projects.map((p) => p.steps.filter((s) => s.lit).length))}|${wx?.kind}|${Math.round((wx?.wind ?? 0) * 4)}|${events.meteorAt || ""}|${events.aurora}|${historyOf(deps.readConfig()).days[ymdLocal(now)] || 0}|${wx?.icon || ""}`;
+    const key = `sky|${temp ? `${temp.now}/${temp.hi}/${temp.lo}/${temp.icon}` : ""}|${motto}|${Math.floor((now.getHours() * 60 + now.getMinutes()) / 10)}|${now.toDateString()}|${JSON.stringify(projects.map((p) => p.steps.filter((s) => s.lit).length))}|${wx?.kind}|${Math.round((wx?.wind ?? 0) * 4)}|${events.meteorAt || ""}|${events.aurora}|${historyOf(deps.readConfig()).days[ymdLocal(now)] || 0}|${wx?.icon || ""}`;
     if (!force && key === lastKey) return;
     busy = true;
     try {
@@ -310,17 +304,17 @@ export function createWallpaper(deps: WallpaperDeps) {
         await feedLive();
         lastKey = key;
         save({ last: { at: now.toISOString(), file: cfgOf().last?.file || "", motto: motto || "", ms: 0 }, error: null });
-        deps.log("wallpaper (moving)", sceneOf(w), motto, temp ? `${temp.now}F` : wx ? "no temperature" : "no weather");
+        deps.log("wallpaper (moving)", motto, temp ? `${temp.now}F` : wx ? "no temperature" : "no weather");
         return;
       }
       const v = await ensureWindow();
-      const job = { when: now.toISOString(), weather: wx?.kind || "clear", motto, projects, events, scene: sceneOf(w), temp, ...skyExtras(), ...size() };
-      const out = await v.webContents.executeJavaScript(`window.__valley.wallpaper(${JSON.stringify(job)})`) as { file: string; ms: number };
+      const job = { when: now.toISOString(), weather: wx?.kind || "clear", motto, projects, events, temp, ...skyExtras(), ...size() };
+      const out = await v.webContents.executeJavaScript(`window.__wallpaper.wallpaper(${JSON.stringify(job)})`) as { file: string; ms: number };
       await helper(["set", out.file, "4"], deps.log);
       lastKey = key;
       save({ last: { at: now.toISOString(), file: out.file, motto: motto || "", ms: out.ms }, error: null });
       if (cfgOf().live) { if (!live) { if (!liveFailed) startLive().catch((e) => deps.log("live wallpaper failed", e?.message || e)); } else await feedLive(); }
-      deps.log("wallpaper", sceneOf(w), motto, out.ms + "ms", temp ? `${temp.now}F` : wx ? "no temperature" : "no weather");
+      deps.log("wallpaper", motto, out.ms + "ms", temp ? `${temp.now}F` : wx ? "no temperature" : "no weather");
     } catch (e) {
       const msg = (e as Error)?.message || String(e);
       deps.log("wallpaper failed", msg);
@@ -381,10 +375,7 @@ export function createWallpaper(deps: WallpaperDeps) {
   }
   function state(): WallpaperState {
     const w = cfgOf();
-    const cf = w.cityFolder || defaultCity;
-    let found = 0;
-    try { const have = new Set(fs.readdirSync(cf)); found = CITY_FILES.filter((n) => have.has(`${n}.png`)).length; } catch { /* no kit yet */ }
-    return { ...w, windows: isWin, mottos: mottos(w).length, defaultFolder, city: { folder: cf, found, total: CITY_FILES.length } };
+    return { ...w, windows: isWin, mottos: mottos(w).length, defaultFolder };
   }
 
   return {
@@ -394,7 +385,6 @@ export function createWallpaper(deps: WallpaperDeps) {
     refresh: async () => { lastKey = ""; await refreshWeather(true); await render(true); return state(); },
     setLive: async (on: boolean) => { liveFailed = false; save({ live: on, error: null }); if (on && cfgOf().enabled) await startLive(); if (!on) { stopLive(); save({ liveHow: null }); lastKey = ""; await render(true); } return state(); },
     setWeather: async (on: boolean) => { save({ useWeather: on }); lastKey = ""; if (on) await refreshWeather(true); await render(true); return state(); },
-    setCityFolder: async (cityFolder: string) => { save({ cityFolder }); lastKey = ""; if (cfgOf().enabled) await render(true); return state(); },
     setFolder: async (folder: string) => { save({ folder, bag: [], current: null }); lastKey = ""; if (cfgOf().enabled) await render(true); return state(); },
     window: () => win,
   };

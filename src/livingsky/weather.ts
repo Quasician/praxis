@@ -1,9 +1,11 @@
-// Real weather for the valley (3.5), from the US National Weather Service (api.weather.gov).
+// Real weather for the wallpaper (3.5; the living sky since 5.1), from the US National Weather Service (api.weather.gov).
 // Its data is open and free to use; each request names the app in a User-Agent header. Nothing to sign up for.
-// This file only turns the service's answers into the valley's few kinds of weather; the desktop app does the fetching.
-import type { Weather } from "./model";
+// This file only turns the service's answers into a few kinds of weather and symbols; the desktop app does the fetching.
 
-export interface ValleyWeather { kind: Weather; wind: number; tempC: number | null; text: string; at: string; source: "station" | "forecast"; station?: string;
+/** The broad kind of weather, from the observation or forecast text. */
+export type Weather = "clear" | "cloudy" | "mist" | "rain" | "snow";
+
+export interface WeatherReading { kind: Weather; wind: number; tempC: number | null; text: string; at: string; source: "station" | "forecast"; station?: string;
   /** 3.9: the forecast's highest and lowest for the rest of today (the desktop app adds what it has already seen since midnight). */
   hiC?: number | null; loC?: number | null;
   /** 3.9: the symbol for the conditions now, and how many of today's remaining forecast hours look like each symbol. */
@@ -47,15 +49,8 @@ const KMH = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : n
 const RAIN = /rain|drizzle|shower|thunder|storm/i, SNOW = /snow|sleet|ice pellets|flurr|blizzard|freezing/i, MIST = /fog|mist|haze|smoke/i, CLOUD = /cloudy|overcast/i;
 const wind01 = (kmh: number | null) => (kmh === null ? 0.2 : Math.max(0, Math.min(1, kmh / 40)));
 
-/** In deep winter, cold rain in the valley falls as snow (the valley is higher than Milpitas). */
-function winterize(kind: Weather, tempC: number | null, when: Date): Weather {
-  const m = when.getMonth();
-  if (kind === "rain" && (m === 11 || m <= 1) && tempC !== null && tempC < 7.2) return "snow";
-  return kind;
-}
-
 /** From a station's latest observation (properties of /stations/{id}/observations/latest). */
-export function fromObservation(p: Record<string, unknown>, when = new Date()): ValleyWeather | null {
+export function fromObservation(p: Record<string, unknown>, when = new Date()): WeatherReading | null {
   if (!p || typeof p !== "object") return null;
   const text = String(p.textDescription || "");
   const present = Array.isArray(p.presentWeather) ? (p.presentWeather as { weather?: string; rawString?: string }[]).map((w) => `${w.weather || ""} ${w.rawString || ""}`).join(" ") : "";
@@ -70,11 +65,11 @@ export function fromObservation(p: Record<string, unknown>, when = new Date()): 
   else if (RAIN.test(all)) kind = "rain";
   else if (MIST.test(all) || (vis !== null && vis < 3000)) kind = "mist";
   else if (layers.some((a) => a === "BKN" || a === "OVC") || CLOUD.test(text)) kind = "cloudy";
-  return { kind: winterize(kind, tempC, when), wind: wind01(kmh), tempC, text: text || present.trim() || "—", at: String(p.timestamp || when.toISOString()), source: "station", icon: iconOf(`${text} ${present}`) };
+  return { kind: kind, wind: wind01(kmh), tempC, text: text || present.trim() || "—", at: String(p.timestamp || when.toISOString()), source: "station", icon: iconOf(`${text} ${present}`) };
 }
 
 /** From the hourly forecast's current period (properties.periods[0] of the gridpoint's forecastHourly). */
-export function fromForecast(period: Record<string, unknown>, when = new Date()): ValleyWeather | null {
+export function fromForecast(period: Record<string, unknown>, when = new Date()): WeatherReading | null {
   if (!period || typeof period !== "object") return null;
   const text = String(period.shortForecast || "");
   const tempF = typeof period.temperature === "number" ? period.temperature : null;
@@ -86,5 +81,5 @@ export function fromForecast(period: Record<string, unknown>, when = new Date())
   else if (RAIN.test(text) && pop >= 40) kind = "rain";
   else if (MIST.test(text)) kind = "mist";
   else if (CLOUD.test(text) || /mostly cloudy|chance/i.test(text)) kind = "cloudy";
-  return { kind: winterize(kind, tempC, when), wind: wind01(Number.isFinite(mph) ? mph * 1.609 : null), tempC, text: text || "—", at: when.toISOString(), source: "forecast", icon: iconOf(text) };
+  return { kind: kind, wind: wind01(Number.isFinite(mph) ? mph * 1.609 : null), tempC, text: text || "—", at: when.toISOString(), source: "forecast", icon: iconOf(text) };
 }

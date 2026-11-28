@@ -10,7 +10,6 @@ interface WState {
   current?: { name: string } | null; last?: { at: string; motto: string; ms: number } | null; error?: string | null;
   saved?: { status: number; folder: string } | null;
   useWeather?: boolean; weather?: { kind: string; text: string; station?: string; source: string; at: string } | null; liveHow?: string | null;
-  scene?: "valley" | "city" | "sky";
 }
 
 export function WallpaperDialog() {

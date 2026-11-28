@@ -2,9 +2,8 @@
 // constellations, your year, the ridge and the motto, and one small WebGL pass for the clouds. Nothing here loops: the
 // wallpaper asks for a new frame when something has changed (about once a minute), and falling rain or snow is a separate,
 // GPU-only layer made by precipLayer() that the page slides along without redrawing anything.
-import { drawSkyIcon } from "../valley/skyIcons";
-import type { SkyIcon } from "../valley/weather";
-import type { Weather } from "../valley/model";
+import { drawSkyIcon } from "./skyIcons";
+import type { SkyIcon, Weather } from "./weather";
 import {
   D_W, D_H, ARC, clamp, mix, rng, lightAt, trailOf, skyWeather, weatherLook, weatherColours, cloudColours, realSky,
   placeProjects, historyStars, mottoFit, fieldStars, onArc, openArc, type ProjectIn, type History, type SkyWeather,
