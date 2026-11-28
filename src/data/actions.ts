@@ -77,7 +77,8 @@ export async function ensureConfig(): Promise<Config> {
 }
 
 // ---------- tasks ----------
-export async function completeTask(task: Task) {
+/** Ticks a task off. Resolves true once Todoist has it (or it's queued while Todoist is down), false if it failed. */
+export async function completeTask(task: Task): Promise<boolean> {
   const undo = removeTask(task.id);
   try {
     await closeTask(task.id);
@@ -93,9 +94,11 @@ export async function completeTask(task: Task) {
     import("./habits").then((h) => h.celebrateIfEarned(task.id)).catch(() => undefined);
     import("../lib/chime").then((m) => m.chime(queryClient.getQueryData<Config>(qk.config)?.planner?.chime)).catch(() => undefined);
     setTimeout(() => queryClient.invalidateQueries({ queryKey: qk.completed }), 800); // streak + progress update promptly
+    return true;
   } catch {
     undo();
     toast("Couldn't complete that task. Try again.");
+    return false;
   }
 }
 

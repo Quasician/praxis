@@ -116,6 +116,13 @@ Praxis is built to be easy on the eyes on a big monitor all day:
 - **Readable type**: Atkinson Hyperlegible for text (designed for legibility) and Bricolage Grotesque for headings, bundled so they work offline.
 - **Calm motion**: finishing a task fills the circle and folds the row away; the focus timer is a ring that fills. If Windows has "Show animations" turned off, Praxis stops animating too.
 
+## Done means done (5.1.1)
+
+- **"Done" on a reminder ticks the task off, every time.** Pressing Done on a "Block ended" reminder used to wait for Praxis to save how the block went before ticking the task off in Todoist. When that save failed, nothing happened at all. The most likely cause was a settings file over 1 MB, which Praxis wouldn't accept back. Now the two happen side by side: the task is ticked off even if the record can't be saved, and settings can grow well past 1 MB.
+- **A reminder for a task that isn't in today's list** (it just refreshed, or the task was added after the list was read) now looks the task up in Todoist instead of doing nothing.
+- **If a reminder's button can't finish the job, you're told**, with a Windows notification when Praxis is out of sight.
+- **⋯ → Copy diagnostics** now includes how big the settings file is, and the log records which reminder button you pressed.
+
 ## The living sky (5.1)
 
 **A new wallpaper scene, replacing the city.** Your mottos now sit on a living sky, drawn at your screen's own resolution (sharp on a 5K2K screen), with nothing painted and nothing to download:

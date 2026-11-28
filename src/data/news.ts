@@ -4,6 +4,10 @@
 export interface News { v: string; title: string; lines: string[] }
 
 export const NEWS: News[] = [
+  { v: "5.1.1", title: "Done means done", lines: [
+    "“Done” on a reminder now ticks the task off in Todoist every time, even if Praxis can't save how the block went.",
+    "If a reminder's button ever can't finish the job, Praxis tells you instead of doing nothing.",
+  ] },
   { v: "5.1.0", title: "The living sky", lines: [
     "Your wallpaper is now a living sky: the real sun, moon and stars over Milpitas, the real weather, and the motto fitted in between.",
     "Your projects shine as gold constellations, and everything you finished this year glows along the horizon.",
