@@ -151,7 +151,9 @@ try {
       a = await waitFor(async () => { const x = await asks(); return x.ci + x.wn ? x : null; }, "the next ask");
     }
     const text = await page.locator(".cv-left #whats-new").textContent();
-    if (!text.includes("Your day, as it happened") || !text.includes("Block gate") && !text.includes("block gate")) throw new Error(`what's new: ${text.slice(0, 200)}`);
+    // The card shows the newest notes (at most three versions' worth): it must lead with the newest one in src/data/news.ts.
+    const newest = /title: "([^"]+)"/.exec(fs.readFileSync(path.join(process.cwd(), "src", "data", "news.ts"), "utf8"))?.[1];
+    if (!newest || !text.includes(newest)) throw new Error(`what's new doesn't show "${newest}": ${text.slice(0, 200)}`);
     if (await page.locator("#whats-new a[href*='github']").count()) throw new Error("what's new should be a card, not a link out");
     await page.click(".cv-left #wn-ok"); await tick(1000);
     if ((await config()).lastSeenVersion !== PKG.version) throw new Error("what's new didn't remember it was seen");

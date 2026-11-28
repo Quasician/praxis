@@ -30,6 +30,8 @@ export interface WallpaperCfg {
   last?: { at: string; file: string; motto: string; ms: number } | null; error?: string | null;
   weather?: WeatherReading | null; useWeather?: boolean; lat?: number; lng?: number;
   liveHow?: string | null;
+  /** 5.1.2: things finished per day over the last year, from Todoist, and when that was last fetched. */
+  year?: { at: string; days: Record<string, number> } | null;
   /** 3.9: the warmest and coldest readings seen today (°C), so the high stays right after the forecast has moved on. */
   tempDay?: { date: string; hi: number; lo: number; seen?: Partial<Record<SkyIcon, number>> } | null;
 }
@@ -96,19 +98,45 @@ function projectsOf(cfg: Cfg) {
   const sky = cfg.sky as { cons?: Record<string, SkyConstellation> } | undefined;
   const live = Object.entries(sky?.cons || {}).filter(([, c]) => !c.finished && c.steps?.length).sort((a, b) => (b[1].since || "").localeCompare(a[1].since || "")).slice(0, 7);
   // 4.0: a project with no star lit for a while fades here too (its colour is mixed toward the night sky).
-  return live.map(([id, c], i) => ({ id, seed: c.seed, dim: dimOf(c), color: fade(COLORS[i % COLORS.length], dimOf(c)), steps: c.steps.map((s) => ({ lit: !!s.done, min: s.min || 20 })) }));
+  return live.map(([id, c], i) => ({ id, name: c.name, seed: c.seed, dim: dimOf(c), color: fade(COLORS[i % COLORS.length], dimOf(c)), steps: c.steps.map((s) => ({ lit: !!s.done, min: s.min || 20 })) }));
 }
 const ymdLocal = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-/** 5.1: your last year of finished things for the living sky's horizon: loose tasks per day (the sky's stardust) and the days
- *  project steps were finished (they show as larger, gold stars). Counts and dates only; no names leave the sky record. */
+/** 5.1: your last year of finished things for the living sky's horizon: things finished per day and the days project steps
+ *  were finished (they show as larger, gold stars). Counts and dates only.
+ *  5.1.2: the sky's stardust only starts when Praxis started counting, so the days before come from Todoist's own record of
+ *  what you finished (fetched once a day, see yearFromTodoist); each day takes whichever count is higher. */
 export function historyOf(cfg: Cfg, now = Date.now()) {
   const sky = cfg.sky as { cons?: Record<string, SkyConstellation>; dust?: Record<string, number> } | undefined;
-  const cutoff = now - 366 * 864e5, milestones: string[] = [];
+  const cutoff = now - 366 * 864e5, milestones: string[] = [], miles: Record<string, number> = {};
   for (const c of Object.values(sky?.cons || {})) for (const s of c.steps || []) {
     const t = s.done ? Date.parse(s.done) : NaN;
-    if (t >= cutoff && t <= now) milestones.push(ymdLocal(new Date(t)));
+    if (t >= cutoff && t <= now) { const k = ymdLocal(new Date(t)); milestones.push(k); miles[k] = (miles[k] || 0) + 1; }
   }
-  return { days: { ...(sky?.dust || {}) }, milestones };
+  const year = ((cfg.wallpaper as WallpaperCfg | undefined)?.year?.days) || {};
+  const days: Record<string, number> = { ...(sky?.dust || {}) };
+  // Todoist's count includes project steps, which already show as milestones.
+  for (const [k, n] of Object.entries(year)) days[k] = Math.max(days[k] || 0, n - (miles[k] || 0));
+  return { days, milestones };
+}
+
+/** 5.1.2: how many tasks you finished each day over the last year, from Todoist (in windows of up to three months, as it serves them). */
+export async function yearFromTodoist(baseUrl: string, now = new Date()): Promise<Record<string, number>> {
+  const days: Record<string, number> = {};
+  const end = now.getTime() + 60_000;
+  for (let w = 0; w < 4; w++) {
+    const until = new Date(end - w * 89 * 864e5), since = new Date(Math.max(end - 366 * 864e5, until.getTime() - 89 * 864e5));
+    if (since >= until) break;
+    let cursor: string | null = null, pages = 0;
+    do {
+      const q = `since=${encodeURIComponent(since.toISOString())}&until=${encodeURIComponent(until.toISOString())}&limit=200${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ""}`;
+      const r = await fetch(`${baseUrl}/api/todoist/tasks/completed/by_completion_date?${q}`, { headers: { "x-planner": "1" } });
+      if (!r.ok) throw new Error(`Todoist answered ${r.status}`);
+      const page = await r.json() as { items?: { completed_at?: string }[]; results?: { completed_at?: string }[]; next_cursor?: string | null };
+      for (const t of page.items || page.results || []) if (t.completed_at) { const k = ymdLocal(new Date(t.completed_at)); days[k] = (days[k] || 0) + 1; }
+      cursor = page.next_cursor || null;
+    } while (cursor && ++pages < 60);
+  }
+  return days;
 }
 
 export function createWallpaper(deps: WallpaperDeps) {
@@ -229,7 +257,9 @@ export function createWallpaper(deps: WallpaperDeps) {
     // everything, even for a second, looks like a terminal taking over the screen. The helper moves it into place.
     const off = isWin ? { x: -32000, y: -32000 } : { x: b.x, y: b.y };
     live = new BrowserWindow({ ...off, width: b.width, height: b.height, frame: false, resizable: false, movable: false, minimizable: false, maximizable: false,
-      fullscreenable: false, skipTaskbar: true, focusable: false, show: false, backgroundColor: "#1b2233", title: "Praxis live wallpaper", hasShadow: false,
+      fullscreenable: false, skipTaskbar: true, focusable: false, show: false, backgroundColor: "#050918", title: "Praxis live wallpaper", hasShadow: false,
+      // 5.1.2: no resize border at all (a frameless window keeps an invisible one, which shifted the sky right by ~10 px).
+      thickFrame: false,
       webPreferences: { contextIsolation: true, sandbox: true, backgroundThrottling: false } });
     live.on("page-title-updated", (e) => e.preventDefault());
     live.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
@@ -286,9 +316,25 @@ export function createWallpaper(deps: WallpaperDeps) {
   powerMonitor.on("on-ac", () => { onBattery = false; syncPause(); });
   try { onBattery = powerMonitor.isOnBatteryPower(); } catch { /* older Electron */ }
 
+  let yearBusy = false;
+  /** Fetches the last year from Todoist once a day (and on the first draw); after a failure it tries again in about an hour. */
+  async function refreshYear() {
+    const y = cfgOf().year;
+    if (yearBusy || (y && Date.now() - Date.parse(y.at) < 20 * 3600_000)) return;
+    yearBusy = true;
+    try { const days = await yearFromTodoist(deps.baseUrl()); save({ year: { at: new Date().toISOString(), days } }); lastKey = ""; deps.log("wallpaper: the year from Todoist", Object.keys(days).length, "days"); }
+    catch (e) {
+      // Try again in about an hour (the date is set back so the once-a-day check lets it through then).
+      save({ year: { at: new Date(Date.now() - 19 * 3600_000).toISOString(), days: cfgOf().year?.days || {} } });
+      deps.log("wallpaper: couldn't fetch the year", (e as Error).message);
+    }
+    finally { yearBusy = false; }
+  }
+
   async function render(force = false) {
     const w = cfgOf();
     if (!w.enabled || busy || (locked && !force)) return;
+    refreshYear().catch(() => undefined);
     const now = new Date();
     const motto = pickMotto(cfgOf(), now);
     const projects = projectsOf(deps.readConfig()), events = eventsOf(deps.readConfig());

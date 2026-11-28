@@ -233,8 +233,8 @@ export function realSky(when: Date, lat = DEFAULT_LAT, lng = DEFAULT_LNG): RealS
 }
 
 // ---------------------------------------------------------------- your projects, as gold constellations
-export interface ProjectIn { id: string; seed?: string; steps: { lit: boolean }[]; dim?: number }
-export interface ProjectOut { stars: { x: number; y: number; lit: boolean }[]; lines: [number, number, number, number][]; label: { x: number; y: number; t: string }; dim: number }
+export interface ProjectIn { id: string; name?: string; seed?: string; steps: { lit: boolean }[]; dim?: number }
+export interface ProjectOut { stars: { x: number; y: number; lit: boolean }[]; lines: [number, number, number, number][]; label: { x: number; y: number; name: string; t: string }; dim: number }
 /** Open patches of sky for project constellations: clear of the motto's zone, the arc, the weather box and each other. */
 export const SLOTS: { cx: number; cy: number; w: number; h: number }[] = [
   { cx: 592, cy: 228, w: 250, h: 78 },
@@ -245,6 +245,11 @@ export const SLOTS: { cx: number; cy: number; w: number; h: number }[] = [
   { cx: 394, cy: 94, w: 110, h: 96 },
   { cx: 1290, cy: 72, w: 150, h: 76 },
 ];
+/** A project's name for its label: plain text, at most 18 characters (labels must not reach the next constellation). */
+export function shortName(name?: string) {
+  const t = String(name || "").replace(/\[([^\]]+)\]\([^)]+\)/g, "$1").replace(/[*_`#]/g, "").replace(/\s+/g, " ").trim().toUpperCase();
+  return t.length > 18 ? t.slice(0, 17).replace(/[\s,.;:–-]+$/, "") + "…" : t;
+}
 export function placeProjects(ps: ProjectIn[]): ProjectOut[] {
   return ps.slice(0, SLOTS.length).map((p, i) => {
     const slot = SLOTS[i], n = Math.max(2, Math.min(9, p.steps.length));
@@ -258,7 +263,7 @@ export function placeProjects(ps: ProjectIn[]): ProjectOut[] {
     const stars = shape.pts.map((q, k) => ({ x: ox + q.x * s, y: oy + q.y * s, lit: k < Math.round((litCount / p.steps.length) * n) }));
     const lines = shape.links.map(([a, b]) => [stars[a].x, stars[a].y, stars[b].x, stars[b].y] as [number, number, number, number]);
     const bottom = Math.max(...stars.map((q) => q.y));
-    return { stars, lines, label: { x: slot.cx, y: Math.min(slot.cy + slot.h / 2 + 4, bottom + 14), t: `${litCount} / ${p.steps.length}` }, dim: p.dim || 0 };
+    return { stars, lines, label: { x: slot.cx, y: Math.min(slot.cy + slot.h / 2 + 4, bottom + 14), name: shortName(p.name), t: `${litCount} / ${p.steps.length}` }, dim: p.dim || 0 };
   });
 }
 
