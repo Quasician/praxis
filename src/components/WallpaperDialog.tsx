@@ -62,7 +62,7 @@ export function WallpaperBody() {
           </p>
           <ul className="wp-notes">
             <li>Your mottos folder is only read, never changed. New mottos you add show up within the hour.</li>
-            <li>Task names never appear on your wallpaper; your projects show only as stars.</li>
+            <li>Task names never appear on your wallpaper; your projects show as constellations with their names.</li>
             <li>Weather comes from the US National Weather Service (weather.gov), checked every 15 minutes.</li>
             <li>{st.saved && (st.saved.status & 2) ? "Turning this off puts your Windows slideshow back as it was." : "Turning this off puts your previous wallpaper back."}</li>
           </ul>

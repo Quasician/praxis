@@ -82,6 +82,18 @@ namespace PraxisWall {
     [StructLayout(LayoutKind.Sequential)] public struct POINT { public int X, Y; }
     [DllImport("user32.dll")] static extern IntPtr MonitorFromPoint(POINT pt, uint flags);
     [DllImport("user32.dll")] static extern bool ScreenToClient(IntPtr h, ref POINT p);
+    [DllImport("user32.dll")] static extern bool ClientToScreen(IntPtr h, ref POINT p);
+    [DllImport("user32.dll")] static extern bool GetClientRect(IntPtr h, out RECT r);
+    [DllImport("user32.dll", EntryPoint = "GetWindowLongPtrW")] static extern IntPtr GetWindowLongPtr(IntPtr h, int i);
+    [DllImport("user32.dll", EntryPoint = "SetWindowLongPtrW")] static extern IntPtr SetWindowLongPtr(IntPtr h, int i, IntPtr v);
+    /** Where the window's content (its client area) actually is on screen: the border Windows keeps around a frameless
+     *  window (invisible, about 10 px at 125%) means the window's outside edge and its content don't line up. */
+    static RECT ClientOnScreen(IntPtr me) {
+      RECT c; GetClientRect(me, out c);
+      POINT o = new POINT(); ClientToScreen(me, ref o);
+      RECT r; r.Left = o.X; r.Top = o.Y; r.Right = o.X + (c.Right - c.Left); r.Bottom = o.Y + (c.Bottom - c.Top);
+      return r;
+    }
 
     /** Puts a window behind the desktop icons, over the wallpaper, covering the main screen. */
     public static string Attach(long hwnd, int w, int h) {
@@ -102,6 +114,16 @@ namespace PraxisWall {
       // Windows 11 24H2 and later: the WorkerW lives inside Progman, under the icons.
       if (target == IntPtr.Zero) { target = FindWindowEx(progman, IntPtr.Zero, "WorkerW", null); if (target != IntPtr.Zero) how = "progman-workerw"; }
       if (target == IntPtr.Zero) { target = progman; how = "progman"; }
+      // 5.1.2: make it a plain child window with no frame at all before moving it in. A frameless Electron window still has
+      // a resize border; behind the icons that border pushed the picture about 10 px right (and down), leaving a strip of the
+      // still wallpaper showing on the left.
+      long style = GetWindowLongPtr(me, -16).ToInt64();
+      style &= ~(0x80000000L | 0x00C00000L | 0x00040000L | 0x00080000L | 0x00020000L | 0x00010000L);   // POPUP, CAPTION, THICKFRAME, SYSMENU, MINIMIZEBOX, MAXIMIZEBOX
+      style |= 0x40000000L | 0x10000000L;                                                               // CHILD, VISIBLE
+      SetWindowLongPtr(me, -16, new IntPtr(style));
+      long ex = GetWindowLongPtr(me, -20).ToInt64();
+      ex &= ~(0x00000001L | 0x00000100L | 0x00000200L | 0x00020000L);                                    // DLGMODALFRAME, WINDOWEDGE, CLIENTEDGE, STATICEDGE
+      SetWindowLongPtr(me, -20, new IntPtr(ex));
       SetParent(me, target);
       // Cover the main screen exactly: take its rectangle on the desktop and convert it into the parent's own coordinates
       // (the parent isn't always at the desktop's corner, so offsetting by the virtual screen alone can land it off to one side).
@@ -113,20 +135,22 @@ namespace PraxisWall {
         ScreenToClient(target, ref p);
         x = p.X; y = p.Y; w = mi.rcMonitor.Right - mi.rcMonitor.Left; h = mi.rcMonitor.Bottom - mi.rcMonitor.Top;
       } else { x = -GetSystemMetrics(76); y = -GetSystemMetrics(77); }
-      SetWindowPos(me, IntPtr.Zero, x, y, w, h, 0x0004 | 0x0010 | 0x0040);
-      // Measure where it actually landed on screen and nudge it until it matches the main screen
-      // (the parent's coordinates can be offset or DPI-scaled in ways a single conversion gets wrong).
+      SetWindowPos(me, IntPtr.Zero, x, y, w, h, 0x0004 | 0x0010 | 0x0040 | 0x0020);   // ... | FRAMECHANGED (the new style takes effect)
+      // Measure where its content actually landed on screen and nudge it until the content matches the main screen exactly
+      // (the parent's coordinates can be offset or DPI-scaled in ways a single conversion gets wrong, and any frame left
+      // over sits between the window's edge and its content).
       int tl = mi.rcMonitor.Left, tt = mi.rcMonitor.Top, tw = mi.rcMonitor.Right - mi.rcMonitor.Left, th = mi.rcMonitor.Bottom - mi.rcMonitor.Top;
-      if (tw > 0 && th > 0) for (int i = 0; i < 4; i++) {
-        RECT got; if (!GetWindowRect(me, out got)) break;
+      if (tw > 0 && th > 0) for (int i = 0; i < 6; i++) {
+        RECT got = ClientOnScreen(me);
         int gw = got.Right - got.Left, gh = got.Bottom - got.Top;
         if (got.Left == tl && got.Top == tt && gw == tw && gh == th) break;
-        if (gw > 0 && gh > 0) { w = (int)Math.Round((double)w * tw / gw); h = (int)Math.Round((double)h * th / gh); }
+        w += tw - gw; h += th - gh;
         x += tl - got.Left; y += tt - got.Top;
         SetWindowPos(me, IntPtr.Zero, x, y, w, h, 0x0004 | 0x0010 | 0x0040);
       }
       if (how == "progman") { IntPtr dv = FindWindowEx(progman, IntPtr.Zero, "SHELLDLL_DefView", null); if (dv != IntPtr.Zero) SetWindowPos(me, dv, x, y, w, h, 0x0010 | 0x0040); }
-      return how + " " + x + "," + y + " " + w + "x" + h;
+      RECT fin = ClientOnScreen(me);
+      return how + " " + x + "," + y + " " + w + "x" + h + " content " + fin.Left + "," + fin.Top + " " + (fin.Right - fin.Left) + "x" + (fin.Bottom - fin.Top);
     }
     /** "full" when the window in front covers its whole screen (a game, a full-screen video), else "normal". */
     public static string Foreground() {

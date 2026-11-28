@@ -1,7 +1,7 @@
 // 5.1 the living sky: the maths behind the wallpaper (no drawing).
 import test from "node:test";
 import assert from "node:assert/strict";
-import { ARC, MOTTO_ZONE, SLOTS, TRAIL_FADE, historyStars, lightAt, mottoFit, onArc, placeProjects, realSky, skyWeather, trailOf } from "../src/livingsky/model";
+import { ARC, MOTTO_ZONE, SLOTS, TRAIL_FADE, historyStars, lightAt, mottoFit, onArc, placeProjects, realSky, shortName, skyWeather, trailOf } from "../src/livingsky/model";
 
 const at = (s: string) => new Date(s);   // tests run in America/Los_Angeles
 
@@ -78,6 +78,15 @@ test("constellations: every slot stays clear of the motto zone, the arc and the 
   const placed = placeProjects([{ id: "a", steps: [{ lit: true }, { lit: true }, { lit: false }, { lit: false }, { lit: false }] }]);
   assert.equal(placed[0].stars.filter((s) => s.lit).length, 2);
   assert.equal(placed[0].label.t, "2 / 5");
+});
+
+test("constellations: each is labelled with its project's name, kept short", () => {
+  const placed = placeProjects([{ id: "a", name: "Praxis 5.0", steps: [{ lit: true }, { lit: false }] }, { id: "b", steps: [{ lit: false }] }]);
+  assert.equal(placed[0].label.name, "PRAXIS 5.0");
+  assert.equal(placed[1].label.name, "");
+  assert.equal(shortName("Learn the **Moonlight** sonata, all three movements"), "LEARN THE MOONLIG…");
+  assert.equal(shortName("[Arete](https://github.com/Quasician/arete) v1"), "ARETE V1");
+  assert.equal(shortName("Moonlight Sonata, first movement"), "MOONLIGHT SONATA…");
 });
 
 test("history: one star per finished thing in the last year, today on the right, older days dimmer", () => {

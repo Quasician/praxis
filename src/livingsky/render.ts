@@ -313,8 +313,16 @@ export class LivingSkyRenderer {
           g.beginPath(); g.arc(s.x, s.y, 2.6, 0, Math.PI * 2); g.fill(); g.stroke();
         }
       }
-      g.globalAlpha = o * 0.9; g.fillStyle = "#ffe2b0"; g.font = `400 10.5px ${FONT}`; g.textAlign = "center"; g.textBaseline = "top";
-      g.shadowColor = "rgba(5,10,30,0.5)"; g.shadowBlur = 6 * k; g.fillText(p.label.t, p.label.x, p.label.y); g.shadowBlur = 0;
+      // The project's name, then how far along it is ("PRAXIS 5.0  3 / 5"), centred under the constellation.
+      g.save(); g.globalAlpha = o * 0.95; g.fillStyle = "#ffe2b0"; g.textBaseline = "top"; g.textAlign = "left";
+      g.shadowColor = "rgba(5,10,30,0.55)"; g.shadowBlur = 6 * k;
+      const ls = g as Ctx & { letterSpacing: string };
+      g.font = `600 10px ${FONT}`; ls.letterSpacing = "1.6px"; const nw = p.label.name ? g.measureText(p.label.name).width : 0;
+      g.font = `400 10px ${FONT}`; ls.letterSpacing = "0.6px"; const cw = g.measureText(p.label.t).width;
+      const gap = p.label.name ? 8 : 0, x0 = p.label.x - (nw + gap + cw) / 2;
+      if (p.label.name) { g.font = `600 10px ${FONT}`; ls.letterSpacing = "1.6px"; g.fillText(p.label.name, x0, p.label.y); }
+      g.globalAlpha = o * 0.8; g.font = `400 10px ${FONT}`; ls.letterSpacing = "0.6px"; g.fillText(p.label.t, x0 + nw + gap, p.label.y);
+      ls.letterSpacing = "0px"; g.restore();
     }
 
     // ---- rain or snow, in a still picture (the moving wallpaper slides its own layer instead)
