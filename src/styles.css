@@ -1856,3 +1856,5 @@ dialog.settings-dialog { width: min(980px, calc(100vw - 40px)); max-width: none;
 .switch-row input[type=time], .switch-row select { width: auto; height: auto; margin-left: auto; }
 .planner-form label.switch-row.rem-select { justify-content: space-between; }
 .settings-body .planner-form, .settings-body form { padding: 0; max-height: none; overflow: visible; }
+/* 5.1: the living sky's falling rain or snow: a ready-made layer slid along by the graphics card (see ValleyPage). */
+.valley-holder canvas.sky-precip { position: absolute; inset: auto; display: block; pointer-events: none; will-change: transform; object-fit: fill; }

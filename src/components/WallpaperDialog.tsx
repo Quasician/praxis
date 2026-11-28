@@ -1,4 +1,4 @@
-// 3.4: your mottos on a living scene, as the Windows wallpaper (the city since 3.9; the valley was retired in 4.4). Opt-in; turning it off puts your slideshow back.
+// 3.4: your mottos on a living scene, as the Windows wallpaper (the living sky since 5.1; the city before it). Opt-in; turning it off puts your slideshow back.
 import { useEffect, useState } from "react";
 import { api } from "../lib/api";
 import { toast, useUi } from "../state/ui";
@@ -10,7 +10,7 @@ interface WState {
   current?: { name: string } | null; last?: { at: string; motto: string; ms: number } | null; error?: string | null;
   saved?: { status: number; folder: string } | null;
   useWeather?: boolean; weather?: { kind: string; text: string; station?: string; source: string; at: string } | null; liveHow?: string | null;
-  scene?: "valley" | "city"; city?: { folder: string; found: number; total: number };
+  scene?: "valley" | "city" | "sky";
 }
 
 export function WallpaperDialog() {
@@ -33,31 +33,24 @@ export function WallpaperBody() {
     finally { setBusy(null); }
   };
   const folder = st?.folder || st?.saved?.folder || st?.defaultFolder || "";
-  const cityReady = !!st?.city && st.city.found === st.city.total;
 
   return (
     <div className="planner-form wallpaper-form" id="wallpaper-form">
-      <h2>Your mottos on the city</h2>
-      <p className="dialog-sub">Your desktop becomes a living scene behind your mottos: the season follows the calendar, the light follows the real sun and moon here, your projects shine as constellations, and the motto changes on the hour.</p>
+      <h2>Your mottos on the living sky</h2>
+      <p className="dialog-sub">Your desktop becomes a living sky behind your mottos: the light follows the real sun and moon here, the real stars come out at night, the clouds follow the weather, your projects shine as gold constellations, your last year of finished things glows along the horizon, and the motto changes on the hour.</p>
       {!desktop && <p className="dialog-note">This works in the Praxis desktop app.</p>}
       {desktop && st && (
         <>
           <label className="switch-row"><input type="checkbox" id="wp-enabled" checked={!!st.enabled} disabled={!!busy}
             onChange={(e) => act(e.target.checked ? "enable" : "disable", e.target.checked ? "Drawing your first one…" : "Putting your wallpaper back…")} />
             <span>Use it as my desktop wallpaper</span></label>
-          {st.city && (
-            <div className="form-row wp-folder"><span className="form-label">City paintings</span>
-              <span className="wp-path" id="wp-city-folder" title={st.city.folder}>{st.city.folder}</span>
-              <button type="button" className="ghost-btn" id="wp-pick-city" disabled={!!busy} onClick={() => act("pick-city-folder", "Choosing…")}>Change…</button>
-            </div>)}
-          {st.city && !cityReady && <p className="dialog-note" id="wp-city-note">{st.city.found ? `${st.city.found} of ${st.city.total} city paintings found there.` : "No city paintings found there yet."} The city needs all 32 paintings (spring-dawn.png … winter-overcast.png) and the 4 season masks in one folder.</p>}
           <label className="switch-row"><input type="checkbox" id="wp-weather" checked={st.useWeather !== false} disabled={!!busy || !st.enabled}
             onChange={(e) => act(e.target.checked ? "weather-on" : "weather-off", "Checking the weather…")} />
             <span>Match the real weather here {st.weather && st.useWeather !== false ? <em className="wp-wx" id="wp-wx">· now: {st.weather.text.toLowerCase()}{st.weather.station ? ` (${st.weather.station})` : ""}</em> : null}</span></label>
           <label className="switch-row"><input type="checkbox" id="wp-live" checked={!!st.live} disabled={!!busy || !st.enabled}
             onChange={(e) => act(e.target.checked ? "live-on" : "live-off", e.target.checked ? "Starting the moving wallpaper…" : "Stopping it…")} />
-            <span>Make it move: twinkling stars, falling rain or snow <em className="wp-wx">(experimental)</em></span></label>
-          {st.live && <p className="dialog-note" id="wp-live-note">The city holds still while a full-screen app is in front, when the PC is locked, and on battery. If it ever stops showing, Praxis keeps the still picture underneath.</p>}
+            <span>Keep it live: a fresh sky every minute, with falling rain or snow</span></label>
+          {st.live && <p className="dialog-note" id="wp-live-note">The sky holds still while a full-screen app is in front, when the PC is locked, and on battery. Between minutes it is a still picture, so it never slows down switching windows. If it ever stops showing, Praxis keeps the still picture underneath.</p>}
           <div className="form-row wp-folder"><span className="form-label">Mottos from</span>
             <span className="wp-path" id="wp-folder" title={folder}>{folder}</span>
             <button type="button" className="ghost-btn" id="wp-pick" disabled={!!busy} onClick={() => act("pick-folder", "Choosing…")}>Change…</button>

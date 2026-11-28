@@ -1,4 +1,4 @@
-// The valley as your Windows wallpaper (3.4).
+// Your mottos on a living scene, as your Windows wallpaper (3.4; the living sky since 5.1, the city before it).
 //   • Opt-in. Turning it on remembers how your desktop was (a slideshow of your Mottos folder, say); turning it off puts it back.
 //   • A hidden window draws the picture (src/valley); this module picks the motto, says when to redraw, and hands the file to Windows.
 //   • Your Mottos folder is only ever read. Pictures go to Praxis's own folder (two files, alternating).
@@ -99,7 +99,19 @@ function projectsOf(cfg: Cfg) {
   const sky = cfg.sky as { cons?: Record<string, SkyConstellation> } | undefined;
   const live = Object.entries(sky?.cons || {}).filter(([, c]) => !c.finished && c.steps?.length).sort((a, b) => (b[1].since || "").localeCompare(a[1].since || "")).slice(0, 7);
   // 4.0: a project with no star lit for a while fades here too (its colour is mixed toward the night sky).
-  return live.map(([id, c], i) => ({ id, seed: c.seed, color: fade(COLORS[i % COLORS.length], dimOf(c)), steps: c.steps.map((s) => ({ lit: !!s.done, min: s.min || 20 })) }));
+  return live.map(([id, c], i) => ({ id, seed: c.seed, dim: dimOf(c), color: fade(COLORS[i % COLORS.length], dimOf(c)), steps: c.steps.map((s) => ({ lit: !!s.done, min: s.min || 20 })) }));
+}
+const ymdLocal = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+/** 5.1: your last year of finished things for the living sky's horizon: loose tasks per day (the sky's stardust) and the days
+ *  project steps were finished (they show as larger, gold stars). Counts and dates only; no names leave the sky record. */
+export function historyOf(cfg: Cfg, now = Date.now()) {
+  const sky = cfg.sky as { cons?: Record<string, SkyConstellation>; dust?: Record<string, number> } | undefined;
+  const cutoff = now - 366 * 864e5, milestones: string[] = [];
+  for (const c of Object.values(sky?.cons || {})) for (const s of c.steps || []) {
+    const t = s.done ? Date.parse(s.done) : NaN;
+    if (t >= cutoff && t <= now) milestones.push(ymdLocal(new Date(t)));
+  }
+  return { days: { ...(sky?.dust || {}) }, milestones };
 }
 
 export function createWallpaper(deps: WallpaperDeps) {
@@ -108,8 +120,10 @@ export function createWallpaper(deps: WallpaperDeps) {
   let busy = false, lastKey = "", locked = false;
   const defaultFolder = path.join(app.getPath("pictures"), "Mottos");
   const defaultCity = path.join(app.getPath("pictures"), "Praxis city kit", "keyframes-5k");
-  // 4.4: the valley is retired; the city is the wallpaper's only scene (an old "valley" setting is read as the city).
-  const sceneOf = (_w: WallpaperCfg) => "city" as const;
+  // 5.1: the living sky replaces the city (the valley was retired in 4.4); an old "valley" or "city" setting is read as the sky.
+  const sceneOf = (_w: WallpaperCfg) => "sky" as const;
+  /** What the sky needs beyond the motto: the forecast's symbol, the wind, your year and where you are. */
+  const skyExtras = () => { const w = cfgOf(), x = weatherNow(); return { icon: x?.icon || null, wind: x?.wind ?? 0.25, history: historyOf(deps.readConfig()), lat: w.lat ?? DEFAULT_LAT, lng: w.lng ?? DEFAULT_LNG }; };
   const cfgOf = (): WallpaperCfg => (deps.readConfig().wallpaper as WallpaperCfg) || {};
   const save = (patch: Partial<WallpaperCfg>) => { const c = deps.readConfig(); deps.writeConfig({ ...c, wallpaper: { ...((c.wallpaper as WallpaperCfg) || {}), ...patch } }); };
   const folderOf = (w: WallpaperCfg) => w.folder || defaultFolder;
@@ -270,7 +284,7 @@ export function createWallpaper(deps: WallpaperDeps) {
   async function feedLive() {
     if (!live || live.isDestroyed()) return;
     const now = new Date(), wx = weatherNow();
-    const job = { when: now.toISOString(), weather: wx?.kind || "clear", wind: wx?.wind ?? 0.2, motto: cfgOf().current?.name || pickMotto(cfgOf(), now), projects: projectsOf(deps.readConfig()), events: eventsOf(deps.readConfig()), scene: sceneOf(cfgOf()), temp: tempNow() };
+    const job = { when: now.toISOString(), weather: wx?.kind || "clear", motto: cfgOf().current?.name || pickMotto(cfgOf(), now), projects: projectsOf(deps.readConfig()), events: eventsOf(deps.readConfig()), scene: sceneOf(cfgOf()), temp: tempNow(), ...skyExtras() };
     await live.webContents.executeJavaScript(`window.__valley.live(${JSON.stringify(job)})`).catch((e) => deps.log("live feed failed", e?.message || e));
     syncPause();
   }
@@ -286,7 +300,7 @@ export function createWallpaper(deps: WallpaperDeps) {
     const projects = projectsOf(deps.readConfig()), events = eventsOf(deps.readConfig());
     await refreshWeather();
     const wx = weatherNow(), temp = tempNow();
-    const key = `${sceneOf(w)}|${temp ? `${temp.now}/${temp.hi}/${temp.lo}/${temp.icon}` : ""}|${motto}|${Math.floor((now.getHours() * 60 + now.getMinutes()) / 10)}|${now.toDateString()}|${JSON.stringify(projects.map((p) => p.steps.filter((s) => s.lit).length))}|${wx?.kind}|${Math.round((wx?.wind ?? 0) * 4)}|${events.meteorAt || ""}|${events.aurora}`;
+    const key = `${sceneOf(w)}|${temp ? `${temp.now}/${temp.hi}/${temp.lo}/${temp.icon}` : ""}|${motto}|${Math.floor((now.getHours() * 60 + now.getMinutes()) / 10)}|${now.toDateString()}|${JSON.stringify(projects.map((p) => p.steps.filter((s) => s.lit).length))}|${wx?.kind}|${Math.round((wx?.wind ?? 0) * 4)}|${events.meteorAt || ""}|${events.aurora}|${historyOf(deps.readConfig()).days[ymdLocal(now)] || 0}|${wx?.icon || ""}`;
     if (!force && key === lastKey) return;
     busy = true;
     try {
@@ -300,7 +314,7 @@ export function createWallpaper(deps: WallpaperDeps) {
         return;
       }
       const v = await ensureWindow();
-      const job = { when: now.toISOString(), weather: wx?.kind || "clear", motto, projects, events, scene: sceneOf(w), temp, ...size() };
+      const job = { when: now.toISOString(), weather: wx?.kind || "clear", motto, projects, events, scene: sceneOf(w), temp, ...skyExtras(), ...size() };
       const out = await v.webContents.executeJavaScript(`window.__valley.wallpaper(${JSON.stringify(job)})`) as { file: string; ms: number };
       await helper(["set", out.file, "4"], deps.log);
       lastKey = key;

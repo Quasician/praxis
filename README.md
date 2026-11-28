@@ -116,6 +116,20 @@ Praxis is built to be easy on the eyes on a big monitor all day:
 - **Readable type**: Atkinson Hyperlegible for text (designed for legibility) and Bricolage Grotesque for headings, bundled so they work offline.
 - **Calm motion**: finishing a task fills the circle and folds the row away; the focus timer is a ring that fills. If Windows has "Show animations" turned off, Praxis stops animating too.
 
+## The living sky (5.1)
+
+**A new wallpaper scene, replacing the city.** Your mottos now sit on a living sky, drawn at your screen's own resolution (sharp on a 5K2K screen), with nothing painted and nothing to download:
+
+- **The light follows the real sun and moon here**, timed from today's sunrise and sunset. The sun and moon travel one arc across the sky and leave glowing trails, gold for the sun and silver-blue for the moon; each part of a trail fades over eight hours, so it's gone before the other one gets there.
+- **The real stars over Milpitas** come out at night, where they actually are (looking south): Pegasus and the Pleiades on a November evening, Orion later, Leo before dawn. The moon shows its real phase.
+- **The real weather**: clouds lit by the time of day (white at noon, peach and lilac low in the sky, moonlit at night), fog lying over the hills, rain or snow falling, the wind drifting the clouds.
+- **Your projects are gold constellations**, a star lit for each finished step, with how far along each one is ("3 / 5"). Names still never appear on the wallpaper.
+- **Your last year glows along the horizon**: one star for each thing you finished, oldest on the left and today on the right, with finished project steps as larger gold stars. A busy month is a bright stretch; a quiet one shows as a gap.
+- **The motto** is the lettering from your motto picture, sized to fit between the stars and the horizon: long mottos shrink a little instead of running into anything.
+- **No more lag when switching windows.** The moving wallpaper used to redraw the whole 5K picture twelve times a second, and pausing and resuming it (as you switched in and out of full-screen apps) could leave several redraw loops running at once. The sky draws one picture a minute and holds still in between; falling rain or snow is a ready-made layer the graphics card slides along. The city and valley's moving version also can't stack loops any more.
+
+The city kit folder isn't used any more (Praxis never changed it, so it's still there).
+
 ## Your day, as it happened (5.0)
 
 - **Plan next to what happened.** Finished blocks stay on the day in their place, ticked (with how long they really took, when you said). A block you moved once its time had come leaves a faint dashed outline: "Moved to 4:30 PM →" (or "Moved off today"). A block you skipped is struck through and hatched, with your reason on hover; one you partly did is half-filled. Praxis keeps a light trace of where each block sat in the day's record to draw this.
